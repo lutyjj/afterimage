@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM oidc_flows WHERE binding_hash = ? AND expires_at > ?\n             RETURNING state, nonce, pkce_verifier",
+  "describe": {
+    "columns": [
+      {
+        "name": "state",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "oidc_flows",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "name": "nonce",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "oidc_flows",
+            "name": "nonce"
+          }
+        }
+      },
+      {
+        "name": "pkce_verifier",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "oidc_flows",
+            "name": "pkce_verifier"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1b1dd31ba16192f0ae2094ee8152ea2aa58b89975fe437bf842919b86908b1a6"
+}

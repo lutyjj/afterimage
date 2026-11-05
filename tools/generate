@@ -1,13 +1,16 @@
 #!/bin/sh
-# Generates the contract into gen/: the device API's Rust server crate and its OpenAPI
-# document. The Nix contract build (deploy/nix/contract.nix) runs this script too, so
-# it alone owns the layout.
+# Generates the contract into gen/: for each service its Rust server crate and its
+# OpenAPI document, and the management API's TypeScript client. The Nix contract
+# build (deploy/nix/contract.nix) runs this script too, so it alone owns the layout.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 rm -rf build/smithy
 smithy build
-rm -rf gen/device-api gen/device-api.openapi.json
+rm -rf gen/device-api gen/device-api.openapi.json gen/management-api gen/management-api.openapi.json gen/management-client
 mkdir -p gen
-cp -r build/smithy/source/rust-server-codegen gen/device-api
-cp build/smithy/source/openapi/DeviceApi.openapi.json gen/device-api.openapi.json
+cp -r build/smithy/device/rust-server-codegen gen/device-api
+cp build/smithy/device/openapi/DeviceApi.openapi.json gen/device-api.openapi.json
+cp -r build/smithy/management/rust-server-codegen gen/management-api
+cp build/smithy/management/openapi/Management.openapi.json gen/management-api.openapi.json
+cp -r build/smithy/management/typescript-client-codegen gen/management-client

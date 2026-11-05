@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT accounts.id, accounts.name, accounts.username\n             FROM sessions JOIN accounts ON accounts.id = sessions.account_id\n             WHERE sessions.token_hash = ? AND sessions.expires_at > ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "username",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "username"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "3789df7580792228c143401f64e620b6ec93c1a5cda9c9b9daec02344de45293"
+}

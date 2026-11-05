@@ -2,16 +2,18 @@ use std::io::IsTerminal;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use clap::Parser;
+use afterimage_server::app;
 use afterimage_server::clock::SystemClock;
 use afterimage_server::config::Config;
-use afterimage_server::device_api;
-use afterimage_server::registrations::Registrations;
-use afterimage_server::secrets::OsEntropy;
+use afterimage_server::keys::OsEntropy;
+use afterimage_server::secrets::Secrets;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    let config = Config::parse();
     // Colour only for a terminal: a service journal would store the escape codes.
     tracing_subscriber::fmt()
         .with_ansi(std::io::stdout().is_terminal())
@@ -19,7 +21,7 @@ async fn main() -> ExitCode {
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .init();
-    match run().await {
+    match run(&config).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!("{error}");
@@ -28,18 +30,26 @@ async fn main() -> ExitCode {
     }
 }
 
-async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let config = Config::from_env()?;
-    std::fs::create_dir_all(&config.data_dir)?;
-    let registrations = Registrations::open(
-        &config.data_dir.join("afterimage.db"),
+async fn run(config: &Config) -> Result<(), Box<dyn std::error::Error>> {
+    let app = app::build(
+        config,
+        Secrets::from_env(),
         Arc::new(SystemClock),
         Arc::new(OsEntropy),
     )
     .await?;
     let listener = TcpListener::bind(config.bind).await?;
-    tracing::info!(bind = %config.bind, data = %config.data_dir.display(), "serving the TRMNL device API");
-    device_api::serve(listener, Arc::new(registrations), shutdown()).await?;
+    tracing::info!(
+        bind = %config.bind,
+        data = %config.data_dir.display(),
+        web = ?config.web_dir,
+        "serving"
+    );
+    // The generated `serve` bounds how long a client may take to send its request
+    // head, which matters for devices on an untrusted network.
+    afterimage_device_api::serve(listener, tower::make::Shared::new(app))
+        .with_graceful_shutdown(shutdown())
+        .await?;
     Ok(())
 }
 

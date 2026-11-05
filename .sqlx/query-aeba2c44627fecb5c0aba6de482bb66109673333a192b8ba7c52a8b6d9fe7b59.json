@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COUNT(*) FROM registrations",
+  "query": "SELECT COUNT(*) FROM registrations WHERE expires_at IS NOT NULL",
   "describe": {
     "columns": [
       {
@@ -17,5 +17,5 @@
       false
     ]
   },
-  "hash": "ccf6d0af60d4150503501dfecb21e524bcbc85ee48214b4bbd4e58eed2dcc23d"
+  "hash": "aeba2c44627fecb5c0aba6de482bb66109673333a192b8ba7c52a8b6d9fe7b59"
 }

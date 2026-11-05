@@ -1,0 +1,3314 @@
+{
+ "data": [
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--v2",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "780px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.8"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "TRMNL X",
+   "height": 1404,
+   "image_size_limit": 750000,
+   "image_upload_supported": true,
+   "kind": "trmnl",
+   "label": "TRMNL X",
+   "mime_type": "image/png",
+   "name": "v2",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "gray-16",
+    "gray-4",
+    "bw"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.8,
+   "width": 1872
+  },
+  {
+   "bit_depth": 1,
+   "colors": 2,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--og_png",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "TRMNL OG (1-bit)",
+   "height": 480,
+   "image_size_limit": 90000,
+   "image_upload_supported": true,
+   "kind": "trmnl",
+   "label": "TRMNL OG (1-bit)",
+   "mime_type": "image/png",
+   "name": "og_png",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--amazon_kindle_2024",
+     "size": "screen--sm"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.75"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "0.8"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Amazon Kindle 2024",
+   "height": 840,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "kindle",
+   "label": "Amazon Kindle 2024",
+   "mime_type": "image/png",
+   "name": "amazon_kindle_2024",
+   "offset_x": 75,
+   "offset_y": 25,
+   "palette_ids": [
+    "gray-256"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 1.75,
+   "width": 1400
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--amazon_kindle_paperwhite_6th_gen",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "600px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.28"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Amazon Kindle PW 6th Gen",
+   "height": 768,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "kindle",
+   "label": "Amazon Kindle PW 6th Gen",
+   "mime_type": "image/png",
+   "name": "amazon_kindle_paperwhite_6th_gen",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "gray-256"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 1.28,
+   "width": 1024
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--amazon_kindle_paperwhite_7th_gen",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "905px"
+     ],
+     [
+      "--screen-h",
+      "670px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.6"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Amazon Kindle PW 7th Gen",
+   "height": 1072,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "kindle",
+   "label": "Amazon Kindle PW 7th Gen",
+   "mime_type": "image/png",
+   "name": "amazon_kindle_paperwhite_7th_gen",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "gray-256"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 1.6,
+   "width": 1448
+  },
+  {
+   "bit_depth": 2,
+   "colors": 4,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--inkplate_10",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "550px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.5"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Inkplate 10",
+   "height": 825,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Inkplate 10",
+   "mime_type": "image/png",
+   "name": "inkplate_10",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.5,
+   "width": 1200
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--amazon_kindle_7",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "600px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Amazon Kindle 7",
+   "height": 600,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "kindle",
+   "label": "Amazon Kindle 7",
+   "mime_type": "image/png",
+   "name": "amazon_kindle_7",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "gray-256"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 1,
+   "colors": 2,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--playdate",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "400px"
+     ],
+     [
+      "--screen-h",
+      "240px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Playdate",
+   "height": 240,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Playdate",
+   "mime_type": "image/png",
+   "name": "playdate",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 400
+  },
+  {
+   "bit_depth": 1,
+   "colors": 2,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--inky_impression_7_3",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Inky Impression 7.3",
+   "height": 480,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Inky Impression 7.3",
+   "mime_type": "image/png",
+   "name": "inky_impression_7_3",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "color-7a",
+    "color-6a"
+   ],
+   "preview_white_point": "limited",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--kobo_libra_2",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "840px"
+     ],
+     [
+      "--screen-h",
+      "632px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Kobo Libra 2",
+   "height": 1264,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Kobo Libra 2",
+   "mime_type": "image/png",
+   "name": "kobo_libra_2",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 2.0,
+   "width": 1680
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--amazon_kindle_oasis_2",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "602px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.1"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Amazon Kindle Oasis 2",
+   "height": 1264,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "kindle",
+   "label": "Amazon Kindle Oasis 2",
+   "mime_type": "image/png",
+   "name": "amazon_kindle_oasis_2",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "gray-256"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 2.1,
+   "width": 1680
+  },
+  {
+   "bit_depth": 2,
+   "colors": 4,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--ogv2",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "TRMNL OG (2-bit)",
+   "height": 480,
+   "image_size_limit": 90000,
+   "image_upload_supported": true,
+   "kind": "trmnl",
+   "label": "TRMNL OG (2-bit)",
+   "mime_type": "image/png",
+   "name": "og_plus",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--kobo_aura_one",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "780px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.8"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Kobo Aura One",
+   "height": 1404,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Kobo Aura One",
+   "mime_type": "image/png",
+   "name": "kobo_aura_one",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.8,
+   "width": 1872
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--kobo_aura_hd",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "600px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.8"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Kobo Aura HD",
+   "height": 1080,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Kobo Aura HD",
+   "mime_type": "image/png",
+   "name": "kobo_aura_hd",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.8,
+   "width": 1440
+  },
+  {
+   "bit_depth": 1,
+   "colors": 2,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--inky_impression_13_3",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "600px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Inky Impression 13.3",
+   "height": 1200,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Inky Impression 13.3",
+   "mime_type": "image/png",
+   "name": "inky_impression_13_3",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "color-6a"
+   ],
+   "preview_white_point": "limited",
+   "rotation": 0,
+   "scale_factor": 2.0,
+   "width": 1600
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--m5_paper_s3",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "960px"
+     ],
+     [
+      "--screen-h",
+      "540px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "M5PaperS3",
+   "height": 540,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "M5PaperS3",
+   "mime_type": "image/png",
+   "name": "m5_paper_s3",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 960
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--amazon_kindle_scribe",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "992px"
+     ],
+     [
+      "--screen-h",
+      "744px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.5"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Amazon Kindle Scribe",
+   "height": 1860,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "kindle",
+   "label": "Amazon Kindle Scribe",
+   "mime_type": "image/png",
+   "name": "amazon_kindle_scribe",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "gray-256"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 2.5,
+   "width": 2480
+  },
+  {
+   "bit_depth": 2,
+   "colors": 4,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--ogv2",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Seeed E1001 Monochrome",
+   "height": 480,
+   "image_size_limit": 90000,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Seeed E1001 Monochrome",
+   "mime_type": "image/png",
+   "name": "seeed_e1001",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 4,
+   "colors": 6,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--ogv2",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Seeed E1002",
+   "height": 480,
+   "image_size_limit": 90000,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Seeed E1002",
+   "mime_type": "image/png",
+   "name": "seeed_e1002",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "color-6a",
+    "bw"
+   ],
+   "preview_white_point": "limited",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 2,
+   "colors": 4,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--ogv2",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Waveshare 4.26\" (2-bit)",
+   "height": 480,
+   "image_size_limit": 90000,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Waveshare 4.26\" (2-bit)",
+   "mime_type": "image/png",
+   "name": "waveshare_4_26",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 1,
+   "colors": 2,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--og",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Waveshare 7.5\" B/W",
+   "height": 480,
+   "image_size_limit": 90000,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Waveshare 7.5\" B/W",
+   "mime_type": "image/png",
+   "name": "waveshare_7_5_bw",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 24,
+   "colors": 16777216,
+   "description": "Tidbyt",
+   "height": 32,
+   "image_size_limit": null,
+   "image_upload_supported": false,
+   "kind": "tidbyt",
+   "label": "Tidbyt",
+   "mime_type": "image/webp",
+   "name": "tidbyt",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "color-24bit"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 64
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--generic_16_9",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "450px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.4"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Generic 16:9 Display",
+   "height": 1080,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Generic 16:9 Display",
+   "mime_type": "image/png",
+   "name": "generic_16_9",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16",
+    "gray-256",
+    "color-24bit"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 2.4,
+   "width": 1920
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--palma",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "824px"
+     ],
+     [
+      "--screen-h",
+      "412px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "0.8"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Onyx BOOX Palma",
+   "height": 824,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Onyx BOOX Palma",
+   "mime_type": "image/png",
+   "name": "palma",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "gray-256"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 2.0,
+   "width": 1648
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--onyx_boox_go_7",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "933px"
+     ],
+     [
+      "--screen-h",
+      "702px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.8008"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Onyx BOOX Go 7",
+   "height": 1264,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Onyx BOOX Go 7",
+   "mime_type": "image/png",
+   "name": "onyx_boox_go_7",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 1.8008,
+   "width": 1680
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--kobo_glo",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "788px"
+     ],
+     [
+      "--screen-h",
+      "591px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.2995"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Kobo Glo",
+   "height": 768,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Kobo Glo",
+   "mime_type": "image/png",
+   "name": "kobo_glo",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.2995,
+   "width": 1024
+  },
+  {
+   "bit_depth": 1,
+   "colors": 2,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--og",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Waveshare 7.5\" B/W/R",
+   "height": 480,
+   "image_size_limit": 90000,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Waveshare 7.5\" B/W/R",
+   "mime_type": "image/png",
+   "name": "waveshare_7_5_bwr",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "color-3bwr"
+   ],
+   "preview_white_point": "limited",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 1,
+   "colors": 2,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--og",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Waveshare 7.5\" B/W/R/Y",
+   "height": 480,
+   "image_size_limit": 90000,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Waveshare 7.5\" B/W/R/Y",
+   "mime_type": "image/png",
+   "name": "waveshare_7_5_bwry",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "color-4bwry"
+   ],
+   "preview_white_point": "limited",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 12,
+   "colors": 4096,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--onxy_boox_nova_air_c",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "780px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.8"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Onyx BOOX Nova Air C",
+   "height": 1404,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Onyx BOOX Nova Air C",
+   "mime_type": "image/png",
+   "name": "onxy_boox_nova_air_c",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16",
+    "gray-256",
+    "color-12bit"
+   ],
+   "preview_white_point": "limited",
+   "rotation": 90,
+   "scale_factor": 1.8,
+   "width": 1872
+  },
+  {
+   "bit_depth": 2,
+   "colors": 4,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--ogv2",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Xteink X4",
+   "height": 480,
+   "image_size_limit": 90000,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Xteink X4",
+   "mime_type": "image/png",
+   "name": "xteink_x4",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--nook_simple_touch",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "600px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Nook Simple Touch",
+   "height": 600,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "kindle",
+   "label": "Nook Simple Touch",
+   "mime_type": "image/png",
+   "name": "nook_simple_touch",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16",
+    "gray-256"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--kobo_sage",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1371px"
+     ],
+     [
+      "--screen-h",
+      "1028px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.4004"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Kobo Sage",
+   "height": 1440,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Kobo Sage",
+   "mime_type": "image/png",
+   "name": "kobo_sage",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.4004,
+   "width": 1920
+  },
+  {
+   "bit_depth": 1,
+   "colors": 2,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--og",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "TRMNL OG (B/W/R/Y)",
+   "height": 480,
+   "image_size_limit": 90000,
+   "image_upload_supported": true,
+   "kind": "trmnl",
+   "label": "TRMNL OG (B/W/R/Y)",
+   "mime_type": "image/png",
+   "name": "og_bwry",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "color-4bwry"
+   ],
+   "preview_white_point": "limited",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--amazon_kindle_voyage",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1034px"
+     ],
+     [
+      "--screen-h",
+      "765px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.4008"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Amazon Kindle Voyage",
+   "height": 1072,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "kindle",
+   "label": "Amazon Kindle Voyage",
+   "mime_type": "image/png",
+   "name": "amazon_kindle_voyage",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "gray-256"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 1.4008,
+   "width": 1448
+  },
+  {
+   "bit_depth": 2,
+   "colors": 4,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--inkplate_5_2",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1067px"
+     ],
+     [
+      "--screen-h",
+      "600px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.1996"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Inkplate 5.2",
+   "height": 720,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Inkplate 5.2",
+   "mime_type": "image/png",
+   "name": "inkplate_5_2",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.1996,
+   "width": 1280
+  },
+  {
+   "bit_depth": 24,
+   "colors": 16777216,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--raspberry_pi_touch_2",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1067px"
+     ],
+     [
+      "--screen-h",
+      "600px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.1996"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Raspberry Pi Touch 2",
+   "height": 720,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Raspberry Pi Touch 2",
+   "mime_type": "image/png",
+   "name": "raspberry_pi_touch_2",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "color-24bit"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.1996,
+   "width": 1280
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--ed133ut2",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "780px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.5385"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "ED133UT2 Active Matrix",
+   "height": 1200,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "ED133UT2 Active Matrix",
+   "mime_type": "image/png",
+   "name": "ed133ut2",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.5385,
+   "width": 1600
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--avalue_epd_42s",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "780px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.7692"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Avalue EPD-42S 42\" Display Board",
+   "height": 2160,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Avalue EPD-42S 42\" Display Board",
+   "mime_type": "image/png",
+   "name": "avalue_epd_42s",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 2.7692,
+   "width": 2880
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--kobo_touch",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "600px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Kobo Touch",
+   "height": 600,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Kobo Touch",
+   "mime_type": "image/png",
+   "name": "kobo_touch",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--kobo_forma",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1371px"
+     ],
+     [
+      "--screen-h",
+      "1028px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.4004"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Kobo Forma",
+   "height": 1440,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Kobo Forma",
+   "mime_type": "image/png",
+   "name": "kobo_forma",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.4004,
+   "width": 1920
+  },
+  {
+   "bit_depth": 24,
+   "colors": 16777216,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--openframe",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "OpenPeak OpenFrame",
+   "height": 480,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "OpenPeak OpenFrame",
+   "mime_type": "image/webp",
+   "name": "openframe",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16",
+    "gray-256",
+    "color-24bit"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--amazon_kindle_paperwhite_signature_11th_gen",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "600px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.06"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Amazon Kindle PW Signature 11th Gen",
+   "height": 1236,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "kindle",
+   "label": "Amazon Kindle PW Signature 11th Gen",
+   "mime_type": "image/png",
+   "name": "amazon_kindle_paperwhite_signature_11th_gen",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 2.06,
+   "width": 1648
+  },
+  {
+   "bit_depth": 2,
+   "colors": 4,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--inkplate_6_plus",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "770px"
+     ],
+     [
+      "--pixel-ratio",
+      "0.9846"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Inkplate 6 Plus",
+   "height": 758,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Inkplate 6 Plus",
+   "mime_type": "image/png",
+   "name": "inkplate_6_plus",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 0.9846,
+   "width": 1024
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--kobo_aura_h2o_2",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "785px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.375"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Kobo Aura H2O Edition 2",
+   "height": 1080,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Kobo Aura H2O Edition 2",
+   "mime_type": "image/png",
+   "name": "kobo_aura_h2o_2",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.375,
+   "width": 1430
+  },
+  {
+   "bit_depth": 1,
+   "colors": 2,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--inkplate_6_color",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "597px"
+     ],
+     [
+      "--pixel-ratio",
+      "0.75"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Inkplate 6COLOR",
+   "height": 448,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Inkplate 6COLOR",
+   "mime_type": "image/png",
+   "name": "inkplate_6_color",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "color-6a"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 0.75,
+   "width": 600
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--seeed_e1003",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "780px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.8"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Seeed E1003 (4-bit)",
+   "height": 1404,
+   "image_size_limit": 750000,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Seeed E1003 (4-bit)",
+   "mime_type": "image/png",
+   "name": "seeed_e1003",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "gray-16",
+    "gray-4",
+    "bw"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.8,
+   "width": 1872
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--seeed_e1004",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "780px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.5385"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Seeed E1004",
+   "height": 1200,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Seeed E1004",
+   "mime_type": "image/png",
+   "name": "seeed_e1004",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "color-6a"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 1.5385,
+   "width": 1600
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--onyx_boox_poke_5",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "1081px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.34"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Onyx BOOX Poke 5",
+   "height": 1448,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Onyx BOOX Poke 5",
+   "mime_type": "image/png",
+   "name": "onyx_boox_poke_5",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 1.34,
+   "width": 1072
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--remarkable_paper_2",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "780px"
+     ],
+     [
+      "--screen-h",
+      "1040px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.8"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "reMarkable 2",
+   "height": 1872,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "reMarkable 2",
+   "mime_type": "image/png",
+   "name": "remarkable_paper_2",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.8,
+   "width": 1404
+  },
+  {
+   "bit_depth": 24,
+   "colors": 16777216,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--meta_portal",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "650px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.2308"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Meta Portal",
+   "height": 800,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Meta Portal",
+   "mime_type": "image/webp",
+   "name": "meta_portal",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-16",
+    "color-24bit"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.2308,
+   "width": 1280
+  },
+  {
+   "bit_depth": 1,
+   "colors": 2,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--byod_custom",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Custom Device",
+   "height": 480,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Custom Device",
+   "mime_type": "image/png",
+   "name": "byod_custom",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16",
+    "gray-256",
+    "color-3bwr",
+    "color-3bwy",
+    "color-4bwry",
+    "color-6a",
+    "color-7a",
+    "color-12bit",
+    "color-24bit"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 2,
+   "colors": 4,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--waveshare_5_8_bw",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "593px"
+     ],
+     [
+      "--pixel-ratio",
+      "0.81"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Waveshare 5.83\" (Steam Machine)",
+   "height": 480,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Waveshare 5.83\" (Steam Machine)",
+   "mime_type": "image/png",
+   "name": "waveshare_5_8_bw",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 0.81,
+   "width": 648
+  },
+  {
+   "bit_depth": 1,
+   "colors": 2,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--inkplate_13_spectra",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "600px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Inkplate 13 Spectra",
+   "height": 1200,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Inkplate 13 Spectra",
+   "mime_type": "image/png",
+   "name": "inkplate_13_spectra",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "color-6a"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 2.0,
+   "width": 1600
+  },
+  {
+   "bit_depth": 24,
+   "colors": 16777216,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--tcl_nxtpaper_14",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "693px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.3077"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "TCL NxtPaper 14",
+   "height": 1600,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "TCL NxtPaper 14",
+   "mime_type": "image/webp",
+   "name": "tcl_nxtpaper_14",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 2.3077,
+   "width": 2400
+  },
+  {
+   "bit_depth": 12,
+   "colors": 4096,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--kobo_libra_color",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "602px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.1"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Kobo Libra Color",
+   "height": 1264,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Kobo Libra Color",
+   "mime_type": "image/png",
+   "name": "kobo_libra_color",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16",
+    "color-12bit"
+   ],
+   "preview_white_point": "limited",
+   "rotation": 0,
+   "scale_factor": 2.1,
+   "width": 1680
+  },
+  {
+   "bit_depth": 2,
+   "colors": 4,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--xteink_x3",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "533px"
+     ],
+     [
+      "--pixel-ratio",
+      "0.99"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Xteink X3",
+   "height": 528,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Xteink X3",
+   "mime_type": "image/png",
+   "name": "xteink_x3",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 0.99,
+   "width": 792
+  },
+  {
+   "bit_depth": 2,
+   "colors": 4,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--seeed_sticky",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "480px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Seeed Sticky",
+   "height": 480,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Seeed Sticky",
+   "mime_type": "image/png",
+   "name": "seeed_sticky",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 800
+  },
+  {
+   "bit_depth": 8,
+   "colors": 256,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--onyx_boox_go_10_3_lumi",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "992px"
+     ],
+     [
+      "--screen-h",
+      "744px"
+     ],
+     [
+      "--pixel-ratio",
+      "2.5"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Onyx BOOX Go 10.3 (Gen II) Lumi",
+   "height": 1860,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Onyx BOOX Go 10.3 (Gen II) Lumi",
+   "mime_type": "image/png",
+   "name": "onyx_boox_go_10_3_lumi",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "gray-256"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 2.5,
+   "width": 2480
+  },
+  {
+   "bit_depth": 24,
+   "colors": 16777216,
+   "description": "Vestaboard",
+   "height": 6,
+   "image_size_limit": null,
+   "image_upload_supported": false,
+   "kind": "vestaboard",
+   "label": "Vestaboard",
+   "mime_type": "image/png",
+   "name": "vestaboard",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "color-24bit"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.0,
+   "width": 22
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-1x",
+     "device": "screen--kobo_clara_2e",
+     "size": "screen--md"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "800px"
+     ],
+     [
+      "--screen-h",
+      "1081px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.34"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "1.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Kobo Clara 2E",
+   "height": 1448,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "byod",
+   "label": "Kobo Clara 2E",
+   "mime_type": "image/png",
+   "name": "kobo_clara_2e",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "bw",
+    "gray-4",
+    "gray-16"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 90,
+   "scale_factor": 1.34,
+   "width": 1072
+  },
+  {
+   "bit_depth": 4,
+   "colors": 16,
+   "css": {
+    "classes": {
+     "density": "screen--density-2x",
+     "device": "screen--joan_13",
+     "size": "screen--lg"
+    },
+    "variables": [
+     [
+      "--screen-w",
+      "1040px"
+     ],
+     [
+      "--screen-h",
+      "780px"
+     ],
+     [
+      "--pixel-ratio",
+      "1.5385"
+     ],
+     [
+      "--dither-pixel-ratio",
+      "2.0"
+     ],
+     [
+      "--device-ui-scale",
+      "1.0"
+     ],
+     [
+      "--gap-scale",
+      "1.0"
+     ]
+    ]
+   },
+   "description": "Joan 13",
+   "height": 1200,
+   "image_size_limit": null,
+   "image_upload_supported": true,
+   "kind": "joan",
+   "label": "Joan 13",
+   "mime_type": "image/png",
+   "name": "joan_13",
+   "offset_x": 0,
+   "offset_y": 0,
+   "palette_ids": [
+    "gray-16",
+    "gray-4",
+    "bw"
+   ],
+   "preview_white_point": "true_white",
+   "rotation": 0,
+   "scale_factor": 1.5385,
+   "width": 1600
+  }
+ ]
+}

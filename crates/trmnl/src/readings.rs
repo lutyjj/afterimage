@@ -38,6 +38,19 @@ impl Readings {
     }
 }
 
+/// The panel size from the `Width` and `Height` headers, when both read as pixels.
+#[must_use]
+pub fn panel_size(width: Option<&str>, height: Option<&str>) -> Option<(u32, u32)> {
+    let pixels = |text: Option<&str>| {
+        text?
+            .trim()
+            .parse::<u32>()
+            .ok()
+            .filter(|pixels| (1..=10_000).contains(pixels))
+    };
+    Some((pixels(width)?, pixels(height)?))
+}
+
 fn number(text: &str, low: f64, high: f64) -> Option<f64> {
     text.trim()
         .parse::<f64>()
@@ -77,6 +90,15 @@ mod tests {
         let readings =
             Readings::parse(Some("-1"), Some("101"), Some("-200"), Some(&"9".repeat(33)));
         assert_eq!(readings, Readings::default());
+    }
+
+    #[test]
+    fn reads_the_panel_size_when_both_sides_are_pixels() {
+        assert_eq!(panel_size(Some("800"), Some(" 480")), Some((800, 480)));
+        assert_eq!(panel_size(Some("800"), None), None);
+        assert_eq!(panel_size(Some("0"), Some("480")), None);
+        assert_eq!(panel_size(Some("-800"), Some("480")), None);
+        assert_eq!(panel_size(Some("800px"), Some("480")), None);
     }
 
     #[test]

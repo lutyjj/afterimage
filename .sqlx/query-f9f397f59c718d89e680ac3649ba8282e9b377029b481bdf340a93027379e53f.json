@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM registrations WHERE mac = ? AND id != ? AND expires_at IS NOT NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "f9f397f59c718d89e680ac3649ba8282e9b377029b481bdf340a93027379e53f"
+}

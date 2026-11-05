@@ -1,96 +1,67 @@
-//! Device keys and friendly IDs.
+//! The deployment's secrets, which data source requests read by name, such as a
+//! Home Assistant token. Each comes from an environment variable
+//! `AFTERIMAGE_SECRET_<NAME>`; screens name them and never hold them.
 
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+use std::ffi::OsString;
 
-/// Where randomness comes from, so that tests can script it.
-pub trait Entropy: Send + Sync + 'static {
-    fn fill(&self, buffer: &mut [u8]);
-}
+const PREFIX: &str = "AFTERIMAGE_SECRET_";
 
-/// The operating system's random number generator.
-pub struct OsEntropy;
+#[derive(Debug, Clone, Default)]
+pub struct Secrets(BTreeMap<String, String>);
 
-impl Entropy for OsEntropy {
-    fn fill(&self, buffer: &mut [u8]) {
-        getrandom::fill(buffer).expect("the operating system provides randomness");
+impl Secrets {
+    #[must_use]
+    pub fn from_env() -> Self {
+        Self::from_vars(std::env::vars_os())
     }
-}
 
-/// A new device access key: 256 random bits as unpadded base64url.
-pub fn new_key(entropy: &dyn Entropy) -> String {
-    let mut bytes = [0; 32];
-    entropy.fill(&mut bytes);
-    URL_SAFE_NO_PAD.encode(bytes)
-}
+    /// Reads `AFTERIMAGE_SECRET_<NAME>` variables whose name is letters, digits and
+    /// underscores and whose value is text, and skips the rest with a warning.
+    pub fn from_vars(vars: impl IntoIterator<Item = (OsString, OsString)>) -> Self {
+        let mut secrets = BTreeMap::new();
+        for (name, value) in vars {
+            let Some(name) = name.to_str().and_then(|name| name.strip_prefix(PREFIX)) else {
+                continue;
+            };
+            let valid =
+                !name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
+            if let (true, Ok(value)) = (valid, value.into_string()) {
+                secrets.insert(name.to_owned(), value);
+            } else {
+                tracing::warn!(
+                    variable = format!("{PREFIX}{name}"),
+                    "secret skipped: its name must be letters, digits and underscores, and its value text"
+                );
+            }
+        }
+        Self(secrets)
+    }
 
-/// What the server stores in place of a key.
-#[must_use]
-pub fn key_hash(key: &str) -> Vec<u8> {
-    Sha256::digest(key.as_bytes()).to_vec()
-}
+    #[must_use]
+    pub fn names(&self) -> Vec<String> {
+        self.0.keys().cloned().collect()
+    }
 
-/// Symbols for friendly IDs: digits and uppercase letters without 0, 1, I and O,
-/// which read alike on a small screen. 32 symbols, so a random byte maps without bias.
-const FRIENDLY_ALPHABET: &[u8; 32] = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-
-/// Length of a friendly ID: 30 bits, typed by hand to claim a device.
-pub const FRIENDLY_ID_LENGTH: usize = 6;
-
-/// A new friendly ID, such as `K7QM2X`.
-pub fn new_friendly_id(entropy: &dyn Entropy) -> String {
-    let mut bytes = [0; FRIENDLY_ID_LENGTH];
-    entropy.fill(&mut bytes);
-    bytes
-        .iter()
-        .map(|byte| char::from(FRIENDLY_ALPHABET[usize::from(byte % 32)]))
-        .collect()
+    #[must_use]
+    pub fn values(&self) -> &BTreeMap<String, String> {
+        &self.0
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    struct Fixed(u8);
-
-    impl Entropy for Fixed {
-        fn fill(&self, buffer: &mut [u8]) {
-            buffer.fill(self.0);
-        }
-    }
-
     #[test]
-    fn keys_carry_256_bits_in_url_safe_text() {
-        let key = new_key(&OsEntropy);
-        assert_eq!(key.len(), 43);
-        assert!(
-            key.bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-        );
-        assert_ne!(key, new_key(&OsEntropy));
-    }
-
-    #[test]
-    fn hashes_keys_with_sha256() {
-        // SHA-256 of "abc", from FIPS 180-2 appendix B.1.
-        assert_eq!(
-            key_hash("abc"),
-            [
-                0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde, 0x5d, 0xae,
-                0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff, 0x61,
-                0xf2, 0x00, 0x15, 0xad
-            ]
-        );
-    }
-
-    #[test]
-    fn friendly_ids_use_unambiguous_symbols() {
-        assert_eq!(new_friendly_id(&Fixed(0)), "222222");
-        assert_eq!(new_friendly_id(&Fixed(31)), "ZZZZZZ");
-        assert_eq!(new_friendly_id(&Fixed(32)), "222222");
-        let id = new_friendly_id(&OsEntropy);
-        assert_eq!(id.len(), FRIENDLY_ID_LENGTH);
-        assert!(id.bytes().all(|b| FRIENDLY_ALPHABET.contains(&b)));
+    fn takes_prefixed_variables_by_their_suffix() {
+        let secrets = Secrets::from_vars([
+            ("AFTERIMAGE_SECRET_HA_TOKEN".into(), "abc".into()),
+            ("AFTERIMAGE_SECRET_".into(), "empty name".into()),
+            ("AFTERIMAGE_SECRET_BAD-NAME".into(), "x".into()),
+            ("AFTERIMAGE_BIND".into(), "0.0.0.0:80".into()),
+        ]);
+        assert_eq!(secrets.names(), ["HA_TOKEN"]);
+        assert_eq!(secrets.values()["HA_TOKEN"], "abc");
     }
 }

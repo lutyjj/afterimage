@@ -10,20 +10,21 @@
 //! A device that runs setup again shows the new code; the registration it left
 //! behind goes idle. Unclaimed registrations end when they are not used: one whose
 //! key never checks in after [`UNUSED_SECONDS`], one that stops checking in after
-//! [`IDLE_SECONDS`]. A powered device checks in at least hourly. Each row carries
-//! the time it ends (`expires_at`), which setup and check-in set; every query treats
-//! an ended registration as gone, and setup deletes ended rows.
+//! [`IDLE_SECONDS`]. A powered device checks in at least hourly. Each unclaimed row
+//! carries the time it ends (`expires_at`), which setup and check-in set; every
+//! query treats an ended registration as gone, and setup deletes ended rows. A
+//! claimed registration has no end time. Claiming and removing devices
+//! ([`crate::devices`]) move registrations between those states in the same
+//! transactions that change the devices table.
 
-use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use afterimage_trmnl::{Mac, Readings};
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
+use sqlx::SqlitePool;
 
 use crate::clock::Clock;
-use crate::secrets::{self, Entropy};
+use crate::keys::{self, Entropy};
 
 /// How long a registration whose key never checks in holds its place.
 pub const UNUSED_SECONDS: i64 = 24 * 60 * 60;
@@ -45,6 +46,8 @@ pub enum Setup {
     Registered {
         key: String,
         friendly_id: String,
+        /// The model as stored: trimmed, at most [`MODEL_LENGTH`] visible ASCII.
+        model: String,
     },
     Refused(Refusal),
 }
@@ -57,7 +60,21 @@ pub enum Refusal {
     UnclaimedLimit,
 }
 
-/// A registration found by its key.
+/// What a check-in's key belongs to.
+#[derive(Debug, PartialEq, Eq)]
+pub enum CheckIn {
+    /// No live registration holds the key.
+    Unknown,
+    /// The device shows this code until someone claims it.
+    Unclaimed { friendly_id: String },
+    /// A device holds the registration.
+    Claimed { registration_id: i64 },
+    /// The device was removed with a reset. The answer erases its settings, and the
+    /// registration is gone.
+    Reset,
+}
+
+/// A live registration found by its key.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Registration {
     pub friendly_id: String,
@@ -67,8 +84,6 @@ pub struct Registration {
 pub enum Error {
     #[error("registration storage: {0}")]
     Storage(#[from] sqlx::Error),
-    #[error("registration storage migration: {0}")]
-    Migration(#[from] sqlx::migrate::MigrateError),
     #[error("no free friendly ID after {FRIENDLY_ID_ATTEMPTS} attempts")]
     FriendlyIdsExhausted,
 }
@@ -80,28 +95,13 @@ pub struct Registrations {
 }
 
 impl Registrations {
-    /// Opens the database at `path`, creating and migrating it as needed.
-    ///
-    /// # Errors
-    ///
-    /// When the database cannot be opened or migrated.
-    pub async fn open(
-        path: &Path,
-        clock: Arc<dyn Clock>,
-        entropy: Arc<dyn Entropy>,
-    ) -> Result<Self, Error> {
-        let options = SqliteConnectOptions::new()
-            .filename(path)
-            .create_if_missing(true)
-            .journal_mode(SqliteJournalMode::Wal)
-            .busy_timeout(Duration::from_secs(5));
-        let pool = SqlitePoolOptions::new().connect_with(options).await?;
-        sqlx::migrate!("./migrations").run(&pool).await?;
-        Ok(Self {
+    #[must_use]
+    pub fn new(pool: SqlitePool, clock: Arc<dyn Clock>, entropy: Arc<dyn Entropy>) -> Self {
+        Self {
             pool,
             clock,
             entropy,
-        })
+        }
     }
 
     /// Registers a device: a new key and friendly ID, whatever registrations its MAC
@@ -124,8 +124,8 @@ impl Registrations {
         let mac = mac.to_string();
         let now = self.clock.now();
         let expires_at = now + UNUSED_SECONDS;
-        let key = secrets::new_key(&*self.entropy);
-        let key_hash = secrets::key_hash(&key);
+        let key = keys::new_token(&*self.entropy);
+        let key_hash = keys::token_hash(&key);
 
         // IMMEDIATE takes the write lock up front (the leading DELETE would take it
         // too), so the count and the insert below see the same registrations as every
@@ -134,15 +134,16 @@ impl Registrations {
         sqlx::query!("DELETE FROM registrations WHERE expires_at <= ?", now)
             .execute(&mut *tx)
             .await?;
-        let unclaimed = sqlx::query_scalar!("SELECT COUNT(*) FROM registrations")
-            .fetch_one(&mut *tx)
-            .await?;
+        let unclaimed =
+            sqlx::query_scalar!("SELECT COUNT(*) FROM registrations WHERE expires_at IS NOT NULL")
+                .fetch_one(&mut *tx)
+                .await?;
         if unclaimed >= UNCLAIMED_LIMIT {
             tx.commit().await?;
             return Ok(Setup::Refused(Refusal::UnclaimedLimit));
         }
         for _ in 0..FRIENDLY_ID_ATTEMPTS {
-            let friendly_id = secrets::new_friendly_id(&*self.entropy);
+            let friendly_id = keys::new_friendly_id(&*self.entropy);
             let inserted = sqlx::query!(
                 "INSERT INTO registrations (mac, friendly_id, key_hash, model, created_at, expires_at)
                  VALUES (?, ?, ?, ?, ?, ?)
@@ -158,13 +159,18 @@ impl Registrations {
             .await?;
             if inserted.rows_affected() == 1 {
                 tx.commit().await?;
-                return Ok(Setup::Registered { key, friendly_id });
+                return Ok(Setup::Registered {
+                    key,
+                    friendly_id,
+                    model: model.to_owned(),
+                });
             }
         }
         Err(Error::FriendlyIdsExhausted)
     }
 
-    /// Records a check-in: the time, and each reading the device reported.
+    /// Records a check-in: the time, the panel size and each reading the device
+    /// reported, then says what the key belongs to.
     ///
     /// # Errors
     ///
@@ -173,22 +179,28 @@ impl Registrations {
         &self,
         key: &str,
         readings: &Readings,
-    ) -> Result<Option<Registration>, Error> {
-        let key_hash = secrets::key_hash(key);
+        panel: Option<(u32, u32)>,
+    ) -> Result<CheckIn, Error> {
+        let key_hash = keys::token_hash(key);
         let now = self.clock.now();
         let expires_at = now + IDLE_SECONDS;
-        let friendly_id = sqlx::query_scalar!(
-            "UPDATE registrations SET
+        let (width, height) = panel.unzip();
+        let row = sqlx::query!(
+            r#"UPDATE registrations SET
                  seen_at = ?,
-                 expires_at = ?,
+                 expires_at = CASE WHEN expires_at IS NULL THEN NULL ELSE ? END,
+                 width = COALESCE(?, width),
+                 height = COALESCE(?, height),
                  battery_voltage = COALESCE(?, battery_voltage),
                  battery_percent = COALESCE(?, battery_percent),
                  signal_dbm = COALESCE(?, signal_dbm),
                  firmware_version = COALESCE(?, firmware_version)
-             WHERE key_hash = ? AND expires_at > ?
-             RETURNING friendly_id",
+             WHERE key_hash = ? AND (expires_at IS NULL OR expires_at > ?)
+             RETURNING id, friendly_id, expires_at IS NULL AS "claimed!: bool", reset AS "reset!: bool""#,
             now,
             expires_at,
+            width,
+            height,
             readings.battery_voltage,
             readings.battery_percent,
             readings.signal_dbm,
@@ -198,19 +210,37 @@ impl Registrations {
         )
         .fetch_optional(&self.pool)
         .await?;
-        Ok(friendly_id.map(|friendly_id| Registration { friendly_id }))
+        let Some(row) = row else {
+            return Ok(CheckIn::Unknown);
+        };
+        if row.reset {
+            sqlx::query!("DELETE FROM registrations WHERE id = ?", row.id)
+                .execute(&self.pool)
+                .await?;
+            return Ok(CheckIn::Reset);
+        }
+        Ok(if row.claimed {
+            CheckIn::Claimed {
+                registration_id: row.id,
+            }
+        } else {
+            CheckIn::Unclaimed {
+                friendly_id: row.friendly_id,
+            }
+        })
     }
 
-    /// The registration that holds this key, without recording anything.
+    /// The live registration that holds this key, without recording anything.
     ///
     /// # Errors
     ///
     /// When storage fails.
     pub async fn find(&self, key: &str) -> Result<Option<Registration>, Error> {
-        let key_hash = secrets::key_hash(key);
+        let key_hash = keys::token_hash(key);
         let now = self.clock.now();
         let friendly_id = sqlx::query_scalar!(
-            "SELECT friendly_id FROM registrations WHERE key_hash = ? AND expires_at > ?",
+            "SELECT friendly_id FROM registrations
+             WHERE key_hash = ? AND (expires_at IS NULL OR expires_at > ?)",
             key_hash,
             now
         )

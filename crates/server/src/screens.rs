@@ -1,0 +1,125 @@
+//! An account's screens. A document is stored as the JSON of the model's
+//! `ScreenDocument`; the management API converts it, and the renderer reads it.
+
+use std::sync::Arc;
+
+use sqlx::SqlitePool;
+
+use crate::clock::Clock;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Screen {
+    pub id: i64,
+    pub name: String,
+    /// JSON in the shape of the model's `ScreenDocument`.
+    pub document: String,
+    pub updated_at: i64,
+}
+
+pub struct Screens {
+    pool: SqlitePool,
+    clock: Arc<dyn Clock>,
+}
+
+impl Screens {
+    #[must_use]
+    pub fn new(pool: SqlitePool, clock: Arc<dyn Clock>) -> Self {
+        Self { pool, clock }
+    }
+
+    /// # Errors
+    ///
+    /// When storage fails.
+    pub async fn list(&self, account_id: i64) -> Result<Vec<Screen>, sqlx::Error> {
+        sqlx::query_as!(
+            Screen,
+            "SELECT id, name, document, updated_at FROM screens
+             WHERE account_id = ? ORDER BY name, id",
+            account_id
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// # Errors
+    ///
+    /// When storage fails.
+    pub async fn create(
+        &self,
+        account_id: i64,
+        name: &str,
+        document: &str,
+    ) -> Result<Screen, sqlx::Error> {
+        let now = self.clock.now();
+        sqlx::query_as!(
+            Screen,
+            "INSERT INTO screens (account_id, name, document, updated_at) VALUES (?, ?, ?, ?)
+             RETURNING id AS \"id!\", name, document, updated_at",
+            account_id,
+            name,
+            document,
+            now
+        )
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    /// The account's screen; `None` when it has no such screen.
+    ///
+    /// # Errors
+    ///
+    /// When storage fails.
+    pub async fn get(&self, account_id: i64, id: i64) -> Result<Option<Screen>, sqlx::Error> {
+        sqlx::query_as!(
+            Screen,
+            "SELECT id, name, document, updated_at FROM screens WHERE id = ? AND account_id = ?",
+            id,
+            account_id
+        )
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    /// # Errors
+    ///
+    /// When storage fails.
+    pub async fn update(
+        &self,
+        account_id: i64,
+        id: i64,
+        name: &str,
+        document: &str,
+    ) -> Result<Option<Screen>, sqlx::Error> {
+        let now = self.clock.now();
+        sqlx::query_as!(
+            Screen,
+            "UPDATE screens SET name = ?, document = ?, updated_at = ?
+             WHERE id = ? AND account_id = ?
+             RETURNING id, name, document, updated_at",
+            name,
+            document,
+            now,
+            id,
+            account_id
+        )
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    /// Deletes the screen, and with it every playlist entry that shows it; `false`
+    /// when the account has no such screen.
+    ///
+    /// # Errors
+    ///
+    /// When storage fails.
+    pub async fn delete(&self, account_id: i64, id: i64) -> Result<bool, sqlx::Error> {
+        let deleted = sqlx::query!(
+            "DELETE FROM screens WHERE id = ? AND account_id = ?",
+            id,
+            account_id
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(deleted.rows_affected() == 1)
+    }
+}

@@ -1,0 +1,12 @@
+#!/bin/sh
+# Refreshes crates/trmnl/catalog/ from TRMNL's public catalogue: the display models
+# (`GET /api/models`) and palettes (`GET /api/palettes`) the server renders for.
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+target="$root/crates/trmnl/catalog"
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+for list in models palettes; do
+  curl -fsS -A afterimage "https://trmnl.com/api/$list" -o "$scratch/$list.json"
+  jq --sort-keys --indent 1 . "$scratch/$list.json" > "$target/$list.json"
+done

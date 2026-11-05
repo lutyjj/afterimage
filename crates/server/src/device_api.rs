@@ -1,15 +1,17 @@
 //! The generated device API, served over the registrations.
 
-use std::future::Future;
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use aws_smithy_types::{Document, Number};
+use http::{Request, Response};
+use afterimage_device_api::server::body::BoxBody;
 use afterimage_device_api::server::{AddExtensionLayer, Extension};
 use afterimage_device_api::{DeviceApi, DeviceApiConfig, error, input, output};
-use afterimage_trmnl::{DisplayStatus, Mac, Readings, SetupStatus};
-use tokio::net::TcpListener;
+use afterimage_trmnl::{DisplayStatus, Mac, Readings, SetupStatus, panel_size};
+use tower::Service;
 
-use crate::registrations::{self, Refusal, Registrations, Setup};
+use crate::registrations::{self, CheckIn, Refusal, Registrations, Setup};
 
 /// The `refresh_rate` sent with 202. The model requires one, but on 202 firmware
 /// 1.8.18 follows its own fast-poll schedule instead (`fastPollSeconds` in
@@ -25,34 +27,33 @@ const LOG_FIELD_CHARS: usize = 512;
 /// message buffer.
 const CLAIM_MESSAGE: &str = "Claim this device in Afterimage with this code.";
 
-/// Serves the device API on `listener` until `shutdown` completes.
-///
-/// # Errors
-///
-/// When accepting connections fails.
+/// The device API as a service. Requests carry the smithy runtime's boxed body.
 ///
 /// # Panics
 ///
-/// When an operation of the generated API has no handler here, which the
-/// `device_api` tests catch.
-pub async fn serve(
-    listener: TcpListener,
+/// When an operation of the generated API has no handler here, which every test
+/// that builds the service catches.
+#[must_use]
+pub fn service(
     registrations: Arc<Registrations>,
-    shutdown: impl Future<Output = ()> + Send + 'static,
-) -> std::io::Result<()> {
+) -> impl Service<
+    Request<BoxBody>,
+    Response = Response<BoxBody>,
+    Error = Infallible,
+    Future: Send + 'static,
+> + Clone
++ Send
++ 'static {
     let config = DeviceApiConfig::builder()
         .layer(AddExtensionLayer::new(registrations))
         .build();
-    let app = DeviceApi::builder(config)
+    DeviceApi::builder(config)
         .setup_device(setup_device)
         .get_display(get_display)
         .get_current_screen(get_current_screen)
         .create_device_log(create_device_log)
         .build()
-        .expect("every device API operation has a handler");
-    afterimage_device_api::serve(listener, app.into_make_service())
-        .with_graceful_shutdown(shutdown)
-        .await
+        .expect("every device API operation has a handler")
 }
 
 async fn setup_device(
@@ -64,8 +65,12 @@ async fn setup_device(
         .await
         .map_err(|error| internal_failure(&error))?;
     Ok(match setup {
-        Setup::Registered { key, friendly_id } => {
-            tracing::info!(%friendly_id, model = input.model, "device set up");
+        Setup::Registered {
+            key,
+            friendly_id,
+            model,
+        } => {
+            tracing::info!(%friendly_id, model, "device set up");
             output::SetupDeviceOutput {
                 status: SetupStatus::Registered.code(),
                 api_key: Some(key),
@@ -102,14 +107,28 @@ fn refusal_message(refusal: Refusal) -> &'static str {
     }
 }
 
-/// Every registration is unclaimed until accounts can claim them. A key the server
-/// does not know gets the same answer, because the only other answer that moves the
-/// device, 500, wipes its Wi-Fi settings. Such a device keeps showing a code the
-/// server has dropped and never runs setup again, since it still holds a key; a
-/// reset at the device recovers it, and the log names its MAC. An empty key, which
-/// the firmware sends after a setup that failed, gets the same answer: the device
-/// shows an empty code until its next wake runs setup again.
-const CHECK_IN_STATUS: DisplayStatus = DisplayStatus::Unclaimed;
+/// The answer to a check-in whose key the server does not know, or whose
+/// registration no device holds yet. A key the server does not know gets the
+/// unclaimed answer because the only other answer that moves the device, 500, wipes
+/// its Wi-Fi settings. Such a device keeps showing a code the server has dropped and
+/// never runs setup again, since it still holds a key; a reset at the device
+/// recovers it, and the log names its MAC. An empty key, which the firmware sends
+/// after a setup that failed, gets the same answer: the device shows an empty code
+/// until its next wake runs setup again. A claimed device gets it too until it has
+/// a screen to show.
+fn waiting() -> output::GetDisplayOutput {
+    output::GetDisplayOutput {
+        status: DisplayStatus::Unclaimed.code(),
+        refresh_rate: RETRY_SECONDS,
+        reset_firmware: false,
+        update_firmware: false,
+        image_url: None,
+        filename: None,
+        firmware_url: None,
+        special_function: None,
+        action: None,
+    }
+}
 
 async fn get_display(
     input: input::GetDisplayInput,
@@ -121,34 +140,37 @@ async fn get_display(
         input.rssi.as_deref(),
         input.firmware_version.as_deref(),
     );
-    let registration = registrations
-        .check_in(&input.access_token, &readings)
+    let panel = panel_size(input.width.as_deref(), input.height.as_deref());
+    let check_in = registrations
+        .check_in(&input.access_token, &readings, panel)
         .await
         .map_err(|error| internal_failure(&error))?;
-    if let Some(registration) = registration {
-        tracing::debug!(
-            friendly_id = registration.friendly_id,
-            ?readings,
-            "check-in"
-        );
-    } else {
-        // The header is untrusted text; only a parsed MAC reaches the log.
-        let mac = input.id.as_deref().and_then(|id| id.parse::<Mac>().ok());
-        tracing::warn!(
-            mac = mac.map(tracing::field::display),
-            "check-in with a key no registration holds"
-        );
-    }
-    Ok(output::GetDisplayOutput {
-        status: CHECK_IN_STATUS.code(),
-        refresh_rate: RETRY_SECONDS,
-        reset_firmware: false,
-        update_firmware: false,
-        image_url: None,
-        filename: None,
-        firmware_url: None,
-        special_function: None,
-        action: None,
+    Ok(match check_in {
+        CheckIn::Unknown => {
+            // The header is untrusted text; only a parsed MAC reaches the log.
+            let mac = input.id.as_deref().and_then(|id| id.parse::<Mac>().ok());
+            tracing::warn!(
+                mac = mac.map(tracing::field::display),
+                "check-in with a key no registration holds"
+            );
+            waiting()
+        }
+        CheckIn::Unclaimed { friendly_id } => {
+            tracing::debug!(friendly_id, ?readings, "check-in");
+            waiting()
+        }
+        CheckIn::Claimed { registration_id } => {
+            tracing::debug!(registration_id, ?readings, "check-in");
+            waiting()
+        }
+        CheckIn::Reset => {
+            tracing::info!("erasing a removed device's settings");
+            output::GetDisplayOutput {
+                status: DisplayStatus::Reset.code(),
+                reset_firmware: true,
+                ..waiting()
+            }
+        }
     })
 }
 
@@ -156,7 +178,7 @@ async fn get_current_screen(
     _input: input::GetCurrentScreenInput,
 ) -> Result<output::GetCurrentScreenOutput, error::GetCurrentScreenError> {
     Ok(output::GetCurrentScreenOutput {
-        status: CHECK_IN_STATUS.code(),
+        status: DisplayStatus::Unclaimed.code(),
         refresh_rate: RETRY_SECONDS,
         image_url: None,
         filename: None,

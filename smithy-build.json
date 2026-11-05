@@ -10,35 +10,81 @@
       "software.amazon.smithy:smithy-validation-model:1.74.1",
       "software.amazon.smithy:smithy-openapi:1.74.1",
       "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.1.0",
-      "software.amazon.smithy.rust:codegen-server:0.1.37"
+      "software.amazon.smithy.rust:codegen-server:0.1.37",
+      "software.amazon.smithy.rust:codegen-serde:0.1.37",
+      "software.amazon.smithy.typescript:smithy-aws-typescript-codegen:0.55.0"
     ]
   },
-  "plugins": {
-    "openapi": {
-      "service": "afterimage.device#DeviceApi",
-      "protocol": "aws.protocols#restJson1",
-      "useIntegerType": true
-    },
-    "rust-server-codegen": {
-      "service": "afterimage.device#DeviceApi",
-      "module": "afterimage-device-api",
-      "moduleVersion": "0.1.0",
-      "moduleAuthors": [
-        "Afterimage"
-      ],
-      "moduleDescription": "Generated server bindings for the TRMNL device API.",
-      "codegen": {
-        "http-1x": true
-      },
-      "customizationConfig": {
-        "protocols": {
-          "common": {
-            "request": {
-              "body": {
-                "maxBytes": "64KiB"
+  "projections": {
+    "device": {
+      "plugins": {
+        "openapi": {
+          "service": "afterimage.device#DeviceApi",
+          "protocol": "aws.protocols#restJson1",
+          "useIntegerType": true
+        },
+        "rust-server-codegen": {
+          "service": "afterimage.device#DeviceApi",
+          "module": "afterimage-device-api",
+          "moduleVersion": "0.1.0",
+          "moduleAuthors": [
+            "Afterimage"
+          ],
+          "moduleDescription": "Generated server bindings for the TRMNL device API.",
+          "codegen": {
+            "http-1x": true
+          },
+          "customizationConfig": {
+            "protocols": {
+              "common": {
+                "request": {
+                  "body": {
+                    "maxBytes": "64KiB"
+                  }
+                }
               }
             }
           }
+        }
+      }
+    },
+    "management": {
+      "plugins": {
+        "openapi": {
+          "service": "afterimage.management#Management",
+          "protocol": "aws.protocols#restJson1",
+          "useIntegerType": true
+        },
+        "rust-server-codegen": {
+          "service": "afterimage.management#Management",
+          "module": "afterimage-management-api",
+          "moduleVersion": "0.1.0",
+          "moduleAuthors": [
+            "Afterimage"
+          ],
+          "moduleDescription": "Generated server bindings for the Afterimage management API.",
+          "codegen": {
+            "http-1x": true
+          },
+          "customizationConfig": {
+            "protocols": {
+              "common": {
+                "request": {
+                  "body": {
+                    "maxBytes": "256KiB"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "typescript-client-codegen": {
+          "service": "afterimage.management#Management",
+          "package": "@afterimage/management-client",
+          "packageVersion": "0.1.0",
+          "packageManager": "pnpm",
+          "private": true,
+          "requiredMemberMode": "strict"
         }
       }
     }

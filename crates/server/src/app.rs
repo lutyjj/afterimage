@@ -1,0 +1,146 @@
+//! The server assembled from its settings: the stores over one database, the
+//! device API, the management API and the web UI behind one router.
+
+use std::path::Path;
+use std::sync::Arc;
+
+use std::convert::Infallible;
+
+use http::{Request, Response, StatusCode};
+use hyper::body::Incoming;
+use afterimage_device_api::server::body::{BoxBody, boxed};
+use tower::steer::Steer;
+use tower::util::BoxCloneService;
+use tower::{Service, ServiceExt, service_fn};
+use tower_http::services::{ServeDir, ServeFile};
+
+use crate::accounts::Accounts;
+use crate::clock::Clock;
+use crate::config::Config;
+use crate::devices::Devices;
+use crate::keys::Entropy;
+use crate::oidc::Oidc;
+use crate::registrations::Registrations;
+use crate::screens::Screens;
+use crate::secrets::Secrets;
+use crate::sessions::{CookiePolicy, Sessions};
+use crate::{database, device_api, management_api};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Database(#[from] database::OpenError),
+    #[error("the data directory: {0}")]
+    DataDir(std::io::Error),
+    #[error("{0}")]
+    Settings(String),
+}
+
+/// Opens the database under the data directory and builds the router.
+///
+/// # Errors
+///
+/// When the data directory or the database cannot be opened, or the settings
+/// contradict each other.
+pub async fn build(
+    config: &Config,
+    secrets: Secrets,
+    clock: Arc<dyn Clock>,
+    entropy: Arc<dyn Entropy>,
+) -> Result<App, Error> {
+    let oidc_settings = config.oidc();
+    if !config.password_sign_in && oidc_settings.is_none() {
+        return Err(Error::Settings(
+            "turning password sign-in off needs an OIDC provider".to_owned(),
+        ));
+    }
+    std::fs::create_dir_all(&config.data_dir).map_err(Error::DataDir)?;
+    let pool = database::open(&config.data_dir.join("afterimage.db")).await?;
+    let oidc = match (oidc_settings, config.public_url.as_deref()) {
+        (Some(settings), Some(public_url)) => Some(
+            Oidc::new(
+                settings,
+                public_url,
+                pool.clone(),
+                Arc::clone(&clock),
+                Arc::clone(&entropy),
+            )
+            .map_err(Error::Settings)?,
+        ),
+        _ => None,
+    };
+    let registrations = Arc::new(Registrations::new(
+        pool.clone(),
+        Arc::clone(&clock),
+        Arc::clone(&entropy),
+    ));
+    let state = Arc::new(management_api::State {
+        accounts: Accounts::new(pool.clone(), Arc::clone(&clock)),
+        sessions: Arc::new(Sessions::new(
+            pool.clone(),
+            Arc::clone(&clock),
+            Arc::clone(&entropy),
+        )),
+        devices: Devices::new(pool.clone(), Arc::clone(&clock)),
+        screens: Screens::new(pool, clock),
+        oidc,
+        landing: config.landing(),
+        cookies: CookiePolicy::new(config.public_url_is_https()),
+        password_sign_in: config.password_sign_in,
+        secret_names: secrets.names(),
+    });
+    Ok(router(
+        device_api::service(registrations),
+        management_api::service(state),
+        config.web_dir.as_deref(),
+    ))
+}
+
+/// The whole server as one service: what `serve` runs and the tests call.
+pub type App = BoxCloneService<Request<Incoming>, Response<BoxBody>, Infallible>;
+
+/// Sends `/api/` to the device API, `/manage/` to the management API, and every
+/// other path to the web UI: a file, or its shell for a client route.
+fn router<D, M>(device: D, management: M, web_dir: Option<&Path>) -> App
+where
+    D: Service<Request<BoxBody>, Response = Response<BoxBody>, Error = Infallible>
+        + Clone
+        + Send
+        + 'static,
+    D::Future: Send + 'static,
+    M: Service<Request<BoxBody>, Response = Response<BoxBody>, Error = Infallible>
+        + Clone
+        + Send
+        + 'static,
+    M::Future: Send + 'static,
+{
+    let boxed_request = |request: Request<Incoming>| request.map(boxed);
+    let web = match web_dir {
+        Some(directory) => {
+            let files =
+                ServeDir::new(directory).fallback(ServeFile::new(directory.join("index.html")));
+            BoxCloneService::new(ServiceExt::<Request<Incoming>>::map_response(
+                files,
+                |response| response.map(boxed),
+            ))
+        }
+        None => BoxCloneService::new(service_fn(|_: Request<Incoming>| async {
+            let mut response = Response::new(boxed(String::new()));
+            *response.status_mut() = StatusCode::NOT_FOUND;
+            Ok::<_, Infallible>(response)
+        })),
+    };
+    let services = vec![
+        BoxCloneService::new(device.map_request(boxed_request)),
+        BoxCloneService::new(management.map_request(boxed_request)),
+        web,
+    ];
+    BoxCloneService::new(Steer::new(
+        services,
+        |request: &Request<Incoming>, _: &[_]| match request.uri().path() {
+            path if path.starts_with("/api/") => 0,
+            path if path.starts_with("/manage/") => 1,
+            _ => 2,
+        },
+    ))
+}

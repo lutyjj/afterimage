@@ -1,6 +1,6 @@
 [package]
 name = "afterimage-server"
-description = "The Afterimage server: TRMNL's device API over SQLite."
+description = "The Afterimage server: TRMNL's device API and the management API over SQLite."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,24 +12,40 @@ path = "src/main.rs"
 
 [dependencies]
 afterimage-device-api = { path = "../../gen/device-api" }
+afterimage-management-api = { path = "../../gen/management-api", features = ["serde"] }
 afterimage-trmnl = { path = "../trmnl" }
 
-# Document and Number, to read log entries; Cargo unifies this 1.x requirement with
-# the release the generated crate uses. The smithy server runtime comes through the
-# generated crate (`afterimage_device_api::server`), so codegen alone picks its version.
+# Document, Number and Blob for generated shapes; Cargo unifies this 1.x requirement
+# with the release the generated crates use. The smithy server runtime comes through
+# the generated crates (`afterimage_device_api::server`), so codegen alone picks its
+# version.
 aws-smithy-types = "1.9.1"
 base64 = "0.23.1"
+bytes = "1.12.1"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+# Cookie parsing and Set-Cookie formatting. Nothing is signed: cookies carry opaque
+# random tokens whose hashes the database holds.
+cookie = "0.18.2"
 getrandom = "0.4.3"
+http = "1.5.0"
+http-body = "1.0.1"
+hyper = "1.12.0"
+# RustCrypto's argon2id with its default cost, as PHC strings the accounts table stores.
+password-auth = "2.0.0"
+openidconnect = { version = "4.1.0", default-features = false, features = ["reqwest", "rustls-tls"] }
+serde = { workspace = true }
+serde_json.workspace = true
 sha2 = "0.11.1"
-thiserror = "2.0.21"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
+thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+tower = { version = "0.5.3", features = ["steer", "util"] }
+tower-http = { version = "0.7.1", features = ["fs"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [dev-dependencies]
-reqwest = { version = "0.13", default-features = false }
-serde_json.workspace = true
+reqwest = { version = "0.13", default-features = false, features = ["cookies", "json"] }
 tempfile = "3"
 
 [lints]

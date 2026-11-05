@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT friendly_id FROM registrations WHERE key_hash = ? AND expires_at > ?",
+  "query": "SELECT friendly_id FROM registrations\n             WHERE key_hash = ? AND (expires_at IS NULL OR expires_at > ?)",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "697ca226d43635912c531f71acc88db8262efbf91d3a967a4f418615ca987cde"
+  "hash": "793bb6c4a6ada8ad49368fb41b80a176cc6bc94c271446e17c052c0dbc714e34"
 }

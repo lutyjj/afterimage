@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM devices WHERE id = ? AND account_id = ? RETURNING registration_id",
+  "describe": {
+    "columns": [
+      {
+        "name": "registration_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "devices",
+            "name": "registration_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "85bd00b0877424e12f4b97148eba8a35c6da2a7a9ece798b4dc70091c970ba79"
+}

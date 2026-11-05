@@ -1,0 +1,110 @@
+{
+ "data": [
+  {
+   "framework_class": "screen--1bit",
+   "grays": 2,
+   "id": "bw",
+   "name": "Black & White (1-bit)"
+  },
+  {
+   "framework_class": "screen--2bit",
+   "grays": 4,
+   "id": "gray-4",
+   "name": "4 Grays (2-bit)"
+  },
+  {
+   "framework_class": "screen--4bit",
+   "grays": 16,
+   "id": "gray-16",
+   "name": "16 Grays (4-bit)"
+  },
+  {
+   "framework_class": "screen--4bit",
+   "grays": 256,
+   "id": "gray-256",
+   "name": "256 Grays (8-bit)"
+  },
+  {
+   "colors": [
+    "#000000",
+    "#FF0000",
+    "#FFFFFF"
+   ],
+   "framework_class": "screen--color-3bwr",
+   "grays": 2,
+   "grayscale_bit_depth": 1,
+   "id": "color-3bwr",
+   "name": "Color (3 colors: black, red, white)"
+  },
+  {
+   "colors": [
+    "#000000",
+    "#FFFF00",
+    "#FFFFFF"
+   ],
+   "framework_class": "screen--color-3bwy",
+   "grays": 2,
+   "grayscale_bit_depth": 1,
+   "id": "color-3bwy",
+   "name": "Color (3 colors: black, yellow, white)"
+  },
+  {
+   "colors": [
+    "#000000",
+    "#FF0000",
+    "#FFFFFF",
+    "#FFFF00"
+   ],
+   "framework_class": "screen--color-4bwry",
+   "grays": 2,
+   "grayscale_bit_depth": 1,
+   "id": "color-4bwry",
+   "name": "Color (4 colors: black, red, white, yellow)"
+  },
+  {
+   "colors": [
+    "#FF0000",
+    "#00FF00",
+    "#0000FF",
+    "#FFFF00",
+    "#000000",
+    "#FFFFFF"
+   ],
+   "framework_class": "screen--color-6a",
+   "grays": 2,
+   "grayscale_bit_depth": 1,
+   "id": "color-6a",
+   "name": "Color (6 colors)"
+  },
+  {
+   "colors": [
+    "#000000",
+    "#FFFFFF",
+    "#FF0000",
+    "#00FF00",
+    "#0000FF",
+    "#FFFF00",
+    "#FFA500"
+   ],
+   "framework_class": "screen--color-7a",
+   "grays": 2,
+   "grayscale_bit_depth": 1,
+   "id": "color-7a",
+   "name": "Color (7 colors)"
+  },
+  {
+   "framework_class": "screen--color-full",
+   "grays": 2,
+   "grayscale_bit_depth": 4,
+   "id": "color-12bit",
+   "name": "Color (4096 colors)"
+  },
+  {
+   "framework_class": "screen--color-full",
+   "grays": 2,
+   "grayscale_bit_depth": 4,
+   "id": "color-24bit",
+   "name": "Color (16777216 colors)"
+  }
+ ]
+}
