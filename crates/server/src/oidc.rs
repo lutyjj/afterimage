@@ -23,9 +23,9 @@ use crate::sessions::CookieName;
 
 /// How long a browser has to come back from the provider.
 pub const FLOW_SECONDS: i64 = 10 * 60;
-/// Sign-ins waiting for the provider's answer at once. Anyone can start one, so
-/// past this the server sends the browser back with `unavailable` instead of
-/// storing more.
+/// Sign-ins kept waiting for the provider's answer. Anyone can start one, so past
+/// this a new sign-in replaces the oldest, which bounds storage without letting a
+/// flood of starts refuse everyone else.
 pub const FLOW_LIMIT: i64 = 64;
 /// Where the provider sends the browser back, under the public URL.
 pub const CALLBACK_PATH: &str = "/manage/auth/oidc/callback";
@@ -150,16 +150,6 @@ impl Oidc {
     /// When the provider is unavailable or storage fails.
     pub async fn start(&self, secure: bool) -> Result<Started, Error> {
         let now = self.clock.now();
-        sqlx::query!("DELETE FROM oidc_flows WHERE expires_at <= ?", now)
-            .execute(&self.pool)
-            .await?;
-        let waiting = sqlx::query_scalar!("SELECT COUNT(*) FROM oidc_flows")
-            .fetch_one(&self.pool)
-            .await?;
-        if waiting >= FLOW_LIMIT {
-            tracing::warn!(waiting, "too many OIDC sign-ins are waiting");
-            return Err(Error::Unavailable);
-        }
         let client = self.client().await?;
         let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
         let (url, state, nonce) = client
@@ -175,6 +165,10 @@ impl Oidc {
         let binding_hash = keys::token_hash(&binding);
         let expires_at = now + FLOW_SECONDS;
         let (state, nonce, verifier) = (state.secret(), nonce.secret(), verifier.secret());
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        sqlx::query!("DELETE FROM oidc_flows WHERE expires_at <= ?", now)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query!(
             "INSERT INTO oidc_flows (binding_hash, state, nonce, pkce_verifier, expires_at)
              VALUES (?, ?, ?, ?, ?)",
@@ -184,8 +178,16 @@ impl Oidc {
             verifier,
             expires_at
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+        sqlx::query!(
+            "DELETE FROM oidc_flows WHERE binding_hash IN
+                 (SELECT binding_hash FROM oidc_flows ORDER BY expires_at DESC LIMIT -1 OFFSET ?)",
+            FLOW_LIMIT
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
         Ok(Started {
             location: url.to_string(),
             cookie: CookieName::OidcFlow.set(binding, FLOW_SECONDS, secure),

@@ -14,7 +14,7 @@ See [the design](docs/design.md).
 
 | Command | Does |
 |---|---|
-| `tools/generate` | Generates the contract into `gen/` from `model/smithy/`: both services' Rust server crates and OpenAPI documents, and the management API's TypeScript client |
+| `tools/generate` | Generates the contract into `gen/` from `model/smithy/`: both services' Rust server crates and OpenAPI documents, and the management API's TypeScript client, which the web UI's build compiles |
 | `cargo test --workspace` | Runs every test, the conformance test included |
 | `tools/prepare-queries` | Refreshes `.sqlx/` after a query or migration changes |
 | `tools/trmnl-excerpt` | Refreshes the excerpt of TRMNL's published device contract |

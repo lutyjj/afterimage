@@ -707,3 +707,31 @@ async fn an_oidc_sign_in_that_cannot_finish_returns_to_the_web_ui() {
     }
     assert!(server.stored("SELECT id FROM accounts").await.is_empty());
 }
+
+/// A session that cannot be read is a server failure, in restJson1's error form,
+/// and not a sign-out.
+#[tokio::test]
+async fn a_session_that_cannot_be_read_is_a_server_failure() {
+    let server = start().await;
+    server.sign_up().await;
+    let pool = sqlx::SqlitePool::connect(&format!(
+        "sqlite://{}",
+        server.data.path().join("afterimage.db").display()
+    ))
+    .await
+    .unwrap();
+    sqlx::query("DROP TABLE sessions")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let response = server
+        .http
+        .get(format!("{}/manage/account", server.url))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(response.headers()["x-amzn-errortype"], "InternalFailure");
+    let body: Value = response.json().await.unwrap();
+    assert!(body["message"].is_string(), "{body}");
+}

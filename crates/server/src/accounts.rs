@@ -184,16 +184,27 @@ static UNKNOWN_USER_HASH: LazyLock<String> =
 
 /// Hashes running at once. Each holds argon2id's default 19 MiB, and requests
 /// without a session start them, so they wait for a place rather than all run.
-static HASHING: LazyLock<Semaphore> =
-    LazyLock::new(|| Semaphore::new(std::thread::available_parallelism().map_or(2, NonZero::get)));
+static HASHING: LazyLock<Arc<Semaphore>> = LazyLock::new(|| {
+    Arc::new(Semaphore::new(
+        std::thread::available_parallelism().map_or(2, NonZero::get),
+    ))
+});
 
-/// Runs password work on the blocking pool once a place under [`HASHING`] is free.
+/// Runs password work on the blocking pool once one of `places` is free. The
+/// work holds its place until it finishes, even when the request that started it
+/// is dropped, since blocking work cannot be cancelled.
 async fn bounded<T: Send + 'static>(
-    places: &Semaphore,
+    places: &Arc<Semaphore>,
     work: impl FnOnce() -> T + Send + 'static,
 ) -> Option<T> {
-    let _place = places.acquire().await.ok()?;
-    tokio::task::spawn_blocking(work).await.ok()
+    let place = Arc::clone(places).acquire_owned().await.ok()?;
+    tokio::task::spawn_blocking(move || {
+        let done = work();
+        drop(place);
+        done
+    })
+    .await
+    .ok()
 }
 
 /// The argon2id PHC string for this password, at `RustCrypto`'s default cost.
@@ -241,20 +252,25 @@ mod tests {
         let places = Arc::new(Semaphore::new(2));
         let running = Arc::new(AtomicUsize::new(0));
         let most = Arc::new(AtomicUsize::new(0));
-        let tasks: Vec<_> = (0..12)
-            .map(|_| {
-                let (places, running, most) = (places.clone(), running.clone(), most.clone());
-                tokio::spawn(async move {
-                    bounded(&places, move || {
-                        let now = running.fetch_add(1, Ordering::SeqCst) + 1;
-                        most.fetch_max(now, Ordering::SeqCst);
-                        std::thread::sleep(std::time::Duration::from_millis(20));
-                        running.fetch_sub(1, Ordering::SeqCst);
-                    })
-                    .await
+        let start = |places: &Arc<Semaphore>| {
+            let (places, running, most) = (places.clone(), running.clone(), most.clone());
+            tokio::spawn(async move {
+                bounded(&places, move || {
+                    let now = running.fetch_add(1, Ordering::SeqCst) + 1;
+                    most.fetch_max(now, Ordering::SeqCst);
+                    std::thread::sleep(std::time::Duration::from_millis(40));
+                    running.fetch_sub(1, Ordering::SeqCst);
                 })
+                .await
             })
-            .collect();
+        };
+        // Requests dropped while their work runs, as a client that disconnects.
+        let dropped: Vec<_> = (0..4).map(|_| start(&places)).collect();
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        for task in &dropped {
+            task.abort();
+        }
+        let tasks: Vec<_> = (0..12).map(|_| start(&places)).collect();
         for task in tasks {
             assert!(task.await.unwrap().is_some());
         }
