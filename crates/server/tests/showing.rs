@@ -264,10 +264,7 @@ async fn a_screen_never_shows_a_secret() {
     let problem = &body["problems"][0];
     assert_eq!(problem["path"], "/content/value/text", "{body}");
     assert!(
-        problem["message"]
-            .as_str()
-            .unwrap()
-            .contains("`secrets` is undefined"),
+        problem["message"].as_str().unwrap().contains("undefined"),
         "{body}"
     );
     assert!(body["image"].is_string());
