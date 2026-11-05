@@ -37,14 +37,19 @@ any Rust project may use the shared library `crates/trmnl`.
 The flake owns the toolchains; do not install unmanaged versions on the host.
 The [README](README.md#development) lists the commands.
 
-## Spikes and milestones
+## Workflow
 
-- A spike answers one design question quickly. It lives on a `spike/<topic>`
-  branch with a README that records its method and measurements, and it is
-  deleted once its answer is in the design.
-- Code that others will build on gets an independent review before it lands:
-  each major milestone, such as the first contract, the device API, or the
-  renderer. Small changes and spikes do not need one.
+- Work on `main`, committing and pushing each working step. Use a branch only
+  when the maintainer asks for one; there are no pull requests. The project
+  moves fast and fixes forward: a defect found after a push gets a follow-up
+  commit, not a revert ritual.
+- A spike answers one design question quickly. It lives in `spikes/<topic>/`
+  with a README that records its method and measurements, outside every build,
+  and it is deleted once its answer is in the design.
+- Code that others will build on gets an independent review once it is on
+  `main`: each major milestone, such as the device API, the management API, the
+  renderer or the web UI. Its findings land as follow-up commits. Small changes
+  and spikes do not need one.
 - Changes proposed to upstream projects (TRMNL's firmware, framework or
   libraries) follow the upstream's own conventions, stand on public evidence,
   and are published only with the maintainer's approval.
