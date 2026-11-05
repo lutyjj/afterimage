@@ -1,0 +1,12 @@
+#!/bin/sh
+# Generates the contract into gen/, the layout the Nix build (deploy/nix/contract.nix)
+# produces: the device API's Rust server crate and its OpenAPI document.
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+rm -rf build/smithy
+smithy build
+rm -rf gen/device-api gen/device-api.openapi.json
+mkdir -p gen
+cp -r build/smithy/source/rust-server-codegen gen/device-api
+cp build/smithy/source/openapi/DeviceApi.openapi.json gen/device-api.openapi.json

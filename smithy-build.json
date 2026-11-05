@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "sources": [
+    "model"
+  ],
+  "maven": {
+    "dependencies": [
+      "software.amazon.smithy:smithy-model:1.74.1",
+      "software.amazon.smithy:smithy-aws-traits:1.74.1",
+      "software.amazon.smithy:smithy-validation-model:1.74.1",
+      "software.amazon.smithy:smithy-openapi:1.74.1",
+      "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.4.21",
+      "software.amazon.smithy.rust:codegen-server:0.1.37"
+    ]
+  },
+  "plugins": {
+    "openapi": {
+      "service": "afterimage.device#DeviceApi",
+      "protocol": "aws.protocols#restJson1",
+      "useIntegerType": true
+    },
+    "rust-server-codegen": {
+      "service": "afterimage.device#DeviceApi",
+      "module": "afterimage-device-api",
+      "moduleVersion": "0.1.0",
+      "moduleAuthors": [
+        "Afterimage"
+      ],
+      "moduleDescription": "Generated server bindings for the TRMNL device API.",
+      "codegen": {
+        "http-1x": true
+      }
+    }
+  }
+}

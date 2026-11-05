@@ -1,0 +1,230 @@
+{
+  "source": "https://trmnl.com/api-docs/openapi.json",
+  "retrieved": "2026-11-05",
+  "operations": {
+    "GET /api/display": {
+      "name": "getDisplay",
+      "success": "200",
+      "headers": {
+        "Access-Token": {
+          "required": true,
+          "type": "string"
+        },
+        "BASE64": {
+          "required": false,
+          "type": "boolean"
+        },
+        "Battery-Capacity": {
+          "required": false,
+          "type": "number"
+        },
+        "Battery-Charging": {
+          "required": false,
+          "type": "number"
+        },
+        "Battery-Count": {
+          "required": false,
+          "type": "number"
+        },
+        "Battery-Current": {
+          "required": false,
+          "type": "number"
+        },
+        "Battery-Health": {
+          "required": false,
+          "type": "number"
+        },
+        "Battery-Temp": {
+          "required": false,
+          "type": "number"
+        },
+        "Battery-Voltage": {
+          "required": false,
+          "type": "number"
+        },
+        "FW-Commit": {
+          "required": false,
+          "type": "string"
+        },
+        "FW-Version": {
+          "required": false,
+          "type": "string"
+        },
+        "Height": {
+          "required": false,
+          "type": "string"
+        },
+        "Image-Cached": {
+          "required": false,
+          "type": "string"
+        },
+        "Panel-Rev": {
+          "required": false,
+          "type": "string"
+        },
+        "Percent-Charged": {
+          "required": false,
+          "type": "number"
+        },
+        "RSSI": {
+          "required": false,
+          "type": "number"
+        },
+        "Sensors": {
+          "required": false,
+          "type": "string"
+        },
+        "Special-Function": {
+          "required": false,
+          "type": "string"
+        },
+        "USB-Connected": {
+          "required": false,
+          "type": "string"
+        },
+        "Wake-Time": {
+          "required": false,
+          "type": "integer"
+        },
+        "WiFi-Band": {
+          "required": false,
+          "type": "string"
+        },
+        "Width": {
+          "required": false,
+          "type": "string"
+        }
+      },
+      "body": {},
+      "fields": {
+        "action": {
+          "required": false,
+          "type": "string"
+        },
+        "filename": {
+          "required": false,
+          "type": "string"
+        },
+        "firmware_url": {
+          "required": false,
+          "type": "string"
+        },
+        "image_url": {
+          "required": false,
+          "type": "string"
+        },
+        "refresh_rate": {
+          "required": false,
+          "type": "integer"
+        },
+        "reset_firmware": {
+          "required": false,
+          "type": "boolean"
+        },
+        "special_function": {
+          "required": false,
+          "type": "string"
+        },
+        "status": {
+          "required": false,
+          "type": "integer"
+        },
+        "update_firmware": {
+          "required": false,
+          "type": "boolean"
+        }
+      }
+    },
+    "GET /api/display/current": {
+      "name": "getCurrentScreen",
+      "success": "200",
+      "headers": {
+        "Access-Token": {
+          "required": true,
+          "type": "string"
+        }
+      },
+      "body": {},
+      "fields": {
+        "filename": {
+          "required": false,
+          "type": "string"
+        },
+        "image_url": {
+          "required": false,
+          "type": "string"
+        },
+        "refresh_rate": {
+          "required": false,
+          "type": "integer"
+        },
+        "rendered_at": {
+          "required": false,
+          "type": "string"
+        },
+        "status": {
+          "required": false,
+          "type": "integer"
+        }
+      }
+    },
+    "GET /api/setup": {
+      "name": "setupDevice",
+      "success": "200",
+      "headers": {
+        "ID": {
+          "required": true,
+          "type": "string"
+        },
+        "Model": {
+          "required": true,
+          "type": "string"
+        },
+        "Panel-Rev": {
+          "required": false,
+          "type": "string"
+        }
+      },
+      "body": {},
+      "fields": {
+        "api_key": {
+          "required": false,
+          "type": "string"
+        },
+        "friendly_id": {
+          "required": false,
+          "type": "string"
+        },
+        "image_url": {
+          "required": false,
+          "type": "string"
+        },
+        "message": {
+          "required": false,
+          "type": "string"
+        },
+        "status": {
+          "required": false,
+          "type": "integer"
+        }
+      }
+    },
+    "POST /api/log": {
+      "name": "createDeviceLog",
+      "success": "204",
+      "headers": {
+        "Access-Token": {
+          "required": true,
+          "type": "string"
+        }
+      },
+      "body": {
+        "logs": {
+          "required": true,
+          "type": "array"
+        }
+      },
+      "fields": {}
+    }
+  }
+}

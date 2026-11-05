@@ -1,0 +1,126 @@
+//! The device API model against TRMNL's published document.
+//!
+//! The excerpt in `model/trmnl/device-api.json` is the oracle for names, paths,
+//! requirements and response types; `tools/trmnl-excerpt` refreshes it. Header
+//! types are the one deliberate difference: the model takes every header as text
+//! (see `model/device.smithy`).
+
+use std::path::Path;
+
+use afterimage_conformance::{Contract, Excerpt, extract_all};
+
+fn trmnl() -> Contract {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../trmnl/device-api.json");
+    let text = std::fs::read_to_string(&path).expect("model/trmnl/device-api.json exists");
+    serde_json::from_str::<Excerpt>(&text)
+        .expect("the excerpt parses")
+        .contract
+}
+
+fn model() -> Contract {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../gen/device-api.openapi.json");
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|_| panic!("{} exists: run tools/generate", path.display()));
+    let document = serde_json::from_str(&text).expect("the generated document parses");
+    extract_all(&document).expect("the generated document has a device contract")
+}
+
+#[test]
+fn models_every_operation_with_its_name_and_success_code() {
+    let model = model();
+    for (key, theirs) in &trmnl().operations {
+        let ours = model
+            .operations
+            .get(key)
+            .unwrap_or_else(|| panic!("{key} is not modelled"));
+        assert!(
+            ours.name.eq_ignore_ascii_case(&theirs.name),
+            "{key} is {} in the model and {} at TRMNL",
+            ours.name,
+            theirs.name
+        );
+        assert_eq!(ours.success, theirs.success, "{key}: success code");
+    }
+}
+
+#[test]
+fn accepts_every_header_as_text_with_the_same_requirement() {
+    let model = model();
+    for (key, theirs) in &trmnl().operations {
+        let ours = &model.operations[key];
+        for (name, header) in &theirs.headers {
+            let modelled = ours
+                .headers
+                .get(name)
+                .unwrap_or_else(|| panic!("{key}: header {name} is not modelled"));
+            assert_eq!(
+                modelled.required, header.required,
+                "{key}: header {name} required"
+            );
+            assert_eq!(
+                modelled.kind, "string",
+                "{key}: header {name} is text on the wire"
+            );
+        }
+    }
+}
+
+#[test]
+fn accepts_every_request_body_field() {
+    let model = model();
+    for (key, theirs) in &trmnl().operations {
+        assert_eq!(
+            model.operations[key].body, theirs.body,
+            "{key}: request body"
+        );
+    }
+}
+
+#[test]
+fn answers_every_response_field_with_the_same_type() {
+    let model = model();
+    for (key, theirs) in &trmnl().operations {
+        let ours = &model.operations[key];
+        for (name, field) in &theirs.fields {
+            let modelled = ours
+                .fields
+                .get(name)
+                .unwrap_or_else(|| panic!("{key}: response field {name} is not modelled"));
+            assert_eq!(
+                modelled.kind, field.kind,
+                "{key}: response field {name} type"
+            );
+        }
+    }
+}
+
+/// An addition the firmware needs and TRMNL does not document goes here, with the
+/// firmware source that establishes it, before the model may carry it.
+#[test]
+fn adds_nothing_trmnl_does_not_document() {
+    let model = model();
+    let trmnl = trmnl();
+    let operations = |contract: &Contract| contract.operations.keys().cloned().collect::<Vec<_>>();
+    assert_eq!(operations(&model), operations(&trmnl), "operations");
+    for (key, ours) in &model.operations {
+        let theirs = &trmnl.operations[key];
+        let extra_headers: Vec<_> = ours
+            .headers
+            .keys()
+            .filter(|name| !theirs.headers.contains_key(*name))
+            .collect();
+        let extra_fields: Vec<_> = ours
+            .fields
+            .keys()
+            .filter(|name| !theirs.fields.contains_key(*name))
+            .collect();
+        assert!(
+            extra_headers.is_empty(),
+            "{key}: headers TRMNL does not document: {extra_headers:?}"
+        );
+        assert!(
+            extra_fields.is_empty(),
+            "{key}: response fields TRMNL does not document: {extra_fields:?}"
+        );
+    }
+}

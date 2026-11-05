@@ -1,0 +1,10 @@
+#!/bin/sh
+# Refreshes model/trmnl/device-api.json from TRMNL's published API document.
+# Review the diff: a changed excerpt means TRMNL changed the device contract.
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+target="$root/model/trmnl/device-api.json"
+curl -fsS https://trmnl.com/api-docs/openapi.json |
+  cargo run --quiet --manifest-path "$root/Cargo.toml" -p afterimage-conformance --bin trmnl-excerpt -- \
+    --retrieved "$(date -u +%F)" > "$target.new"
+mv "$target.new" "$target"
