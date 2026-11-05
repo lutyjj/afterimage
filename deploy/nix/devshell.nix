@@ -6,6 +6,8 @@
   sqlite,
   jq,
   curl,
+  nodejs_24,
+  pnpm,
 }:
 
 mkShell {
@@ -25,6 +27,8 @@ mkShell {
     sqlite
     jq
     curl
+    nodejs_24
+    pnpm
   ];
 
   shellHook = ''

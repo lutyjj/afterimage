@@ -3,3 +3,6 @@
 /target/
 /.impeccable/mocks/
 /.impeccable/decision-*.json
+/node_modules/
+/web/node_modules/
+/web/dist/
