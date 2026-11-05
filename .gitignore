@@ -6,3 +6,5 @@
 /node_modules/
 /web/node_modules/
 /web/dist/
+/.impeccable/review/
+/.impeccable/build/

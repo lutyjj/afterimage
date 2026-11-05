@@ -200,3 +200,21 @@ fn supports_what_it_can_write_and_has_tokens_for() {
         );
     }
 }
+
+#[test]
+fn every_default_display_is_one_it_can_draw() {
+    let catalog = Catalog::get();
+    for (firmware, size) in [
+        ("unknown", None),
+        ("xiao_epaper_display", Some((800, 480))),
+        ("openframe", None),
+        ("tidbyt", Some((64, 32))),
+    ] {
+        let (model, palette) = catalog.default_display(firmware, size, Renderer::supports);
+        assert!(
+            Renderer::supports(model, palette),
+            "{firmware}: {}",
+            model.name
+        );
+    }
+}

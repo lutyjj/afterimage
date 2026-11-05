@@ -220,25 +220,28 @@ impl Drawing {
         }
     }
 
-    /// Draws a document whose values are final, such as the server's own screens.
+    /// The latest moment a drawing starting now may begin its templates or its
+    /// render; a caller drawing several things for one check-in shares it.
+    #[must_use]
+    pub fn places_deadline() -> Instant {
+        Instant::now() + PLACE_TIME
+    }
+
+    /// Draws a document whose values are final, such as the server's own screens,
+    /// giving up when no place is free by `by`.
     ///
     /// # Errors
     ///
-    /// When the renderer cannot draw it.
+    /// When the renderer cannot draw it, or no place is free in time.
     pub async fn draw_resolved(
         &self,
         resolved: Value,
         model: &Model,
         palette: &Palette,
+        by: Instant,
     ) -> Result<Image, String> {
-        self.render(
-            resolved,
-            BTreeMap::new(),
-            model,
-            palette,
-            Instant::now() + PLACE_TIME,
-        )
-        .await
+        self.render(resolved, BTreeMap::new(), model, palette, by)
+            .await
     }
 
     /// One of the places, or a failure once `by` passes without one.

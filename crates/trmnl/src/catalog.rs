@@ -149,7 +149,14 @@ impl Catalog {
                     .filter(usable)
                     .max_by_key(|model| (model.kind == "trmnl", self.gray_levels(model)))
             })
-            .unwrap_or_else(|| self.fallback_model());
+            .unwrap_or_else(|| {
+                let fallback = self.fallback_model();
+                if usable(&fallback) {
+                    fallback
+                } else {
+                    self.models.iter().find(usable).unwrap_or(fallback)
+                }
+            });
         (model, self.default_palette(model))
     }
 

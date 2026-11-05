@@ -76,6 +76,8 @@ pub async fn next(
         .unwrap_or(jiff::Timestamp::UNIX_EPOCH)
         .to_zoned(drawing.time_zone().zone().clone());
     let wait = schedule::wait(&device.playlist, device.refresh_minutes, &at);
+    // The server's own screens share the check-in's time with the screen drawn first.
+    let places_by = Drawing::places_deadline();
     let (model, palette) = display(device);
     let position = schedule::next(&device.playlist, device.playlist_position, &at);
     let drawn = if let Some(position) = position {
@@ -101,7 +103,7 @@ pub async fn next(
         }
     } else {
         let image = drawing
-            .draw_resolved(nothing_to_show(&device.name), model, palette)
+            .draw_resolved(nothing_to_show(&device.name), model, palette, places_by)
             .await
             .map_err(Error::Fallback)?;
         Ok((image.bytes, None))
@@ -132,7 +134,7 @@ pub async fn next(
                 });
             }
             let image = drawing
-                .draw_resolved(could_not_draw(&name, &problems), model, palette)
+                .draw_resolved(could_not_draw(&name, &problems), model, palette, places_by)
                 .await
                 .map_err(Error::Fallback)?;
             (image.bytes, None)
