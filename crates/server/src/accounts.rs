@@ -258,15 +258,18 @@ mod tests {
                 bounded(&places, move || {
                     let now = running.fetch_add(1, Ordering::SeqCst) + 1;
                     most.fetch_max(now, Ordering::SeqCst);
-                    std::thread::sleep(std::time::Duration::from_millis(40));
+                    std::thread::sleep(std::time::Duration::from_millis(100));
                     running.fetch_sub(1, Ordering::SeqCst);
                 })
                 .await
             })
         };
-        // Requests dropped while their work runs, as a client that disconnects.
+        // Requests dropped while their work runs, as a client that disconnects:
+        // aborted once both places hold running work.
         let dropped: Vec<_> = (0..4).map(|_| start(&places)).collect();
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        while running.load(Ordering::SeqCst) < 2 {
+            tokio::task::yield_now().await;
+        }
         for task in &dropped {
             task.abort();
         }

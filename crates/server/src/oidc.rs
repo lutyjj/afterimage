@@ -182,7 +182,7 @@ impl Oidc {
         .await?;
         sqlx::query!(
             "DELETE FROM oidc_flows WHERE binding_hash IN
-                 (SELECT binding_hash FROM oidc_flows ORDER BY expires_at DESC LIMIT -1 OFFSET ?)",
+                 (SELECT binding_hash FROM oidc_flows ORDER BY expires_at DESC, rowid DESC LIMIT -1 OFFSET ?)",
             FLOW_LIMIT
         )
         .execute(&mut *tx)
