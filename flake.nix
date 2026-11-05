@@ -27,13 +27,14 @@
     in
     {
       packages = forSystems (system: {
-        default = scope.${system}.server;
-        inherit (scope.${system}) contract server tokens;
+        default = scope.${system}.afterimage;
+        inherit (scope.${system}) contract server web tokens;
       });
 
-      # The server's build runs every test; lint runs clippy and rustfmt.
+      # The server's build runs every Rust test; lint runs clippy and rustfmt; the
+      # web UI's build type-checks it with the generated client and runs its tests.
       checks = forSystems (system: {
-        inherit (scope.${system}) server lint;
+        inherit (scope.${system}) server lint web;
       });
 
       # tools/tokens/refresh runs this.
