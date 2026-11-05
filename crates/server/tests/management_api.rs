@@ -315,6 +315,7 @@ async fn another_account_cannot_reach_a_device_or_screen() {
         .unwrap();
     let eve = common::Server {
         http: reqwest::Client::builder()
+            .tls_certs_only([])
             .cookie_store(true)
             .build()
             .unwrap(),
@@ -394,7 +395,10 @@ fn clone_server(server: &common::Server) -> common::Server {
         url: server.url.clone(),
         clock: server.clock.clone(),
         data: tempfile::TempDir::new().unwrap(),
-        http: reqwest::Client::new(),
+        http: reqwest::Client::builder()
+            .tls_certs_only([])
+            .build()
+            .unwrap(),
     }
 }
 
@@ -684,6 +688,7 @@ async fn with_password_sign_in_off_no_password_works() {
 async fn an_oidc_sign_in_that_cannot_finish_returns_to_the_web_ui() {
     let server = start_with(Arc::new(OsEntropy), &OIDC_SETTINGS).await;
     let http = reqwest::Client::builder()
+        .tls_certs_only([])
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .unwrap();

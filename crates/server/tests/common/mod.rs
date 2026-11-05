@@ -112,6 +112,7 @@ async fn start_full(entropy: Arc<dyn Entropy>, settings: &[&str], secrets: Secre
         clock,
         data,
         http: reqwest::Client::builder()
+            .tls_certs_only([])
             .cookie_store(true)
             .build()
             .unwrap(),
