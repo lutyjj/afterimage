@@ -54,7 +54,7 @@ A screen is a tree of generic components (title bar, value, label, table, chart 
 
 The render contract is one operation in the model: a screen, its resolved data and a render profile in, an image out. The render profile is what TRMNL's `GET /api/models` publishes for the device's model: width, height, bit depth, palette, MIME type and image size limit. The server caches each image on disk by screen and profile, and renders again when the data or the schedule changes.
 
-Typst implements the operation in-process. Its component library is generated from the public tokens of TRMNL's design system (MIT): fonts, palette, gaps, type scale and dither patterns, so screens keep TRMNL's look. On one measured screen, Typst rendered in 13 ms with a 19 MiB memory peak; TRMNL's design system in headless Chromium took 1.3 s and about 1 GiB, most of it loading its 19 MB stylesheet.
+Typst implements the operation in-process. Its component library is generated from the public tokens of TRMNL's design system (MIT): fonts, palette, gaps, type scale and dither patterns, so screens keep TRMNL's look. On one measured screen, Typst rendered in 13 ms with a 19 MiB memory peak; TRMNL's design system in headless Chromium took 1.3 s and about 1 GiB, most of it loading its 19 MB stylesheet. On the device, the two renders were hard to tell apart.
 
 Another engine replaces Typst by implementing the same operation and every component, for example as a separate service that runs TRMNL's design system; screens stay unchanged. A screen may instead carry a raw Typst template for what the components cannot express. Such a screen works only with the Typst renderer.
 
