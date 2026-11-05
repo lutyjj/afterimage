@@ -29,6 +29,17 @@
       "moduleDescription": "Generated server bindings for the TRMNL device API.",
       "codegen": {
         "http-1x": true
+      },
+      "customizationConfig": {
+        "protocols": {
+          "common": {
+            "request": {
+              "body": {
+                "maxBytes": "64KiB"
+              }
+            }
+          }
+        }
       }
     }
   }

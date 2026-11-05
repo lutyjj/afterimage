@@ -20,7 +20,9 @@ The Smithy model in `model/` is the single source of truth. One build generates 
 | Management API | Afterimage | Web UI |
 | Render operation | Afterimage | Server |
 
-The device API mirrors the four operations TRMNL firmware calls: `GET /api/setup`, `GET /api/display`, `GET /api/display/current` and `POST /api/log`. TRMNL publishes them in its OpenAPI document (`https://trmnl.com/api-docs/openapi.json`). A test compares the generated document with TRMNL's and fails on any difference in the paths, headers and response fields the model covers.
+The device API mirrors the four operations TRMNL firmware calls: `GET /api/setup`, `GET /api/display`, `GET /api/display/current` and `POST /api/log`. TRMNL publishes them in its OpenAPI document (`https://trmnl.com/api-docs/openapi.json`); `model/trmnl/device-api.json` is the excerpt that `tools/trmnl-excerpt` takes from it, and the conformance test fails on any operation, header, body field or response field that the generated document and the excerpt do not share.
+
+Where the document and the firmware disagree, the firmware decides. Headers are text, because the firmware sends values such as `3000/3500` where the document says number; the server parses what it reads and treats a value that does not parse as unknown. Status values follow the firmware's handling of them, which behaviour tests replay with the headers and bodies the firmware builds.
 
 ## Components
 
@@ -29,6 +31,8 @@ Each component builds on its own and depends on the others only through generate
 | Path | Owns |
 |---|---|
 | `model/` | Smithy contract |
+| `model/conformance/` | The conformance test and the extractor behind `tools/trmnl-excerpt` |
+| `crates/trmnl/` | TRMNL firmware protocol: MAC addresses, reported readings, status values |
 | `crates/server/` | Device and management APIs, schedule, SQLite persistence, MQTT publishing |
 | `crates/render-typst/` | The render operation in Typst, with a component library that reads design tokens |
 | `tools/tokens/` | Build-time generator of design tokens per render profile |
@@ -37,11 +41,11 @@ Each component builds on its own and depends on the others only through generate
 
 ## Devices
 
-1. **Setup.** The device joins Wi-Fi through its captive portal, configured with this server's URL, and calls `/api/setup` with its MAC (`ID`) and `Model`. The server creates an unclaimed device with an access key and a friendly ID, and returns a setup screen showing that ID. A user claims the device by entering the ID in the web UI.
+1. **Setup.** The device joins Wi-Fi through its captive portal, configured with this server's URL, and calls `/api/setup` with its MAC (`ID`) and `Model`. A new MAC becomes an unclaimed device with an access key, stored only as a SHA-256 hash, and a six-character friendly ID, which the firmware shows. A user claims the device by entering the ID in the web UI. At most 32 devices wait unclaimed, and one still unclaimed 24 hours after setup starts over: its key stops working and its next setup gives it a new ID. Setup for a known unclaimed MAC issues a new key and keeps the ID. Setup for a claimed device's MAC waits for its owner's approval in the web UI, because anyone on the network can present a MAC.
 2. **Model.** The reported `Model` selects the device's render profile from TRMNL's `GET /api/models` and its firmware board from TRMNL's firmware lists. TRMNL publishes no mapping from the name a firmware build reports to either list, so the server keeps that mapping as data. A user can change a device's render profile.
-3. **Check-in.** The device calls `/api/display` with its `Access-Token` and its state (`Battery-Voltage`, `Percent-Charged`, `RSSI`, `FW-Version`). The server answers with the image URL of the screen due now and a `refresh_rate` that wakes the device at its refresh interval or the next scheduled change, whichever comes first. It publishes the reported state to MQTT.
+3. **Check-in.** The device calls `/api/display` with its `Access-Token` and its state (`Battery-Voltage`, `Percent-Charged`, `RSSI`, `FW-Version`); the server keeps the last known value of each reading. A claimed device gets the image URL of the screen due now and a `refresh_rate` that wakes it at its refresh interval or the next scheduled change, whichever comes first. An unclaimed device gets status 202, on which the firmware shows its friendly ID; an unknown or expired key gets 500, on which the firmware forgets its key and runs setup again. The server publishes the reported state to MQTT.
 4. **Firmware update.** TRMNL publishes over-the-air images for its own hardware at `GET /api/firmware`, and full flash images for every supported board at `GET /api/firmware/flash`. For a board with only a flash image, the server cuts the app image out at the offset the image's partition table gives, and checks its checksum and SHA-256 before serving it. The server downloads each image once and serves it from its own URL, so devices without internet access can update. An install request sets `update_firmware` and `firmware_url` in the device's next check-in answer.
-5. **Logs.** The server writes `/api/log` entries to its own structured log and stores none.
+5. **Logs.** The server writes `/api/log` entries to its own structured log and stores none. It reads at most 64 KiB per request, writes at most 32 entries and 512 characters per field, and writes device text escaped so that it cannot add lines to the log.
 
 ## MQTT
 
@@ -65,6 +69,6 @@ Another engine replaces Typst by implementing the same operation and every compo
 
 ## Storage and accounts
 
-SQLite holds accounts, devices (MAC, access key, model, settings, owner), screens, data sources and schedules. Rendered images and firmware files live in a cache directory that the server rebuilds when it is lost.
+SQLite holds accounts, devices (MAC, access key hash, model, latest readings, settings, owner), screens, data sources and schedules. Rendered images and firmware files live in a cache directory that the server rebuilds when it is lost.
 
 Users sign in through OIDC or with a local password. Both implement one sign-in interface, so handlers and storage see an account, never the method. An account owns devices and screens; there are no roles.

@@ -24,6 +24,7 @@ service DeviceApi {
     ]
     errors: [
         ValidationException
+        InternalFailure
     ]
 }
 
@@ -244,5 +245,12 @@ list DeviceLogEntries {
 @error("client")
 @httpError(401)
 structure UnknownDevice {
+    message: String
+}
+
+/// The server could not complete the request; the device tries again later.
+@error("server")
+@httpError(500)
+structure InternalFailure {
     message: String
 }

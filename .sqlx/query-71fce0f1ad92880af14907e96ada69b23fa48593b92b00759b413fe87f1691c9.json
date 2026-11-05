@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT friendly_id FROM devices WHERE key_hash = ? AND created_at > ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "friendly_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "devices",
+            "name": "friendly_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "71fce0f1ad92880af14907e96ada69b23fa48593b92b00759b413fe87f1691c9"
+}

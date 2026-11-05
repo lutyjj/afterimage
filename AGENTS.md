@@ -34,6 +34,7 @@ output is never edited by hand. Each project builds on its own and depends on
 the others only through code generated from the model.
 
 The flake owns the toolchains; do not install unmanaged versions on the host.
+The [README](README.md#development) lists the commands.
 
 ## Spikes and milestones
 

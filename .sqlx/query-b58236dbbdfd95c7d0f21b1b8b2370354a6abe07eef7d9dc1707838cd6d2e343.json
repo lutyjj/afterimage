@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO devices (mac, friendly_id, key_hash, model, created_at)\n                 VALUES (?, ?, ?, ?, ?)\n                 ON CONFLICT (friendly_id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "b58236dbbdfd95c7d0f21b1b8b2370354a6abe07eef7d9dc1707838cd6d2e343"
+}

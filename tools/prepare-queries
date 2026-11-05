@@ -1,0 +1,13 @@
+#!/bin/sh
+# Refreshes .sqlx/, the query metadata that sqlx checks queries against at build time,
+# from a database built from the server's migrations. Run it after changing a query
+# or a migration; builds then need no database.
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+export DATABASE_URL="sqlite://$scratch/schema.db"
+sqlx database create
+sqlx migrate run --source "$root/crates/server/migrations"
+cd "$root"
+cargo sqlx prepare --workspace -- --all-targets

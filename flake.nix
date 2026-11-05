@@ -27,7 +27,13 @@
     in
     {
       packages = forSystems (system: {
-        inherit (scope.${system}) contract;
+        default = scope.${system}.server;
+        inherit (scope.${system}) contract server;
+      });
+
+      # The server's build runs every test.
+      checks = forSystems (system: {
+        inherit (scope.${system}) server;
       });
 
       devShells = forSystems (system: {

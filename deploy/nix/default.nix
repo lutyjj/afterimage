@@ -10,6 +10,7 @@ lib.makeScope pkgs.newScope (self: {
   smithy-cli = self.callPackage ./smithy-cli.nix { };
 
   contract = self.callPackage ./contract.nix { };
+  server = self.callPackage ./server.nix { };
 
   devShell = self.callPackage ./devshell.nix { };
 })
