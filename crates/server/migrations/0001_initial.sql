@@ -73,7 +73,14 @@ CREATE TABLE devices (
     display_model TEXT NOT NULL,
     palette TEXT NOT NULL,
     refresh_minutes INTEGER NOT NULL,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    -- The playlist position shown last; the next check-in moves past it.
+    playlist_position INTEGER,
+    -- The image the device shows: its file name, the screen it was drawn from
+    -- (NULL for one of the server's own), and when.
+    image_name TEXT,
+    image_screen_id INTEGER REFERENCES screens (id) ON DELETE SET NULL,
+    rendered_at INTEGER
 ) STRICT;
 
 -- A screen document, stored as JSON in the shape of the model's ScreenDocument.

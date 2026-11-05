@@ -305,3 +305,28 @@ operation DeleteDevice {
         NotFound
     ]
 }
+
+/// The image the device shows now.
+@readonly
+@http(method: "GET", uri: "/manage/devices/{deviceId}/image")
+operation GetDeviceImage {
+    input := {
+        @required
+        @httpLabel
+        deviceId: Id
+    }
+
+    output := {
+        @required
+        @httpHeader("Content-Type")
+        contentType: String
+
+        @required
+        @httpPayload
+        image: Blob
+    }
+
+    errors: [
+        NotFound
+    ]
+}

@@ -109,10 +109,23 @@ const FIRMWARE_ADDITIONS: [(&str, &str, &str); 2] = [
     ),
 ];
 
+/// Operations of Afterimage's own in the device API, each with why TRMNL's document
+/// has no place for it.
+const AFTERIMAGE_OPERATIONS: [(&str, &str); 1] = [(
+    "GET /api/images/{name}",
+    "TRMNL's document leaves `image_url` to the server; firmware downloads it with buildImageHeaders",
+)];
+
 #[test]
 fn adds_nothing_but_listed_firmware_additions() {
-    let model = model();
+    let mut model = model();
     let trmnl = trmnl();
+    for (operation, _) in AFTERIMAGE_OPERATIONS {
+        assert!(
+            model.operations.remove(operation).is_some(),
+            "listed operation {operation} is not in the model"
+        );
+    }
     let operations = |contract: &Contract| contract.operations.keys().cloned().collect::<Vec<_>>();
     assert_eq!(operations(&model), operations(&trmnl), "operations");
     let listed = |key: &str, name: &str| {

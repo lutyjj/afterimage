@@ -27,7 +27,10 @@ use afterimage_management_api::{Management, ManagementConfig, error, scope};
 use tower::Service;
 
 use crate::accounts::{Account, Accounts};
+use crate::clock::Clock;
 use crate::devices::Devices;
+use crate::drawing::Drawing;
+use crate::images::Images;
 use crate::oidc::Oidc;
 use crate::screens::Screens;
 use crate::sessions::{CookieName, CookiePolicy, Sessions};
@@ -45,6 +48,9 @@ pub struct State {
     pub password_sign_in: bool,
     /// Names of the secrets data sources may read; the values stay with the renderer.
     pub secret_names: Vec<String>,
+    pub drawing: Arc<Drawing>,
+    pub images: Arc<Images>,
+    pub clock: Arc<dyn Clock>,
 }
 
 /// The management API as a service. Requests carry the smithy runtime's boxed body.
@@ -88,11 +94,13 @@ pub fn service(
         .update_device(devices::update_device)
         .set_playlist(devices::set_playlist)
         .delete_device(devices::delete_device)
+        .get_device_image(devices::get_device_image)
         .list_screens(screens::list_screens)
         .create_screen(screens::create_screen)
         .get_screen(screens::get_screen)
         .update_screen(screens::update_screen)
         .delete_screen(screens::delete_screen)
+        .preview_screen(screens::preview_screen)
         .list_secret_names(screens::list_secret_names)
         .build()
         .expect("every management API operation has a handler")

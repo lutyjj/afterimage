@@ -40,9 +40,20 @@ pub struct Entry {
     pub until_minute: Option<u16>,
 }
 
+/// The image a device shows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Showing {
+    /// The file name in [`crate::images::Images`].
+    pub image: String,
+    /// The screen it was drawn from; `None` for one of the server's own.
+    pub screen_id: Option<i64>,
+    pub rendered_at: i64,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Device {
     pub id: i64,
+    pub account_id: i64,
     pub name: String,
     pub mac: String,
     pub firmware_model: String,
@@ -51,6 +62,9 @@ pub struct Device {
     pub playlist: Vec<Entry>,
     pub readings: Readings,
     pub seen_at: Option<i64>,
+    /// The playlist position shown last.
+    pub playlist_position: Option<usize>,
+    pub showing: Option<Showing>,
 }
 
 /// What a claim did.
@@ -217,6 +231,52 @@ impl Devices {
         Ok(load(&mut tx, account_id, id).await?)
     }
 
+    /// The device whose live registration holds `key`.
+    ///
+    /// # Errors
+    ///
+    /// When storage fails.
+    pub async fn with_key(&self, key: &str) -> Result<Option<Device>, Error> {
+        let key_hash = crate::keys::token_hash(key);
+        let Some(registration) = sqlx::query_scalar!(
+            "SELECT id FROM registrations WHERE key_hash = ? AND expires_at IS NULL",
+            key_hash
+        )
+        .fetch_optional(&self.pool)
+        .await?
+        else {
+            return Ok(None);
+        };
+        self.holding(registration).await
+    }
+
+    /// Records the image a device now shows and the playlist position it came
+    /// from.
+    ///
+    /// # Errors
+    ///
+    /// When storage fails.
+    pub async fn show(
+        &self,
+        id: i64,
+        position: Option<usize>,
+        showing: &Showing,
+    ) -> Result<(), Error> {
+        let position = position.and_then(|position| i64::try_from(position).ok());
+        sqlx::query!(
+            "UPDATE devices SET playlist_position = ?, image_name = ?, image_screen_id = ?, rendered_at = ?
+             WHERE id = ?",
+            position,
+            showing.image,
+            showing.screen_id,
+            showing.rendered_at,
+            id
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     /// The device holding a registration, whichever account owns it.
     ///
     /// # Errors
@@ -378,8 +438,9 @@ async fn load(
     id: i64,
 ) -> Result<Option<Device>, sqlx::Error> {
     let Some(row) = sqlx::query!(
-        "SELECT devices.id, devices.name, devices.display_model, devices.palette,
-                devices.refresh_minutes, registrations.mac, registrations.model,
+        "SELECT devices.id, devices.account_id, devices.name, devices.display_model, devices.palette,
+                devices.refresh_minutes, devices.playlist_position, devices.image_name,
+                devices.image_screen_id, devices.rendered_at, registrations.mac, registrations.model,
                 registrations.seen_at, registrations.battery_voltage,
                 registrations.battery_percent, registrations.signal_dbm,
                 registrations.firmware_version
@@ -412,8 +473,17 @@ async fn load(
             .and_then(|minute| u16::try_from(minute).ok()),
     })
     .collect();
+    let showing = row
+        .image_name
+        .zip(row.rendered_at)
+        .map(|(image, rendered_at)| Showing {
+            image,
+            screen_id: row.image_screen_id,
+            rendered_at,
+        });
     Ok(Some(Device {
         id: row.id,
+        account_id: row.account_id,
         name: row.name,
         mac: row.mac,
         firmware_model: row.model,
@@ -430,5 +500,9 @@ async fn load(
             firmware_version: row.firmware_version,
         },
         seen_at: row.seen_at,
+        playlist_position: row
+            .playlist_position
+            .and_then(|position| usize::try_from(position).ok()),
+        showing,
     }))
 }

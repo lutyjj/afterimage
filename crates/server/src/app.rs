@@ -18,6 +18,8 @@ use crate::accounts::Accounts;
 use crate::clock::Clock;
 use crate::config::Config;
 use crate::devices::Devices;
+use crate::drawing::Drawing;
+use crate::images::Images;
 use crate::keys::Entropy;
 use crate::oidc::Oidc;
 use crate::registrations::Registrations;
@@ -54,6 +56,11 @@ pub async fn build(
             "turning password sign-in off needs an OIDC provider".to_owned(),
         ));
     }
+    let time_zone = match config.time_zone.as_deref() {
+        Some(name) => jiff::tz::TimeZone::get(name)
+            .map_err(|error| Error::Settings(format!("the time zone {name}: {error}")))?,
+        None => jiff::tz::TimeZone::system(),
+    };
     std::fs::create_dir_all(&config.data_dir).map_err(Error::DataDir)?;
     let pool = database::open(&config.data_dir.join("afterimage.db")).await?;
     let oidc = match (oidc_settings, config.public_url.as_deref()) {
@@ -69,11 +76,17 @@ pub async fn build(
         ),
         _ => None,
     };
-    let registrations = Arc::new(Registrations::new(
-        pool.clone(),
-        Arc::clone(&clock),
-        Arc::clone(&entropy),
-    ));
+    let secret_names = secrets.names();
+    let drawing = Arc::new(Drawing::new(secrets, time_zone));
+    let images = Arc::new(Images::new(config.data_dir.join("images")));
+    let device_state = Arc::new(device_api::State {
+        registrations: Registrations::new(pool.clone(), Arc::clone(&clock), Arc::clone(&entropy)),
+        devices: Devices::new(pool.clone(), Arc::clone(&clock)),
+        screens: Screens::new(pool.clone(), Arc::clone(&clock)),
+        drawing: Arc::clone(&drawing),
+        images: Arc::clone(&images),
+        clock: Arc::clone(&clock),
+    });
     let state = Arc::new(management_api::State {
         accounts: Accounts::new(pool.clone(), Arc::clone(&clock)),
         sessions: Arc::new(Sessions::new(
@@ -82,15 +95,18 @@ pub async fn build(
             Arc::clone(&entropy),
         )),
         devices: Devices::new(pool.clone(), Arc::clone(&clock)),
-        screens: Screens::new(pool, clock),
+        screens: Screens::new(pool, Arc::clone(&clock)),
         oidc,
         landing: config.landing(),
         cookies: CookiePolicy::new(config.public_url_is_https()),
         password_sign_in: config.password_sign_in,
-        secret_names: secrets.names(),
+        secret_names,
+        drawing,
+        images,
+        clock,
     });
     Ok(router(
-        device_api::service(registrations),
+        device_api::service(device_state),
         management_api::service(state),
         config.web_dir.as_deref(),
     ))

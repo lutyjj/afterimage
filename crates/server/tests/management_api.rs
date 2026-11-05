@@ -199,7 +199,11 @@ async fn claiming_a_code_makes_the_registration_a_device_with_a_default_display(
     server
         .clock
         .advance(afterimage_server::registrations::IDLE_SECONDS + 24 * 60 * 60);
-    assert_eq!(server.display(&key, &READINGS).await["status"], 202);
+    assert_eq!(
+        server.display(&key, &READINGS).await["status"],
+        0,
+        "a claimed device shows a screen"
+    );
     assert_eq!(
         server.call("GET", "/manage/devices", None).await.1["devices"]
             .as_array()

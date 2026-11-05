@@ -30,11 +30,13 @@ service Management {
         UpdateDevice
         SetPlaylist
         DeleteDevice
+        GetDeviceImage
         ListScreens
         CreateScreen
         GetScreen
         UpdateScreen
         DeleteScreen
+        PreviewScreen
         ListSecretNames
     ]
     errors: [

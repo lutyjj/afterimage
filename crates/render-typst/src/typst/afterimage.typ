@@ -3,6 +3,9 @@
 // fonts and fills come from the design tokens of the display's profile, so one
 // pt is one layout pixel of TRMNL's design system.
 
+// A resolved value as text: nothing for a value a template could not produce.
+#let shown(value) = if value == none { "" } else if type(value) in (str, int, float, bool) { str(value) } else { repr(value) }
+
 // A token's value; lengths are pixels.
 #let tok(t, name, default: none) = t.at(name, default: default)
 #let px(t, name, default: 0) = tok(t, name, default: default) * 1pt
@@ -74,13 +77,13 @@
   let leading = sized(t, component, size, "-line-height")
   let leading = if leading == none or leading < 0.8 { 1.2 } else { leading }
   set par(leading: (leading - 1) * face.size)
-  clamp(text(..face, str(value.text)), value.at("clamp", default: none), face.size, leading)
+  clamp(text(..face, shown(value.text)), value.at("clamp", default: none), face.size, leading)
 }
 
 #let label(t, value, levels) = {
   let size = value.at("size", default: "base")
   let face = typeface(t, "--label", size)
-  let body = text(..face, str(value.text))
+  let body = text(..face, shown(value.text))
   let inset = (x: px(t, "--gap-xsmall", default: 5), y: 1pt)
   let radius = px(t, "--rounded-xsmall", default: 5)
   let style = value.at("style", default: "plain")
@@ -106,7 +109,7 @@
     weight: int(sized(t, "--value", value.at("size", default: "base"), "-font-weight") / 100) * 100,
     number-width: if value.at("tabular", default: false) { "tabular" } else { "proportional" },
   )
-  let body(size) = text(..face(size), str(value.text))
+  let body(size) = text(..face(size), shown(value.text))
   if not value.at("fit", default: false) { return body(base) }
   layout(region => {
     let width = measure(body(base)).width
@@ -163,9 +166,11 @@
       let every = calc.max(1, calc.ceil(labels.len() * 48pt / width))
       for (i, label) in labels.enumerate() {
         if calc.rem(i, every) == 0 and i < count {
-          // Whole pixels, so that pixel fonts land on the device's grid.
-          place(dx: calc.round((x(i) - 30pt) / 1pt) * 1pt, dy: calc.round((height + 8pt) / 1pt) * 1pt,
-            box(width: 60pt, align(center, text(..small, str(label)))))
+          // One line, clipped; whole pixels, so that pixel fonts land on the
+          // device's grid.
+          let slot = calc.max(every * width / calc.max(count, 1), 24pt)
+          place(dx: calc.round((x(i) - slot / 2) / 1pt) * 1pt, dy: calc.round((height + 8pt) / 1pt) * 1pt,
+            box(width: slot, height: small.size * 1.3, clip: true, align(center, text(..small, shown(label)))))
         }
       }
     }
@@ -236,7 +241,7 @@
     columns: (if index == none { px(t, "--item-meta-width", default: 10) } else { auto }, 1fr),
     column-gutter: px(t, "--gap-small", default: 7),
     grid.cell(fill: meta, inset: if index == none { 0pt } else { (x: 4pt, y: 2pt) },
-      if index == none { [] } else { align(center + horizon, text(..face, str(index))) }),
+      if index == none { [] } else { align(center + horizon, text(..face, shown(index))) }),
     content,
   )
 }
@@ -298,9 +303,9 @@
       align: horizon,
       rows: (100%,),
       if icon == none { [] } else { icon },
-      haloed(t, text(..face, fill: ink, str(bar.title))),
+      haloed(t, text(..face, fill: ink, shown(bar.title))),
       [],
-      haloed(t, text(..face, weight: "regular", fill: ink, str(bar.at("instance", default: "")))),
+      haloed(t, text(..face, weight: "regular", fill: ink, shown(bar.at("instance", default: none)))),
     ),
   )
 }

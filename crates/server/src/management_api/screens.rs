@@ -1,10 +1,13 @@
-//! Screens and the secrets their data sources may read.
+//! Screens, their previews, and the secrets their data sources may read.
 
 use afterimage_management_api::server::Extension;
 use afterimage_management_api::{error, input, model, output};
 
+use afterimage_trmnl::catalog::Catalog;
+
 use super::{Caller, Shared, internal, wire};
 use crate::screens::TEMPLATE_NAMES;
+use crate::showing;
 
 /// Refuses a data source named like something templates already read.
 fn check(document: &model::ScreenDocument) -> Result<(), error::ValidationException> {
@@ -129,4 +132,86 @@ pub async fn list_secret_names(
     Ok(output::ListSecretNamesOutput {
         names: state.secret_names.clone(),
     })
+}
+
+pub async fn preview_screen(
+    input: input::PreviewScreenInput,
+    Extension(state): Shared,
+    caller: Caller,
+) -> Result<output::PreviewScreenOutput, error::PreviewScreenError> {
+    check(&input.document)?;
+    let catalog = Catalog::get();
+    let display = wire::display(input.display);
+    let (Some(model), Some(palette)) = (
+        catalog.model(&display.model),
+        catalog.palette(&display.palette),
+    ) else {
+        return Err(invalid_display(&display).into());
+    };
+    if !catalog.supports(&model.name, &palette.id) {
+        return Err(invalid_display(&display).into());
+    }
+    let name = match input.device_id {
+        Some(id) => {
+            state
+                .devices
+                .get(caller.account.id, *id.inner())
+                .await
+                .map_err(|error| internal(&error))?
+                .ok_or_else(|| error::NotFound {
+                    message: "This device does not exist.".to_owned(),
+                })?
+                .name
+        }
+        None => "Preview".to_owned(),
+    };
+    let document: serde_json::Value =
+        serde_json::from_str(&wire::stored_document(&input.document)?)
+            .map_err(|error| internal(&error))?;
+    let drawn = state
+        .drawing
+        .draw(
+            &document,
+            &showing::context(&name, model),
+            model,
+            palette,
+            state.clock.now(),
+        )
+        .await;
+    let sources = drawn
+        .sources
+        .into_iter()
+        .filter_map(|(source, answer)| {
+            let source = model::Identifier::try_from(source).ok()?;
+            let answer = match answer {
+                Ok(data) => model::SourceResult::Data(wire::json(data)),
+                Err(message) => model::SourceResult::Error(message),
+            };
+            Some((source, answer))
+        })
+        .collect();
+    Ok(output::PreviewScreenOutput {
+        image: drawn
+            .image
+            .map(|image| aws_smithy_types::Blob::new(image.bytes)),
+        sources,
+        problems: drawn
+            .problems
+            .into_iter()
+            .map(|problem| model::Problem {
+                message: problem.message,
+                path: problem.path,
+            })
+            .collect(),
+    })
+}
+
+fn invalid_display(display: &crate::devices::Display) -> error::ValidationException {
+    error::ValidationException {
+        message: format!(
+            "{} with {} is not a display TRMNL's catalogue lists.",
+            display.model, display.palette
+        ),
+        field_list: None,
+    }
 }

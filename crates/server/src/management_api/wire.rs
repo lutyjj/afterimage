@@ -57,7 +57,15 @@ pub fn device(device: Device) -> Result<model::Device, InternalFailure> {
             firmware_version: device.readings.firmware_version,
         },
         seen_at: device.seen_at.map(DateTime::from_secs),
-        showing: None,
+        showing: device
+            .showing
+            .map(|showing| -> Result<_, InternalFailure> {
+                Ok(model::Showing {
+                    screen_id: showing.screen_id.map(fit).transpose()?,
+                    rendered_at: DateTime::from_secs(showing.rendered_at),
+                })
+            })
+            .transpose()?,
     })
 }
 
@@ -179,4 +187,28 @@ pub fn summary(screen: Summary) -> Result<model::ScreenSummary, InternalFailure>
         name: fit(screen.name)?,
         updated_at: DateTime::from_secs(screen.updated_at),
     })
+}
+
+/// JSON as a Smithy document.
+pub fn json(value: serde_json::Value) -> aws_smithy_types::Document {
+    use aws_smithy_types::{Document, Number};
+    match value {
+        serde_json::Value::Null => Document::Null,
+        serde_json::Value::Bool(value) => Document::Bool(value),
+        serde_json::Value::Number(number) => Document::Number(
+            number
+                .as_u64()
+                .map(Number::PosInt)
+                .or_else(|| number.as_i64().map(Number::NegInt))
+                .unwrap_or_else(|| Number::Float(number.as_f64().unwrap_or(0.0))),
+        ),
+        serde_json::Value::String(text) => Document::String(text),
+        serde_json::Value::Array(items) => Document::Array(items.into_iter().map(json).collect()),
+        serde_json::Value::Object(members) => Document::Object(
+            members
+                .into_iter()
+                .map(|(name, member)| (name, json(member)))
+                .collect(),
+        ),
+    }
 }

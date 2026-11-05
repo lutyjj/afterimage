@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 afterimage-device-api = { path = "../../gen/device-api" }
 afterimage-management-api = { path = "../../gen/management-api", features = ["serde"] }
+afterimage-render-typst = { path = "../render-typst" }
 afterimage-trmnl = { path = "../trmnl" }
 
 # Document, Number and Blob for generated shapes; Cargo unifies this 1.x requirement
@@ -26,12 +27,23 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 # Cookie parsing and Set-Cookie formatting. Nothing is signed: cookies carry opaque
 # random tokens whose hashes the database holds.
 cookie = "0.18.2"
+# data: URLs in image components.
+data-url = "0.3.2"
 getrandom = "0.4.3"
 http = "1.5.0"
+# Local time for playlists; the time zone database is bundled so that a host or
+# container without one still schedules correctly.
+jiff = { version = "0.2.39", features = ["tzdb-bundle-always"] }
+# Screen templates, with Jinja's filters for dates (in the server's time zone) and
+# Python's string methods, as Home Assistant templates have them.
+minijinja = { version = "3.0.5", features = ["fuel", "json", "loop_controls", "serde", "urlencode"] }
+minijinja-contrib = { version = "3.0.5", features = ["datetime", "timezone", "pycompat"] }
 http-body = "1.0.1"
 hyper = "1.12.0"
 # RustCrypto's argon2id with its default cost, as PHC strings the accounts table stores.
 password-auth = "2.0.0"
+# Data sources and images.
+reqwest = "0.13.5"
 openidconnect = { version = "4.1.0", default-features = false, features = ["reqwest", "rustls-tls"] }
 serde = { workspace = true }
 serde_json.workspace = true
@@ -45,6 +57,9 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [dev-dependencies]
+# A stand-in data source for the tests.
+axum = { version = "0.8.9", default-features = false, features = ["tokio", "http1", "json"] }
+png = "0.18.1"
 reqwest = { version = "0.13", default-features = false, features = ["cookies", "json"] }
 tempfile = "3"
 

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT devices.id, devices.name, devices.display_model, devices.palette,\n                devices.refresh_minutes, registrations.mac, registrations.model,\n                registrations.seen_at, registrations.battery_voltage,\n                registrations.battery_percent, registrations.signal_dbm,\n                registrations.firmware_version\n         FROM devices JOIN registrations ON registrations.id = devices.registration_id\n         WHERE devices.id = ? AND devices.account_id = ?",
+  "query": "SELECT devices.id, devices.account_id, devices.name, devices.display_model, devices.palette,\n                devices.refresh_minutes, devices.playlist_position, devices.image_name,\n                devices.image_screen_id, devices.rendered_at, registrations.mac, registrations.model,\n                registrations.seen_at, registrations.battery_voltage,\n                registrations.battery_percent, registrations.signal_dbm,\n                registrations.firmware_version\n         FROM devices JOIN registrations ON registrations.id = devices.registration_id\n         WHERE devices.id = ? AND devices.account_id = ?",
   "describe": {
     "columns": [
       {
@@ -15,8 +15,19 @@
         }
       },
       {
-        "name": "name",
+        "name": "account_id",
         "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "devices",
+            "name": "account_id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 2,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -27,7 +38,7 @@
       },
       {
         "name": "display_model",
-        "ordinal": 2,
+        "ordinal": 3,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -38,7 +49,7 @@
       },
       {
         "name": "palette",
-        "ordinal": 3,
+        "ordinal": 4,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -49,7 +60,7 @@
       },
       {
         "name": "refresh_minutes",
-        "ordinal": 4,
+        "ordinal": 5,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -59,8 +70,52 @@
         }
       },
       {
+        "name": "playlist_position",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "devices",
+            "name": "playlist_position"
+          }
+        }
+      },
+      {
+        "name": "image_name",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "devices",
+            "name": "image_name"
+          }
+        }
+      },
+      {
+        "name": "image_screen_id",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "devices",
+            "name": "image_screen_id"
+          }
+        }
+      },
+      {
+        "name": "rendered_at",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "devices",
+            "name": "rendered_at"
+          }
+        }
+      },
+      {
         "name": "mac",
-        "ordinal": 5,
+        "ordinal": 10,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -71,7 +126,7 @@
       },
       {
         "name": "model",
-        "ordinal": 6,
+        "ordinal": 11,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -82,7 +137,7 @@
       },
       {
         "name": "seen_at",
-        "ordinal": 7,
+        "ordinal": 12,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -93,7 +148,7 @@
       },
       {
         "name": "battery_voltage",
-        "ordinal": 8,
+        "ordinal": 13,
         "type_info": "Float",
         "origin": {
           "Table": {
@@ -104,7 +159,7 @@
       },
       {
         "name": "battery_percent",
-        "ordinal": 9,
+        "ordinal": 14,
         "type_info": "Float",
         "origin": {
           "Table": {
@@ -115,7 +170,7 @@
       },
       {
         "name": "signal_dbm",
-        "ordinal": 10,
+        "ordinal": 15,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -126,7 +181,7 @@
       },
       {
         "name": "firmware_version",
-        "ordinal": 11,
+        "ordinal": 16,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -146,6 +201,11 @@
       false,
       false,
       false,
+      true,
+      true,
+      true,
+      true,
+      false,
       false,
       true,
       true,
@@ -154,5 +214,5 @@
       true
     ]
   },
-  "hash": "ba8270d5cd38e2d33c6cfb082db2d666ad4031f206b810578b8db68e9f6bf6fc"
+  "hash": "c1052f1a8fa6a18151f402bc15bd0b24f210274cef08cb96e8d12ac5c9801111"
 }

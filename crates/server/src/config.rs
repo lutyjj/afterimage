@@ -31,6 +31,11 @@ pub struct Config {
     #[arg(long, env = "AFTERIMAGE_WEB_DIR")]
     pub web_dir: Option<PathBuf>,
 
+    /// The time zone of playlist times and of dates on screens, such as
+    /// `Europe/Berlin`; the host's when unset.
+    #[arg(long, env = "AFTERIMAGE_TIME_ZONE")]
+    pub time_zone: Option<String>,
+
     /// Whether people may sign in with a password. Turning it off needs an OIDC
     /// provider.
     #[arg(long, env = "AFTERIMAGE_PASSWORD_SIGN_IN", default_value_t = true, action = clap::ArgAction::Set)]

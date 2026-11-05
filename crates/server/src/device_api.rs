@@ -1,4 +1,5 @@
-//! The generated device API, served over the registrations.
+//! The generated device API, served over the registrations and, for claimed
+//! devices, what they show.
 
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -11,7 +12,25 @@ use afterimage_device_api::{DeviceApi, DeviceApiConfig, error, input, output};
 use afterimage_trmnl::{DisplayStatus, Mac, Readings, SetupStatus, panel_size};
 use tower::Service;
 
-use crate::registrations::{self, CheckIn, Refusal, Registrations, Setup};
+use crate::clock::Clock;
+use crate::devices::Devices;
+use crate::drawing::Drawing;
+use crate::images::Images;
+use crate::registrations::{CheckIn, Refusal, Registrations, Setup};
+use crate::screens::Screens;
+use crate::showing;
+
+/// What the handlers act on.
+pub struct State {
+    pub registrations: Registrations,
+    pub devices: Devices,
+    pub screens: Screens,
+    pub drawing: Arc<Drawing>,
+    pub images: Arc<Images>,
+    pub clock: Arc<dyn Clock>,
+}
+
+type Shared = Extension<Arc<State>>;
 
 /// The `refresh_rate` sent with 202. The model requires one, but on 202 firmware
 /// 1.8.18 follows its own fast-poll schedule instead (`fastPollSeconds` in
@@ -35,7 +54,7 @@ const CLAIM_MESSAGE: &str = "Claim this device in Afterimage with this code.";
 /// that builds the service catches.
 #[must_use]
 pub fn service(
-    registrations: Arc<Registrations>,
+    state: Arc<State>,
 ) -> impl Service<
     Request<BoxBody>,
     Response = Response<BoxBody>,
@@ -45,22 +64,24 @@ pub fn service(
 + Send
 + 'static {
     let config = DeviceApiConfig::builder()
-        .layer(AddExtensionLayer::new(registrations))
+        .layer(AddExtensionLayer::new(state))
         .build();
     DeviceApi::builder(config)
         .setup_device(setup_device)
         .get_display(get_display)
         .get_current_screen(get_current_screen)
         .create_device_log(create_device_log)
+        .get_screen_image(get_screen_image)
         .build()
         .expect("every device API operation has a handler")
 }
 
 async fn setup_device(
     input: input::SetupDeviceInput,
-    Extension(registrations): Extension<Arc<Registrations>>,
+    Extension(state): Shared,
 ) -> Result<output::SetupDeviceOutput, error::SetupDeviceError> {
-    let setup = registrations
+    let setup = state
+        .registrations
         .setup(&input.id, &input.model)
         .await
         .map_err(|error| internal_failure(&error))?;
@@ -132,7 +153,8 @@ fn waiting() -> output::GetDisplayOutput {
 
 async fn get_display(
     input: input::GetDisplayInput,
-    Extension(registrations): Extension<Arc<Registrations>>,
+    Extension(state): Shared,
+    Origin(origin): Origin,
 ) -> Result<output::GetDisplayOutput, error::GetDisplayError> {
     let readings = Readings::parse(
         input.battery_voltage.as_deref(),
@@ -141,7 +163,8 @@ async fn get_display(
         input.firmware_version.as_deref(),
     );
     let panel = panel_size(input.width.as_deref(), input.height.as_deref());
-    let check_in = registrations
+    let check_in = state
+        .registrations
         .check_in(&input.access_token, &readings, panel)
         .await
         .map_err(|error| internal_failure(&error))?;
@@ -161,7 +184,31 @@ async fn get_display(
         }
         CheckIn::Claimed { registration_id } => {
             tracing::debug!(registration_id, ?readings, "check-in");
-            waiting()
+            let Some(device) = state
+                .devices
+                .holding(registration_id)
+                .await
+                .map_err(|error| internal_failure(&error))?
+            else {
+                return Ok(waiting());
+            };
+            let shown = showing::next(
+                &device,
+                &state.devices,
+                &state.screens,
+                &state.drawing,
+                &state.images,
+                state.clock.now(),
+            )
+            .await
+            .map_err(|error| internal_failure(&error))?;
+            output::GetDisplayOutput {
+                status: DisplayStatus::Show.code(),
+                image_url: Some(format!("{origin}/api/images/{}", shown.image)),
+                filename: Some(filename(&shown.image)),
+                refresh_rate: i32::try_from(shown.wait).unwrap_or(i32::MAX),
+                ..waiting()
+            }
         }
         CheckIn::Reset => {
             tracing::info!("erasing a removed device's settings");
@@ -175,22 +222,110 @@ async fn get_display(
 }
 
 async fn get_current_screen(
-    _input: input::GetCurrentScreenInput,
+    input: input::GetCurrentScreenInput,
+    Extension(state): Shared,
+    Origin(origin): Origin,
 ) -> Result<output::GetCurrentScreenOutput, error::GetCurrentScreenError> {
-    Ok(output::GetCurrentScreenOutput {
-        status: DisplayStatus::Unclaimed.code(),
-        refresh_rate: RETRY_SECONDS,
-        image_url: None,
-        filename: None,
-        rendered_at: None,
+    let device = state
+        .devices
+        .with_key(&input.access_token)
+        .await
+        .map_err(|error| internal_failure(&error))?;
+    let showing = device
+        .as_ref()
+        .and_then(|device| device.showing.clone().map(|showing| (device, showing)));
+    Ok(match showing {
+        Some((device, showing)) => output::GetCurrentScreenOutput {
+            status: DisplayStatus::Show.code(),
+            refresh_rate: i32::try_from(device.refresh_minutes * 60).unwrap_or(i32::MAX),
+            image_url: Some(format!("{origin}/api/images/{}", showing.image)),
+            filename: Some(filename(&showing.image)),
+            rendered_at: Some(aws_smithy_types::DateTime::from_secs(showing.rendered_at)),
+        },
+        None => output::GetCurrentScreenOutput {
+            status: DisplayStatus::Unclaimed.code(),
+            refresh_rate: RETRY_SECONDS,
+            image_url: None,
+            filename: None,
+            rendered_at: None,
+        },
     })
+}
+
+async fn get_screen_image(
+    input: input::GetScreenImageInput,
+    Extension(state): Shared,
+) -> Result<output::GetScreenImageOutput, error::GetScreenImageError> {
+    let Some(device) = state
+        .devices
+        .with_key(&input.access_token)
+        .await
+        .map_err(|error| internal_failure(&error))?
+    else {
+        return Err(error::UnknownDevice {
+            message: Some("No device holds this access token.".to_owned()),
+        }
+        .into());
+    };
+    let not_found = || error::ImageNotFound {
+        message: Some("This device shows no image of that name.".to_owned()),
+    };
+    let current = device
+        .showing
+        .as_ref()
+        .map(|showing| showing.image.as_str());
+    if current != Some(input.name.as_str()) {
+        return Err(not_found().into());
+    }
+    let image = state
+        .images
+        .read(device.id, &input.name)
+        .map_err(|error| internal_failure(&error))?
+        .ok_or_else(not_found)?;
+    Ok(output::GetScreenImageOutput {
+        content_type: "image/png".to_owned(),
+        image: aws_smithy_types::Blob::new(image),
+    })
+}
+
+/// The `filename` the firmware caches an image under: its name without the
+/// extension, within the firmware's 31 characters.
+fn filename(image: &str) -> String {
+    image.trim_end_matches(".png").to_owned()
+}
+
+/// The scheme and host the device reached the server at, from `Host` and a
+/// reverse proxy's `X-Forwarded-Proto`; image URLs use it so that a device
+/// downloads from where it checks in.
+pub struct Origin(pub String);
+
+impl<Protocol> afterimage_device_api::server::request::FromParts<Protocol> for Origin {
+    type Rejection = Infallible;
+
+    fn from_parts(parts: &mut http::request::Parts) -> Result<Self, Self::Rejection> {
+        let header = |name: http::header::HeaderName| {
+            parts
+                .headers
+                .get(name)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned)
+        };
+        let scheme = header(http::HeaderName::from_static("x-forwarded-proto"))
+            .filter(|scheme| scheme == "https")
+            .unwrap_or_else(|| "http".to_owned());
+        let host = header(http::header::HOST)
+            .filter(|host| !host.is_empty() && host.bytes().all(|b| b.is_ascii_graphic()))
+            .unwrap_or_else(|| "localhost".to_owned());
+        Ok(Self(format!("{scheme}://{host}")))
+    }
 }
 
 async fn create_device_log(
     input: input::CreateDeviceLogInput,
-    Extension(registrations): Extension<Arc<Registrations>>,
+    Extension(state): Shared,
 ) -> Result<output::CreateDeviceLogOutput, error::CreateDeviceLogError> {
-    let Some(registration) = registrations
+    let Some(registration) = state
+        .registrations
         .find(&input.access_token)
         .await
         .map_err(|error| internal_failure(&error))?
@@ -247,7 +382,7 @@ fn write_entry(friendly_id: &str, entry: &Document) {
     }
 }
 
-fn internal_failure(error: &registrations::Error) -> error::InternalFailure {
+fn internal_failure(error: &dyn std::fmt::Display) -> error::InternalFailure {
     tracing::error!(%error, "device API request failed");
     error::InternalFailure {
         message: Some("The server could not complete the request.".to_owned()),

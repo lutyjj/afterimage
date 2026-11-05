@@ -164,6 +164,35 @@ pub async fn delete_device(
     if !deleted {
         return Err(not_found().into());
     }
+    if let Err(error) = state.images.forget(*input.device_id.inner()) {
+        tracing::warn!(%error, "a removed device's images stay on disk");
+    }
     tracing::info!(device = *input.device_id.inner(), reset, "device removed");
     Ok(output::DeleteDeviceOutput {})
+}
+
+pub async fn get_device_image(
+    input: input::GetDeviceImageInput,
+    Extension(state): Shared,
+    caller: Caller,
+) -> Result<output::GetDeviceImageOutput, error::GetDeviceImageError> {
+    let device = state
+        .devices
+        .get(caller.account.id, *input.device_id.inner())
+        .await
+        .map_err(|error| internal(&error))?
+        .ok_or_else(not_found)?;
+    let no_image = || error::NotFound {
+        message: "This device shows no image yet.".to_owned(),
+    };
+    let showing = device.showing.ok_or_else(no_image)?;
+    let image = state
+        .images
+        .read(device.id, &showing.image)
+        .map_err(|error| internal(&error))?
+        .ok_or_else(no_image)?;
+    Ok(output::GetDeviceImageOutput {
+        content_type: "image/png".to_owned(),
+        image: aws_smithy_types::Blob::new(image),
+    })
 }

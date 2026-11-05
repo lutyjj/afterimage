@@ -22,6 +22,7 @@ service DeviceApi {
         GetDisplay
         GetCurrentScreen
         CreateDeviceLog
+        GetScreenImage
     ]
     errors: [
         ValidationException
@@ -269,5 +270,45 @@ structure UnknownDevice {
 @error("server")
 @httpError(500)
 structure InternalFailure {
+    message: String
+}
+
+/// The image a check-in answer names in `image_url`. This operation is Afterimage's:
+/// TRMNL's document leaves the image URL to the server. Firmware 1.8.18 downloads
+/// it with the device's `Access-Token` (`buildImageHeaders`), and only the device
+/// the image was drawn for may fetch it.
+@readonly
+@http(method: "GET", uri: "/api/images/{name}", code: 200)
+operation GetScreenImage {
+    input := {
+        @required
+        @httpLabel
+        name: String
+
+        @required
+        @httpHeader("Access-Token")
+        accessToken: String
+    }
+
+    output := {
+        @required
+        @httpHeader("Content-Type")
+        contentType: String
+
+        @required
+        @httpPayload
+        image: Blob
+    }
+
+    errors: [
+        UnknownDevice
+        ImageNotFound
+    ]
+}
+
+/// The device's current screen has another name, or there is none yet.
+@error("client")
+@httpError(404)
+structure ImageNotFound {
     message: String
 }

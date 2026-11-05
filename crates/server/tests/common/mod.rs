@@ -83,14 +83,23 @@ pub async fn start() -> Server {
 
 /// The server with this randomness and these extra command-line settings.
 pub async fn start_with(entropy: Arc<dyn Entropy>, settings: &[&str]) -> Server {
+    start_full(entropy, settings, Secrets::default()).await
+}
+
+/// The server with these secrets, in UTC.
+pub async fn start_with_secrets(secrets: Secrets) -> Server {
+    start_full(Arc::new(OsEntropy), &[], secrets).await
+}
+
+async fn start_full(entropy: Arc<dyn Entropy>, settings: &[&str], secrets: Secrets) -> Server {
     let data = TempDir::new().unwrap();
     let clock = Arc::new(ManualClock(AtomicI64::new(1_800_000_000)));
     let data_dir = data.path().to_str().unwrap().to_owned();
-    let arguments = ["afterimage", "--data-dir", &data_dir]
+    let arguments = ["afterimage", "--data-dir", &data_dir, "--time-zone", "UTC"]
         .into_iter()
         .chain(settings.iter().copied());
     let config = Config::try_parse_from(arguments).unwrap();
-    let app = app::build(&config, Secrets::default(), clock.clone(), entropy)
+    let app = app::build(&config, secrets, clock.clone(), entropy)
         .await
         .unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

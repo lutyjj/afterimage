@@ -12,8 +12,9 @@ string ScreenName
 /// Text without `{{` is itself. A template that is exactly one `{{ expression }}`
 /// keeps the expression's value, so `{{ forecast | map(attribute='temperature') }}`
 /// is a list; any other template is text. Templates read every data source by its
-/// name, `now` (the time of the render) and `device` (`name`, `width`, `height`).
-/// Data source requests also read `secrets`.
+/// name, `now()` (the time of the render, for filters such as `datetimeformat`)
+/// and `device` (`name`, `width`, `height`). Data source requests also read
+/// `secrets`.
 @length(max: 4096)
 string Template
 
@@ -476,6 +477,65 @@ operation DeleteScreen {
         NotFound
     ]
 }
+
+/// Draws a screen document as a device with `display` would show it, with what
+/// each data source answered.
+@http(method: "POST", uri: "/manage/preview")
+operation PreviewScreen {
+    input := {
+        @required
+        document: ScreenDocument
+
+        @required
+        display: Display
+
+        /// The device whose name and size templates read; absent reads the
+        /// display model's size and the name "Preview".
+        deviceId: Id
+    }
+
+    output := {
+        /// A PNG at the display's size; absent when the screen could not be drawn.
+        image: Blob
+
+        @required
+        sources: SourceResults
+
+        /// What kept the screen from being drawn as written.
+        @required
+        problems: Problems
+    }
+
+    errors: [
+        NotFound
+    ]
+}
+
+map SourceResults {
+    key: Identifier
+    value: SourceResult
+}
+
+union SourceResult {
+    /// The JSON the source answered.
+    data: Document
+
+    /// Why the source gave no data.
+    error: String
+}
+
+list Problems {
+    member: Problem
+}
+
+structure Problem {
+    @required
+    message: String
+
+    /// Where in the document, as a JSON Pointer such as `/content/column/children/0`.
+    path: String
+}
+
 
 /// The names of the secrets the deployment provides, which data source requests read
 /// as `secrets.NAME`. The values never appear in an answer, but every account's
