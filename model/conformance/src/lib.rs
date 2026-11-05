@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// The operations TRMNL firmware calls, as `(method, path)`.
+/// The device operations TRMNL documents, as `(method, path)`.
 pub const DEVICE_OPERATIONS: [(&str, &str); 4] = [
     ("get", "/api/setup"),
     ("get", "/api/display"),

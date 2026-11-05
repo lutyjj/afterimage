@@ -6,7 +6,7 @@ use std::sync::Arc;
 use aws_smithy_types::{Document, Number};
 use afterimage_device_api::server::{AddExtensionLayer, Extension};
 use afterimage_device_api::{DeviceApi, DeviceApiConfig, error, input, output};
-use afterimage_trmnl::{DisplayStatus, Readings, SetupStatus};
+use afterimage_trmnl::{DisplayStatus, Mac, Readings, SetupStatus};
 use tokio::net::TcpListener;
 
 use crate::registrations::{self, Refusal, Registrations, Setup};
@@ -100,7 +100,9 @@ fn refusal_message(refusal: Refusal) -> &'static str {
 /// does not know gets the same answer, because the only other answer that moves the
 /// device, 500, wipes its Wi-Fi settings. Such a device keeps showing a code the
 /// server has dropped and never runs setup again, since it still holds a key; a
-/// reset at the device recovers it, and the log names its MAC.
+/// reset at the device recovers it, and the log names its MAC. An empty key, which
+/// the firmware sends after a setup that failed, gets the same answer: the device
+/// shows an empty code until its next wake runs setup again.
 const CHECK_IN_STATUS: DisplayStatus = DisplayStatus::Unclaimed;
 
 async fn get_display(
@@ -124,7 +126,12 @@ async fn get_display(
             "check-in"
         );
     } else {
-        tracing::warn!(mac = ?input.id, "check-in with a key no registration holds");
+        // The header is untrusted text; only a parsed MAC reaches the log.
+        let mac = input.id.as_deref().and_then(|id| id.parse::<Mac>().ok());
+        tracing::warn!(
+            mac = mac.map(tracing::field::display),
+            "check-in with a key no registration holds"
+        );
     }
     Ok(output::GetDisplayOutput {
         status: CHECK_IN_STATUS.code(),

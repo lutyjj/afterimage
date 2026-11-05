@@ -22,7 +22,7 @@ The Smithy model in `model/smithy/` is the single source of truth. One build gen
 
 The device API mirrors the four device operations TRMNL documents: `GET /api/setup`, `GET /api/display`, `GET /api/display/current` and `POST /api/log`; firmware 1.8.18 calls all but `/api/display/current`. TRMNL publishes them in its OpenAPI document (`https://trmnl.com/api-docs/openapi.json`); `model/trmnl/device-api.json` is the excerpt that `tools/trmnl-excerpt` takes from it, and the conformance test fails on any operation, header, body field or response field that the generated document and the excerpt do not share.
 
-Where the document and the firmware disagree, the firmware decides. Headers are text, because the firmware sends values such as `3000/3500` where the document says number; the server parses what it reads and treats a value that does not parse as unknown. Status values follow the firmware's handling of them, which behaviour tests replay with the headers and bodies the firmware builds.
+Where the document and the firmware disagree, the firmware decides. Headers are text, because the firmware sends values such as `3000/3500` where the document says number; the server parses what it reads and treats a value that does not parse as unknown. Status values follow the firmware's handling of them, which behaviour tests replay with the headers and bodies the firmware builds. The conformance test compares operations, headers, body fields and success fields; error responses are outside it, and each one the model adds is documented on its operation.
 
 ## Components
 
@@ -45,7 +45,7 @@ Each component builds on its own and depends on the others only through generate
 2. **Model.** The reported `Model` selects the device's render profile from TRMNL's `GET /api/models` and its firmware board from TRMNL's firmware lists. TRMNL publishes no mapping from the name a firmware build reports to either list, so the server keeps that mapping as data. A user can change a device's render profile.
 3. **Check-in.** The device calls `/api/display` with its `Access-Token`, its MAC and its state (`Battery-Voltage`, `Percent-Charged`, `RSSI`, `FW-Version`); the server keeps the last known value of each reading. A claimed device gets the image URL of the screen due now and a `refresh_rate` that wakes it at its refresh interval or the next scheduled change, whichever comes first. An unclaimed device gets status 202, on which the firmware shows its friendly ID and polls on its own schedule, every 5 seconds at first and backing off to hourly. A key the server does not know also gets 202, because 500 would wipe the device; such a device keeps showing a code the server has dropped and needs a reset at the device, and the server logs its MAC. Status 500 is sent only when a user removes a device in the web UI and chooses to reset it. A server failure is an HTTP error, which the firmware retries. The server publishes the reported state to MQTT.
 4. **Firmware update.** TRMNL publishes over-the-air images for its own hardware at `GET /api/firmware`, and full flash images for every supported board at `GET /api/firmware/flash`. For a board with only a flash image, the server cuts the app image out at the offset the image's partition table gives, and checks its checksum and SHA-256 before serving it. The server downloads each image once and serves it from its own URL, so devices without internet access can update. An install request sets `update_firmware` and `firmware_url` in the device's next check-in answer.
-5. **Logs.** The server writes `/api/log` entries to its own structured log and stores none. It reads at most 64 KiB per request, writes at most 32 entries and 512 characters per field, and writes device text escaped so that it cannot add lines to the log.
+5. **Logs.** The server writes `/api/log` entries to its own structured log and stores none. It reads at most 64 KiB per request, writes at most 32 entries and 512 characters per field, and writes device text escaped so that it cannot add lines to the log. Requests are bounded but their rate is not: a host on the network that holds a key can fill the log, which is the same trust the network already has over the device API.
 
 ## MQTT
 
@@ -69,6 +69,6 @@ Another engine replaces Typst by implementing the same operation and every compo
 
 ## Storage and accounts
 
-SQLite holds accounts, registrations (MAC, access key hash, friendly ID, latest readings), devices (owner, name, settings, current registration), screens, data sources and schedules. Rendered images and firmware files live in a cache directory that the server rebuilds when it is lost.
+SQLite holds accounts, registrations (MAC, model, access key hash, friendly ID, end time, latest readings), devices (owner, name, settings, current registration), screens, data sources and schedules. Rendered images and firmware files live in a cache directory that the server rebuilds when it is lost.
 
 Users sign in through OIDC or with a local password. Both implement one sign-in interface, so handlers and storage see an account, never the method. An account owns devices and screens; there are no roles.

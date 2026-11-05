@@ -172,13 +172,11 @@ impl Server {
             .header("Model", MODEL)
             .header("Image-Cached", "false")
             .header("Wake-Time", "12")
-            .header("Reset-Reason", "deepsleep")
             .header("RSSI", readings.rssi)
             .header("WiFi-Band", "2.4")
             .header("Temperature-Profile", "true")
             .header("Width", "800")
             .header("Height", "480")
-            .header("Log-Level", "info")
             .send()
             .await
             .unwrap();
@@ -391,6 +389,55 @@ async fn concurrent_setups_each_get_their_own_key_and_code() {
     for (key, _) in &answers {
         assert_eq!(server.display(key, &READINGS).await["status"], 202);
     }
+}
+
+/// The unclaimed limit holds under concurrent setups: `BEGIN IMMEDIATE` serializes
+/// each setup's count and insert.
+#[tokio::test]
+async fn concurrent_setups_at_the_limit_take_the_last_place_once() {
+    let server = Arc::new(start().await);
+    for index in 0..u8::try_from(UNCLAIMED_LIMIT - 1).unwrap() {
+        server.register(&mac(index)).await;
+    }
+    let setups: Vec<_> = (0..8)
+        .map(|index| {
+            let server = Arc::clone(&server);
+            tokio::spawn(async move { server.setup(&format!("02:00:00:00:01:{index:02X}")).await })
+        })
+        .collect();
+    let mut registered = 0;
+    for setup in setups {
+        if setup.await.unwrap()["status"] == 200 {
+            registered += 1;
+        }
+    }
+    assert_eq!(registered, 1);
+    assert_eq!(
+        server.stored("SELECT id FROM registrations").await.len(),
+        usize::try_from(UNCLAIMED_LIMIT).unwrap()
+    );
+}
+
+/// A registration ends on time whether or not another setup runs: its key stops
+/// working and a late check-in does not revive it.
+#[tokio::test]
+async fn an_ended_registration_does_not_come_back() {
+    let server = start().await;
+    let (unused, _) = server.register(&mac(1)).await;
+    let (idle, _) = server.register(&mac(2)).await;
+    server.display(&idle, &READINGS).await;
+    server.clock.advance(UNUSED_SECONDS);
+    server.display(&unused, &READINGS).await;
+    let rows = server
+        .stored("SELECT seen_at FROM registrations WHERE mac = '41:B4:10:39:A1:01'")
+        .await;
+    assert_eq!(rows[0].get::<Option<i64>, _>(0), None, "not revived");
+    server.clock.advance(IDLE_SECONDS - UNUSED_SECONDS);
+    assert_eq!(
+        server.log(&idle, json!({ "logs": [] }).to_string()).await,
+        StatusCode::UNAUTHORIZED,
+        "an idle registration's key stops working"
+    );
 }
 
 #[tokio::test]

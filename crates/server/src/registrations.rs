@@ -10,7 +10,9 @@
 //! A device that runs setup again shows the new code; the registration it left
 //! behind goes idle. Unclaimed registrations end when they are not used: one whose
 //! key never checks in after [`UNUSED_SECONDS`], one that stops checking in after
-//! [`IDLE_SECONDS`]. A powered device checks in at least hourly.
+//! [`IDLE_SECONDS`]. A powered device checks in at least hourly. Each row carries
+//! the time it ends (`expires_at`), which setup and check-in set; every query treats
+//! an ended registration as gone, and setup deletes ended rows.
 
 use std::path::Path;
 use std::str::FromStr;
@@ -121,22 +123,16 @@ impl Registrations {
         }
         let mac = mac.to_string();
         let now = self.clock.now();
-        let unused_before = now - UNUSED_SECONDS;
-        let idle_before = now - IDLE_SECONDS;
+        let expires_at = now + UNUSED_SECONDS;
         let key = secrets::new_key(&*self.entropy);
         let key_hash = secrets::key_hash(&key);
 
         // IMMEDIATE takes the write lock up front, so the count and the insert below
         // see the same registrations as every other setup.
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
-        sqlx::query!(
-            "DELETE FROM registrations
-             WHERE (seen_at IS NULL AND created_at <= ?) OR seen_at <= ?",
-            unused_before,
-            idle_before
-        )
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query!("DELETE FROM registrations WHERE expires_at <= ?", now)
+            .execute(&mut *tx)
+            .await?;
         let unclaimed = sqlx::query_scalar!("SELECT COUNT(*) FROM registrations")
             .fetch_one(&mut *tx)
             .await?;
@@ -147,14 +143,15 @@ impl Registrations {
         for _ in 0..FRIENDLY_ID_ATTEMPTS {
             let friendly_id = secrets::new_friendly_id(&*self.entropy);
             let inserted = sqlx::query!(
-                "INSERT INTO registrations (mac, friendly_id, key_hash, model, created_at)
-                 VALUES (?, ?, ?, ?, ?)
+                "INSERT INTO registrations (mac, friendly_id, key_hash, model, created_at, expires_at)
+                 VALUES (?, ?, ?, ?, ?, ?)
                  ON CONFLICT (friendly_id) DO NOTHING",
                 mac,
                 friendly_id,
                 key_hash,
                 model,
-                now
+                now,
+                expires_at
             )
             .execute(&mut *tx)
             .await?;
@@ -178,21 +175,25 @@ impl Registrations {
     ) -> Result<Option<Registration>, Error> {
         let key_hash = secrets::key_hash(key);
         let now = self.clock.now();
+        let expires_at = now + IDLE_SECONDS;
         let friendly_id = sqlx::query_scalar!(
             "UPDATE registrations SET
                  seen_at = ?,
+                 expires_at = ?,
                  battery_voltage = COALESCE(?, battery_voltage),
                  battery_percent = COALESCE(?, battery_percent),
                  signal_dbm = COALESCE(?, signal_dbm),
                  firmware_version = COALESCE(?, firmware_version)
-             WHERE key_hash = ?
+             WHERE key_hash = ? AND expires_at > ?
              RETURNING friendly_id",
             now,
+            expires_at,
             readings.battery_voltage,
             readings.battery_percent,
             readings.signal_dbm,
             readings.firmware_version,
-            key_hash
+            key_hash,
+            now
         )
         .fetch_optional(&self.pool)
         .await?;
@@ -206,9 +207,11 @@ impl Registrations {
     /// When storage fails.
     pub async fn find(&self, key: &str) -> Result<Option<Registration>, Error> {
         let key_hash = secrets::key_hash(key);
+        let now = self.clock.now();
         let friendly_id = sqlx::query_scalar!(
-            "SELECT friendly_id FROM registrations WHERE key_hash = ?",
-            key_hash
+            "SELECT friendly_id FROM registrations WHERE key_hash = ? AND expires_at > ?",
+            key_hash,
+            now
         )
         .fetch_optional(&self.pool)
         .await?;

@@ -13,6 +13,8 @@ CREATE TABLE registrations (
     created_at INTEGER NOT NULL,
     -- The last check-in; NULL until the device uses its key.
     seen_at INTEGER,
+    -- When the registration ends unless the device checks in before then.
+    expires_at INTEGER NOT NULL,
     -- The latest readings; a check-in that omits one keeps the last known value.
     battery_voltage REAL,
     battery_percent REAL,

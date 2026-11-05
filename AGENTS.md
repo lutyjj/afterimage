@@ -10,7 +10,8 @@ Afterimage is a self-hosted server for TRMNL e-paper displays. [The design](docs
 - Complete replacements in one change: remove obsolete code, configuration,
   callers, tests, and documentation. Keep one implementation of each contract.
 - Database migrations are the exception: never edit or delete a migration that
-  has reached `main`.
+  a release or deployment has run. Until the first one, the schema stays in
+  `0001_*.sql` and changes in place; recreate local databases after pulling.
 - Follow the [design principles](docs/design.md#principles): implement TRMNL's
   device API as published, generate from TRMNL's published sources, and keep
   device facts in data, never in code paths.
@@ -32,7 +33,9 @@ Afterimage is a self-hosted server for TRMNL e-paper displays. [The design](docs
 For API changes, update `model/smithy/` first, then regenerate and implement.
 Generated output is never edited by hand. Each project builds on its own and
 depends on the others only through code generated from the model, except that
-any Rust project may use the shared library `crates/trmnl`.
+any Rust project may use the shared library `crates/trmnl`. The Rust projects
+share one Cargo workspace, so every Cargo command needs `gen/`: run
+`tools/generate` first in a fresh checkout.
 
 The flake owns the toolchains; do not install unmanaged versions on the host.
 The [README](README.md#development) lists the commands.

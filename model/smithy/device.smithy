@@ -150,8 +150,15 @@ operation GetDisplay {
         @httpHeader("Width")
         width: String
 
+        /// TRMNL's document names this header; firmware 1.8.18 sends
+        /// `special_function` instead (below).
         @httpHeader("Special-Function")
         specialFunction: String
+
+        /// `true` for the function configured on the server, or the name of one.
+        /// The firmware's spelling of `Special-Function` (`buildDisplayHeaders`).
+        @httpHeader("special_function")
+        firmwareSpecialFunction: String
 
         @httpHeader("BASE64")
         base64: String
