@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT friendly_id FROM devices WHERE key_hash = ?",
+  "query": "SELECT friendly_id FROM registrations WHERE key_hash = ?",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "devices",
+            "table": "registrations",
             "name": "friendly_id"
           }
         }
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "8505ffa415469406c406c830855f04ed3fa40fd1bb12cc9d7176e8bc3b553b99"
+  "hash": "7ad1652a7a1e4550f4d8694d78e6cf74ce8cb4d17df84c9ffa410725b0937f54"
 }

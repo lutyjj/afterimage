@@ -77,7 +77,8 @@ operation SetupDevice {
 ///
 /// The HTTP status is always 200 and `status` carries the outcome. The firmware
 /// acts on three values: 0 shows `image_url`; 202 shows the device's friendly ID
-/// and polls again soon; 500, like `reset_firmware`, erases the device's saved
+/// and polls on the firmware's own schedule, every 5 seconds at first and backing
+/// off to hourly; 500, like `reset_firmware`, erases the device's saved
 /// Wi-Fi networks and every stored setting, the server URL included, and restarts
 /// it into its setup portal, where a person must provision it again.
 @suppress(["HttpMethodSemantics"])
@@ -87,6 +88,11 @@ operation GetDisplay {
         @required
         @httpHeader("Access-Token")
         accessToken: String
+
+        /// The device's MAC address. TRMNL's document does not list it here, but the
+        /// firmware sends it on every check-in (`buildDisplayHeaders`).
+        @httpHeader("ID")
+        id: String
 
         /// Volts, such as `4.12`.
         @httpHeader("Battery-Voltage")

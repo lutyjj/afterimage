@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO registrations (mac, friendly_id, key_hash, model, created_at)\n                 VALUES (?, ?, ?, ?, ?)\n                 ON CONFLICT (friendly_id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "2249c0972879ac542fbbb421bfb7a3c3707e47474f4df57cd5b76784581279cf"
+}

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use afterimage_server::clock::SystemClock;
 use afterimage_server::config::Config;
 use afterimage_server::device_api;
-use afterimage_server::devices::Registry;
+use afterimage_server::registrations::Registrations;
 use afterimage_server::secrets::OsEntropy;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
@@ -31,7 +31,7 @@ async fn main() -> ExitCode {
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
     std::fs::create_dir_all(&config.data_dir)?;
-    let registry = Registry::open(
+    let registrations = Registrations::open(
         &config.data_dir.join("afterimage.db"),
         Arc::new(SystemClock),
         Arc::new(OsEntropy),
@@ -39,7 +39,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
     let listener = TcpListener::bind(config.bind).await?;
     tracing::info!(bind = %config.bind, data = %config.data_dir.display(), "serving the TRMNL device API");
-    device_api::serve(listener, Arc::new(registry), shutdown()).await?;
+    device_api::serve(listener, Arc::new(registrations), shutdown()).await?;
     Ok(())
 }
 

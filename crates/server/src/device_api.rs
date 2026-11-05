@@ -1,4 +1,4 @@
-//! The generated device API, served over the registry.
+//! The generated device API, served over the registrations.
 
 use std::future::Future;
 use std::sync::Arc;
@@ -9,10 +9,11 @@ use afterimage_device_api::{DeviceApi, DeviceApiConfig, error, input, output};
 use afterimage_trmnl::{DisplayStatus, Readings, SetupStatus};
 use tokio::net::TcpListener;
 
-use crate::devices::{self, Refusal, Registry, Setup};
+use crate::registrations::{self, Refusal, Registrations, Setup};
 
-/// The `refresh_rate` sent with 202, which the firmware answers with its own fast
-/// poll; it is required, and 0 would mean no wait at all.
+/// The `refresh_rate` sent with 202. The model requires one, but on 202 firmware
+/// 1.8.18 follows its own fast-poll schedule instead (`fastPollSeconds` in
+/// `refresh_interval.cpp`): every 5 seconds at first, backing off to hourly.
 const RETRY_SECONDS: i32 = 60;
 /// Log entries kept from one batch. The firmware stores 10 and sends them with the
 /// new ones; more than this is not firmware and is dropped.
@@ -36,11 +37,11 @@ const CLAIM_MESSAGE: &str = "Claim this device in Afterimage with this code.";
 /// `device_api` tests catch.
 pub async fn serve(
     listener: TcpListener,
-    registry: Arc<Registry>,
+    registrations: Arc<Registrations>,
     shutdown: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
     let config = DeviceApiConfig::builder()
-        .layer(AddExtensionLayer::new(registry))
+        .layer(AddExtensionLayer::new(registrations))
         .build();
     let app = DeviceApi::builder(config)
         .setup_device(setup_device)
@@ -56,9 +57,9 @@ pub async fn serve(
 
 async fn setup_device(
     input: input::SetupDeviceInput,
-    Extension(registry): Extension<Arc<Registry>>,
+    Extension(registrations): Extension<Arc<Registrations>>,
 ) -> Result<output::SetupDeviceOutput, error::SetupDeviceError> {
-    let setup = registry
+    let setup = registrations
         .setup(&input.id, &input.model)
         .await
         .map_err(|error| internal_failure(&error))?;
@@ -92,21 +93,19 @@ fn refusal_message(refusal: Refusal) -> &'static str {
         Refusal::InvalidMac => "Afterimage could not read this device's MAC address.",
         Refusal::InvalidModel => "Afterimage could not read this device's model.",
         Refusal::UnclaimedLimit => "Too many devices are waiting to be claimed in Afterimage.",
-        Refusal::KeyInUse => {
-            "Afterimage has this device. It can set up again 30 minutes after its last check-in."
-        }
     }
 }
 
-/// Every device is unclaimed until accounts can claim them. A key the server does
-/// not know gets the same answer, so the device keeps showing its code: the only
-/// other answer that moves it, 500, wipes its Wi-Fi settings, which takes a person
-/// at the device to undo.
+/// Every registration is unclaimed until accounts can claim them. A key the server
+/// does not know gets the same answer, because the only other answer that moves the
+/// device, 500, wipes its Wi-Fi settings. Such a device keeps showing a code the
+/// server has dropped and never runs setup again, since it still holds a key; a
+/// reset at the device recovers it, and the log names its MAC.
 const CHECK_IN_STATUS: DisplayStatus = DisplayStatus::Unclaimed;
 
 async fn get_display(
     input: input::GetDisplayInput,
-    Extension(registry): Extension<Arc<Registry>>,
+    Extension(registrations): Extension<Arc<Registrations>>,
 ) -> Result<output::GetDisplayOutput, error::GetDisplayError> {
     let readings = Readings::parse(
         input.battery_voltage.as_deref(),
@@ -114,14 +113,18 @@ async fn get_display(
         input.rssi.as_deref(),
         input.firmware_version.as_deref(),
     );
-    let device = registry
+    let registration = registrations
         .check_in(&input.access_token, &readings)
         .await
         .map_err(|error| internal_failure(&error))?;
-    if let Some(device) = device {
-        tracing::debug!(friendly_id = device.friendly_id, ?readings, "check-in");
+    if let Some(registration) = registration {
+        tracing::debug!(
+            friendly_id = registration.friendly_id,
+            ?readings,
+            "check-in"
+        );
     } else {
-        tracing::info!("check-in with a key no device holds");
+        tracing::warn!(mac = ?input.id, "check-in with a key no registration holds");
     }
     Ok(output::GetDisplayOutput {
         status: CHECK_IN_STATUS.code(),
@@ -150,19 +153,19 @@ async fn get_current_screen(
 
 async fn create_device_log(
     input: input::CreateDeviceLogInput,
-    Extension(registry): Extension<Arc<Registry>>,
+    Extension(registrations): Extension<Arc<Registrations>>,
 ) -> Result<output::CreateDeviceLogOutput, error::CreateDeviceLogError> {
-    let Some(device) = registry
+    let Some(registration) = registrations
         .find(&input.access_token)
         .await
         .map_err(|error| internal_failure(&error))?
     else {
         return Err(error::UnknownDevice {
-            message: Some("No device holds this access token.".to_owned()),
+            message: Some("No registration holds this access token.".to_owned()),
         }
         .into());
     };
-    write_log(&device.friendly_id, &input.logs);
+    write_log(&registration.friendly_id, &input.logs);
     Ok(output::CreateDeviceLogOutput {})
 }
 
@@ -209,7 +212,7 @@ fn write_entry(friendly_id: &str, entry: &Document) {
     }
 }
 
-fn internal_failure(error: &devices::Error) -> error::InternalFailure {
+fn internal_failure(error: &registrations::Error) -> error::InternalFailure {
     tracing::error!(%error, "device API request failed");
     error::InternalFailure {
         message: Some("The server could not complete the request.".to_owned()),

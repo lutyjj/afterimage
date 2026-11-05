@@ -11,7 +11,9 @@ use std::sync::{Arc, Mutex};
 
 use afterimage_server::clock::Clock;
 use afterimage_server::device_api::serve;
-use afterimage_server::devices::{QUIET_SECONDS, Registry, UNCLAIMED_LIMIT, UNUSED_KEY_SECONDS};
+use afterimage_server::registrations::{
+    IDLE_SECONDS, Registrations, UNCLAIMED_LIMIT, UNUSED_SECONDS,
+};
 use afterimage_server::secrets::{Entropy, OsEntropy, key_hash};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
@@ -82,12 +84,17 @@ async fn start() -> Server {
 async fn start_with(entropy: Arc<dyn Entropy>) -> Server {
     let data = TempDir::new().unwrap();
     let clock = Arc::new(ManualClock(AtomicI64::new(1_800_000_000)));
-    let registry = Registry::open(&data.path().join("afterimage.db"), clock.clone(), entropy)
-        .await
-        .unwrap();
+    let registrations =
+        Registrations::open(&data.path().join("afterimage.db"), clock.clone(), entropy)
+            .await
+            .unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
-    tokio::spawn(serve(listener, Arc::new(registry), std::future::pending()));
+    tokio::spawn(serve(
+        listener,
+        Arc::new(registrations),
+        std::future::pending(),
+    ));
     Server {
         url,
         clock,
@@ -144,7 +151,7 @@ impl Server {
         let response = self
             .http
             .get(format!("{}/api/display", self.url))
-            .header("ID", "41:B4:10:39:A1:24")
+            .header("ID", "41:B4:10:39:A1:01")
             .header("Content-Type", "application/json")
             .header("Update-Source", "timer")
             .header("Access-Token", key)
@@ -300,7 +307,12 @@ async fn an_unknown_key_leaves_the_device_as_it_is() {
     let server = start().await;
     assert_eq!(server.display(UNKNOWN_KEY, &READINGS).await["status"], 202);
     assert_eq!(server.current(UNKNOWN_KEY).await["status"], 202);
-    assert!(server.stored("SELECT id FROM devices").await.is_empty());
+    assert!(
+        server
+            .stored("SELECT id FROM registrations")
+            .await
+            .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -311,9 +323,9 @@ async fn a_device_that_checks_in_keeps_its_key_for_good() {
         server.clock.advance(60 * 60);
         assert_eq!(server.display(&key, &READINGS).await["status"], 202);
     }
-    // Setup, which drops unused registrations, leaves this one alone.
+    // Setup, which drops unused and idle registrations, leaves this one alone.
     server.register(&mac(2)).await;
-    let rows = server.stored("SELECT friendly_id FROM devices").await;
+    let rows = server.stored("SELECT friendly_id FROM registrations").await;
     assert_eq!(rows.len(), 2);
     assert!(
         rows.iter()
@@ -321,63 +333,64 @@ async fn a_device_that_checks_in_keeps_its_key_for_good() {
     );
 }
 
+/// Firmware 1.8.18 answers 202 with its own fast-poll schedule (`fastPollSeconds`):
+/// 50 polls at 5 s, 10 at 60 s, 10 at 900 s, then hourly. A setup with the same MAC
+/// before every one of them takes nothing from the device.
 #[tokio::test]
-async fn setup_again_waits_until_the_key_is_quiet() {
+async fn setup_never_replaces_a_key() {
     let server = start().await;
-    let (old_key, old_id) = server.register(&mac(1)).await;
-    server.display(&old_key, &READINGS).await;
-
-    server.clock.advance(QUIET_SECONDS - 1);
-    let answer = server.setup(&mac(1)).await;
-    assert_eq!(
-        answer["status"], 404,
-        "a spoofed MAC cannot take a running device's key"
-    );
-    assert!(answer.get("api_key").is_none());
-    assert!(answer["message"].as_str().unwrap().contains("30 minutes"));
-    assert_eq!(server.display(&old_key, &READINGS).await["status"], 202);
-
-    server.clock.advance(QUIET_SECONDS);
-    let (new_key, new_id) = server.register(&mac(1)).await;
-    assert_ne!(new_key, old_key);
-    assert_ne!(new_id, old_id, "a new key comes with a new code");
-
-    server.display(&old_key, &READINGS).await;
-    let row = &server.stored("SELECT seen_at FROM devices").await[0];
-    assert_eq!(
-        row.get::<Option<i64>, _>(0),
-        None,
-        "the old key no longer reaches the device"
-    );
-    server.display(&new_key, &READINGS).await;
-    let row = &server.stored("SELECT seen_at FROM devices").await[0];
-    assert!(row.get::<Option<i64>, _>(0).is_some());
+    let (key, friendly_id) = server.register(&mac(1)).await;
+    let schedule = [(50, 5), (10, 60), (10, 900), (6, 3600)];
+    for (polls, seconds) in schedule {
+        for _ in 0..polls {
+            server.clock.advance(seconds - 1);
+            let spoofed = server.setup(&mac(1)).await;
+            assert_ne!(spoofed["friendly_id"], friendly_id.as_str());
+            server.clock.advance(1);
+            assert_eq!(server.display(&key, &READINGS).await["status"], 202);
+        }
+    }
+    let rows = server
+        .stored("SELECT friendly_id, seen_at, created_at FROM registrations")
+        .await;
+    let own = rows
+        .iter()
+        .find(|row| row.get::<String, _>(0) == friendly_id)
+        .expect("the device's registration is still there");
+    assert!(own.get::<Option<i64>, _>(1).unwrap() > own.get::<i64, _>(2));
 }
 
 #[tokio::test]
-async fn concurrent_setups_of_one_device_register_it_once() {
+async fn setup_again_gives_the_device_a_new_code_at_once() {
+    let server = start().await;
+    let (old_key, old_id) = server.register(&mac(1)).await;
+    server.display(&old_key, &READINGS).await;
+    let (new_key, new_id) = server.register(&mac(1)).await;
+    assert_ne!(new_key, old_key);
+    assert_ne!(new_id, old_id);
+    assert_eq!(server.display(&new_key, &READINGS).await["status"], 202);
+    assert_eq!(server.display(&old_key, &READINGS).await["status"], 202);
+    assert_eq!(server.stored("SELECT id FROM registrations").await.len(), 2);
+}
+
+#[tokio::test]
+async fn concurrent_setups_each_get_their_own_key_and_code() {
     let server = Arc::new(start().await);
     let setups: Vec<_> = (0..8)
         .map(|_| {
             let server = Arc::clone(&server);
-            tokio::spawn(async move { server.setup(&mac(1)).await })
+            tokio::spawn(async move { server.register(&mac(1)).await })
         })
         .collect();
-    let mut keys = Vec::new();
+    let mut answers = Vec::new();
     for setup in setups {
-        let answer = setup.await.unwrap();
-        match answer["status"].as_i64() {
-            Some(200) => keys.push(answer["api_key"].as_str().unwrap().to_owned()),
-            Some(404) => {}
-            other => panic!("unexpected setup status {other:?}"),
-        }
+        answers.push(setup.await.unwrap());
     }
-    assert_eq!(
-        keys.len(),
-        1,
-        "one setup registers it; the rest find its key in use"
-    );
-    assert_eq!(server.stored("SELECT id FROM devices").await.len(), 1);
+    let codes: std::collections::HashSet<_> = answers.iter().map(|(_, id)| id.clone()).collect();
+    assert_eq!(codes.len(), 8);
+    for (key, _) in &answers {
+        assert_eq!(server.display(key, &READINGS).await["status"], 202);
+    }
 }
 
 #[tokio::test]
@@ -394,7 +407,7 @@ async fn records_readings_and_keeps_the_last_known_value() {
     server.display(&key, &garbled).await;
     let row = &server
         .stored(
-            "SELECT battery_voltage, battery_percent, signal_dbm, firmware_version, seen_at, created_at FROM devices",
+            "SELECT battery_voltage, battery_percent, signal_dbm, firmware_version, seen_at, created_at FROM registrations",
         )
         .await[0];
     assert_eq!(
@@ -432,35 +445,32 @@ async fn stores_only_a_hash_of_the_key() {
             path.display()
         );
     }
-    let row = &server.stored("SELECT key_hash FROM devices").await[0];
+    let row = &server.stored("SELECT key_hash FROM registrations").await[0];
     assert_eq!(row.get::<Vec<u8>, _>(0), key_hash(&key));
 }
 
 #[tokio::test]
-async fn refuses_new_devices_beyond_the_unclaimed_limit() {
+async fn refuses_setup_beyond_the_unclaimed_limit() {
     let server = start().await;
+    let mut keys = Vec::new();
     for index in 0..u8::try_from(UNCLAIMED_LIMIT).unwrap() {
-        server.register(&mac(index)).await;
+        keys.push(server.register(&mac(index)).await.0);
     }
-    let answer = server.setup("02:00:00:00:00:01").await;
-    assert_eq!(
-        answer["status"], 404,
-        "404 makes the firmware show 'not registered'"
-    );
-    assert!(answer.get("api_key").is_none());
-    assert!(
-        answer["message"]
-            .as_str()
-            .unwrap()
-            .contains("waiting to be claimed")
-    );
-    server.clock.advance(QUIET_SECONDS);
-    let (key, _) = server.register(&mac(0)).await;
-    assert_eq!(
-        server.display(&key, &READINGS).await["status"],
-        202,
-        "a known device can still set up again"
-    );
+    for mac in ["02:00:00:00:00:01".to_owned(), mac(0)] {
+        let answer = server.setup(&mac).await;
+        assert_eq!(
+            answer["status"], 404,
+            "404 makes the firmware show 'not registered'"
+        );
+        assert!(answer.get("api_key").is_none());
+        assert!(
+            answer["message"]
+                .as_str()
+                .unwrap()
+                .contains("waiting to be claimed")
+        );
+    }
+    assert_eq!(server.display(&keys[0], &READINGS).await["status"], 202);
 }
 
 #[tokio::test]
@@ -471,7 +481,7 @@ async fn an_unused_registration_frees_its_place_after_a_day() {
         keys.push(server.register(&mac(index)).await.0);
     }
     server.display(&keys[1], &READINGS).await;
-    server.clock.advance(UNUSED_KEY_SECONDS - 1);
+    server.clock.advance(UNUSED_SECONDS - 1);
     assert_eq!(
         server.setup("02:00:00:00:00:01").await["status"],
         404,
@@ -480,9 +490,30 @@ async fn an_unused_registration_frees_its_place_after_a_day() {
     server.clock.advance(1);
     assert_eq!(server.setup("02:00:00:00:00:01").await["status"], 200);
     assert_eq!(
-        server.stored("SELECT id FROM devices").await.len(),
+        server.stored("SELECT id FROM registrations").await.len(),
         2,
         "the device that checked in stays"
+    );
+}
+
+#[tokio::test]
+async fn an_idle_registration_frees_its_place_after_a_week() {
+    let server = start().await;
+    let mut keys = Vec::new();
+    for index in 0..u8::try_from(UNCLAIMED_LIMIT).unwrap() {
+        let (key, _) = server.register(&mac(index)).await;
+        server.display(&key, &READINGS).await;
+        keys.push(key);
+    }
+    server.clock.advance(IDLE_SECONDS - 1);
+    server.display(&keys[0], &READINGS).await;
+    assert_eq!(server.setup("02:00:00:00:00:01").await["status"], 404);
+    server.clock.advance(1);
+    assert_eq!(server.setup("02:00:00:00:00:01").await["status"], 200);
+    assert_eq!(
+        server.stored("SELECT id FROM registrations").await.len(),
+        2,
+        "the registration that kept checking in stays"
     );
 }
 
@@ -495,7 +526,12 @@ async fn refuses_setup_it_cannot_read() {
     let answer = server.setup_as(&mac(1), &"x".repeat(65)).await;
     assert_eq!(answer["status"], 404);
     assert!(answer["message"].as_str().unwrap().contains("model"));
-    assert!(server.stored("SELECT id FROM devices").await.is_empty());
+    assert!(
+        server
+            .stored("SELECT id FROM registrations")
+            .await
+            .is_empty()
+    );
 }
 
 #[tokio::test]

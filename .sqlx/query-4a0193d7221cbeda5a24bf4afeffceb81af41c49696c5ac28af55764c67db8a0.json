@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM registrations\n             WHERE (seen_at IS NULL AND created_at <= ?) OR seen_at <= ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "4a0193d7221cbeda5a24bf4afeffceb81af41c49696c5ac28af55764c67db8a0"
+}

@@ -94,25 +94,36 @@ fn answers_every_response_field_with_the_same_type() {
     }
 }
 
-/// An addition the firmware needs and TRMNL does not document goes here, with the
-/// firmware source that establishes it, before the model may carry it.
+/// Members the firmware uses and TRMNL's document does not list, each with the
+/// firmware 1.8.18 source that establishes it.
+const FIRMWARE_ADDITIONS: [(&str, &str, &str); 1] = [(
+    "GET /api/display",
+    "ID",
+    "lib/trmnl/src/api-client/request_headers.cpp: buildDisplayHeaders sends the MAC",
+)];
+
 #[test]
-fn adds_nothing_trmnl_does_not_document() {
+fn adds_nothing_but_listed_firmware_additions() {
     let model = model();
     let trmnl = trmnl();
     let operations = |contract: &Contract| contract.operations.keys().cloned().collect::<Vec<_>>();
     assert_eq!(operations(&model), operations(&trmnl), "operations");
+    let listed = |key: &str, name: &str| {
+        FIRMWARE_ADDITIONS
+            .iter()
+            .any(|(operation, member, _)| *operation == key && *member == name)
+    };
     for (key, ours) in &model.operations {
         let theirs = &trmnl.operations[key];
         let extra_headers: Vec<_> = ours
             .headers
             .keys()
-            .filter(|name| !theirs.headers.contains_key(*name))
+            .filter(|name| !theirs.headers.contains_key(*name) && !listed(key, name))
             .collect();
         let extra_fields: Vec<_> = ours
             .fields
             .keys()
-            .filter(|name| !theirs.fields.contains_key(*name))
+            .filter(|name| !theirs.fields.contains_key(*name) && !listed(key, name))
             .collect();
         assert!(
             extra_headers.is_empty(),
@@ -121,6 +132,13 @@ fn adds_nothing_trmnl_does_not_document() {
         assert!(
             extra_fields.is_empty(),
             "{key}: response fields TRMNL does not document: {extra_fields:?}"
+        );
+    }
+    for (key, name, _) in FIRMWARE_ADDITIONS {
+        let ours = &model.operations[key];
+        assert!(
+            ours.headers.contains_key(name) || ours.fields.contains_key(name),
+            "{key}: listed addition {name} is not in the model"
         );
     }
 }

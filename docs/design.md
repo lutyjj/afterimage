@@ -12,7 +12,7 @@ It does not run TRMNL community recipes, host plugins for other people, or imple
 
 ## Contract
 
-The Smithy model in `model/` is the single source of truth. One build generates the Rust server stubs (smithy-rs), the TypeScript client (smithy-typescript) and an OpenAPI document from it. No component defines an operation, shape or error outside the model.
+The Smithy model in `model/smithy/` is the single source of truth. One build generates the Rust server stubs (smithy-rs), the TypeScript client (smithy-typescript) and an OpenAPI document from it. No component defines an operation, shape or error outside the model.
 
 | Service | Contract owner | Caller |
 |---|---|---|
@@ -30,7 +30,7 @@ Each component builds on its own and depends on the others only through generate
 
 | Path | Owns |
 |---|---|
-| `model/` | Smithy contract |
+| `model/smithy/` | Smithy contract |
 | `model/conformance/` | The conformance test and the extractor behind `tools/trmnl-excerpt` |
 | `crates/trmnl/` | TRMNL firmware protocol: MAC addresses, reported readings, status values |
 | `crates/server/` | Device and management APIs, schedule, SQLite persistence, MQTT publishing |
@@ -41,9 +41,9 @@ Each component builds on its own and depends on the others only through generate
 
 ## Devices
 
-1. **Setup.** The device joins Wi-Fi through its captive portal, configured with this server's URL, and calls `/api/setup` with its MAC (`ID`) and `Model`. A new MAC becomes an unclaimed device with an access key, stored only as a SHA-256 hash, and a six-character friendly ID, which the firmware shows. A user claims the device by entering the ID in the web UI. The server never invalidates a key a device is using: the firmware's only way back from a lost key is status 500, which erases its saved Wi-Fi networks and every stored setting, the server URL included, so that a person must provision it again at the portal. Anyone on the network can present a MAC, so setup for a known MAC issues a new key only once the current one has gone 30 minutes without a check-in, and with it a new friendly ID, which a spoofer cannot make the real device show. Setup for a claimed device's MAC also waits for its owner's approval in the web UI. At most 32 devices wait unclaimed; a registration whose key never checks in is dropped 24 hours after the key was issued. A host on the network can still hold those 32 places with devices that check in, until a user removes them in the web UI.
+1. **Setup.** The device joins Wi-Fi through its captive portal, configured with this server's URL, and calls `/api/setup` with its MAC (`ID`) and `Model`. Every setup creates a new registration: an access key, stored only as a SHA-256 hash, and a six-character friendly ID, which the firmware shows. A user claims the device by entering the ID in the web UI. Setup never touches an existing registration, because the firmware's only way back from a lost key is status 500, which erases its saved Wi-Fi networks and every stored setting, the server URL included. Anyone on the network can present a MAC, so a spoofed setup only creates a registration of its own, whose code never appears on the real device's screen. A device that runs setup again shows its new code; claiming that code for a device the account already owns replaces the old registration and keeps the device's screens and schedule. At most 32 registrations wait unclaimed. One whose key never checks in ends 24 hours after setup, and one that stops checking in ends after 7 days; a powered device checks in at least hourly. A host on the network can still hold those places with registrations that keep checking in, until a user removes them in the web UI.
 2. **Model.** The reported `Model` selects the device's render profile from TRMNL's `GET /api/models` and its firmware board from TRMNL's firmware lists. TRMNL publishes no mapping from the name a firmware build reports to either list, so the server keeps that mapping as data. A user can change a device's render profile.
-3. **Check-in.** The device calls `/api/display` with its `Access-Token` and its state (`Battery-Voltage`, `Percent-Charged`, `RSSI`, `FW-Version`); the server keeps the last known value of each reading. A claimed device gets the image URL of the screen due now and a `refresh_rate` that wakes it at its refresh interval or the next scheduled change, whichever comes first. An unclaimed device gets status 202, on which the firmware shows its friendly ID; so does a key the server does not know, because answering 500 would wipe the device. Status 500 is sent only when a user removes a device in the web UI and chooses to reset it. A server failure is an HTTP error, which the firmware retries. The server publishes the reported state to MQTT.
+3. **Check-in.** The device calls `/api/display` with its `Access-Token`, its MAC and its state (`Battery-Voltage`, `Percent-Charged`, `RSSI`, `FW-Version`); the server keeps the last known value of each reading. A claimed device gets the image URL of the screen due now and a `refresh_rate` that wakes it at its refresh interval or the next scheduled change, whichever comes first. An unclaimed device gets status 202, on which the firmware shows its friendly ID and polls on its own schedule, every 5 seconds at first and backing off to hourly. A key the server does not know also gets 202, because 500 would wipe the device; such a device keeps showing a code the server has dropped and needs a reset at the device, and the server logs its MAC. Status 500 is sent only when a user removes a device in the web UI and chooses to reset it. A server failure is an HTTP error, which the firmware retries. The server publishes the reported state to MQTT.
 4. **Firmware update.** TRMNL publishes over-the-air images for its own hardware at `GET /api/firmware`, and full flash images for every supported board at `GET /api/firmware/flash`. For a board with only a flash image, the server cuts the app image out at the offset the image's partition table gives, and checks its checksum and SHA-256 before serving it. The server downloads each image once and serves it from its own URL, so devices without internet access can update. An install request sets `update_firmware` and `firmware_url` in the device's next check-in answer.
 5. **Logs.** The server writes `/api/log` entries to its own structured log and stores none. It reads at most 64 KiB per request, writes at most 32 entries and 512 characters per field, and writes device text escaped so that it cannot add lines to the log.
 
@@ -69,6 +69,6 @@ Another engine replaces Typst by implementing the same operation and every compo
 
 ## Storage and accounts
 
-SQLite holds accounts, devices (MAC, access key hash, model, latest readings, settings, owner), screens, data sources and schedules. Rendered images and firmware files live in a cache directory that the server rebuilds when it is lost.
+SQLite holds accounts, registrations (MAC, access key hash, friendly ID, latest readings), devices (owner, name, settings, current registration), screens, data sources and schedules. Rendered images and firmware files live in a cache directory that the server rebuilds when it is lost.
 
 Users sign in through OIDC or with a local password. Both implement one sign-in interface, so handlers and storage see an account, never the method. An account owns devices and screens; there are no roles.

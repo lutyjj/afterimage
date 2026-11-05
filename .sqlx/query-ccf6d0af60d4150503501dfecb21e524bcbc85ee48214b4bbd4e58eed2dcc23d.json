@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COUNT(*) FROM devices",
+  "query": "SELECT COUNT(*) FROM registrations",
   "describe": {
     "columns": [
       {
@@ -17,5 +17,5 @@
       false
     ]
   },
-  "hash": "ce6a9a291c0d02cb69bea70bdef355ffca6658368c56fd88322ef4149f4354a5"
+  "hash": "ccf6d0af60d4150503501dfecb21e524bcbc85ee48214b4bbd4e58eed2dcc23d"
 }

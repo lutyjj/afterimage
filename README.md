@@ -14,8 +14,8 @@ See [the design](docs/design.md).
 
 | Command | Does |
 |---|---|
-| `tools/generate` | Generates the contract into `gen/` from `model/` |
+| `tools/generate` | Generates the contract into `gen/` from `model/smithy/` |
 | `cargo test --workspace` | Runs every test, the conformance test included |
 | `tools/prepare-queries` | Refreshes `.sqlx/` after a query or migration changes |
 | `tools/trmnl-excerpt` | Refreshes the excerpt of TRMNL's published device contract |
-| `nix flake check` | Builds the server from the pinned contract and runs every test |
+| `nix flake check` | Builds the server from the pinned contract, runs every test, and runs clippy and rustfmt |
