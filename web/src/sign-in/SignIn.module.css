@@ -1,0 +1,57 @@
+.page {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: var(--space-6) var(--gutter);
+}
+
+.sheet {
+  position: relative;
+  display: grid;
+  gap: var(--space-6);
+  width: min(100%, 24rem);
+  padding: var(--space-6);
+  background: var(--white);
+}
+
+.header {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.wordmark {
+  color: var(--blue-text);
+  font-size: var(--text-2xl);
+  font-stretch: 118%;
+  font-weight: 640;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.forms {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.formTitle {
+  font-size: var(--text-md);
+}
+
+.form :global(.button) {
+  justify-self: start;
+}
+
+.oidc {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}

@@ -1,0 +1,14 @@
+.page {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 40rem;
+  padding: var(--space-7) var(--gutter);
+}
+
+.page h1 {
+  font-size: var(--text-xl);
+}
+
+.reason {
+  color: var(--red-text);
+}

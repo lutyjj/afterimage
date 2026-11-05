@@ -1,0 +1,15 @@
+.panel {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--blue-rule);
+  background: var(--paper-sunk);
+}
+
+.title {
+  font-size: var(--text-md);
+}
+
+.panel :global(.button) {
+  justify-self: stretch;
+}

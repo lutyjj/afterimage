@@ -1,0 +1,110 @@
+.shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-6);
+  padding: 0 var(--gutter);
+  border-bottom: var(--rule);
+  background: var(--paper);
+  color: var(--blue-text);
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  color: var(--blue-text);
+  font-size: var(--text-lg);
+  font-stretch: 118%;
+  font-weight: 640;
+  letter-spacing: -0.015em;
+  text-decoration: none;
+}
+
+.wordmark:hover {
+  text-decoration: none;
+}
+
+.places {
+  display: flex;
+  gap: var(--space-5);
+}
+
+.place {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 3.25rem;
+  color: var(--blue-text);
+  font-size: var(--text-sm);
+  font-weight: 480;
+  text-decoration: none;
+}
+
+.place:hover {
+  text-decoration: none;
+  color: #1f4d9f;
+}
+
+.place[aria-current="page"] {
+  font-weight: 640;
+}
+
+.place[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -1px;
+  height: 2px;
+  background: var(--blue);
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+  font-size: var(--text-sm);
+}
+
+.accountName {
+  color: var(--ink-soft);
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signOut {
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  color: var(--blue-text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.signOut:hover {
+  background: var(--blue-wash);
+}
+
+.main {
+  min-width: 0;
+}
+
+@media (max-width: 40rem) {
+  .bar {
+    gap: var(--space-4);
+  }
+
+  .accountName {
+    display: none;
+  }
+}
