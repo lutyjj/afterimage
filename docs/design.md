@@ -30,7 +30,8 @@ Each component builds on its own and depends on the others only through generate
 |---|---|
 | `model/` | Smithy contract |
 | `crates/server/` | Device and management APIs, schedule, SQLite persistence, MQTT publishing |
-| `crates/render-typst/` | The render operation in Typst, with a component library generated from TRMNL's design tokens |
+| `crates/render-typst/` | The render operation in Typst, with a component library that reads design tokens |
+| `tools/tokens/` | Build-time generator of design tokens per render profile |
 | `web/` | Web UI on the generated TypeScript client |
 | `deploy/nix/` | Nix package, container image and NixOS module |
 
@@ -48,13 +49,17 @@ The server publishes each device's battery, signal, firmware version, last check
 
 ## Screens and schedule
 
-A screen is a tree of generic components (title bar, value, label, table, chart and others) whose properties bind to named data sources. The components and their properties are shapes in the model, so the web UI edits screens without a template language. A data source is an HTTP endpoint returning JSON, such as a Home Assistant REST call; the screen refers to its credentials by name and never stores them. A schedule lists, per device, the screens it shows and when.
+A screen is a tree of generic components whose properties bind to named data sources. The components and their properties are shapes in the model, so the web UI edits screens without a template language. A data source is an HTTP endpoint returning JSON, such as a Home Assistant REST call; the screen refers to its credentials by name and never stores them. A schedule lists, per device, the screens it shows and when.
+
+The first release defines the components that TRMNL's 30 published plugins use most: view and layout (rows, columns, grid spans, alignment, gaps), title bar, item, title, label, value, description, image and divider, plus line and bar charts and three behaviours: fitting a value to its box, clamping text to a line count, and ending an overflowing list with a count of what is hidden. Table, progress, rich text and maps follow when a screen needs them; no published plugin uses table or progress.
 
 ## Rendering
 
 The render contract is one operation in the model: a screen, its resolved data and a render profile in, an image out. The render profile is what TRMNL's `GET /api/models` publishes for the device's model: width, height, bit depth, palette, MIME type and image size limit. The server caches each image on disk by screen and profile, and renders again when the data or the schedule changes.
 
-Typst implements the operation in-process. Its component library is generated from the public tokens of TRMNL's design system (MIT): fonts, palette, gaps, type scale and dither patterns, so screens keep TRMNL's look. On one measured screen, Typst rendered in 13 ms with a 19 MiB memory peak; TRMNL's design system in headless Chromium took 1.3 s and about 1 GiB, most of it loading its 19 MB stylesheet. On the device, the two renders were hard to tell apart.
+Typst implements the operation in-process, with a component library that reads the design tokens of TRMNL's design system (MIT), so screens keep TRMNL's look. A build-time generator produces those tokens. It loads a pinned release of the compiled stylesheet in headless Chromium once per render profile, applies each public token (the 278 that the release documents, plus its 21 fill patterns) to a probe element, and records the computed value: lengths in pixels, colors, font families, weights, and the dither patterns as SVG. Chromium runs only in the generator, never during a render. Reading the Sass source or the compiled stylesheet directly would mean reimplementing the cascade: the stylesheet declares 5,254 custom properties across 62,375 selectors, with `:is()`, `:where()`, cascade layers and color, dark and theme modes. The generator's inputs are pinned: a framework release and a snapshot of TRMNL's model and palette lists, which one command refreshes.
+
+On one measured screen, Typst rendered in 13 ms with a 19 MiB memory peak; TRMNL's design system in headless Chromium took 1.3 s and about 1 GiB, most of it loading its 19 MB stylesheet. On the device, the two renders were hard to tell apart.
 
 Another engine replaces Typst by implementing the same operation and every component, for example as a separate service that runs TRMNL's design system; screens stay unchanged. A screen may instead carry a raw Typst template for what the components cannot express. Such a screen works only with the Typst renderer.
 
@@ -63,8 +68,3 @@ Another engine replaces Typst by implementing the same operation and every compo
 SQLite holds accounts, devices (MAC, access key, model, settings, owner), screens, data sources and schedules. Rendered images and firmware files live in a cache directory that the server rebuilds when it is lost.
 
 Users sign in through OIDC or with a local password. Both implement one sign-in interface, so handlers and storage see an account, never the method. An account owns devices and screens; there are no roles.
-
-## Open questions
-
-1. **Token source.** Whether the generator reads the design system's tokens from its Sass source or from a compiled stylesheet, and how it resolves their per-mode values (1-bit, 2-bit, density).
-2. **Component set.** Which of TRMNL's documented components the first release defines.
