@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE OR IGNORE devices\n                     SET key_hash = ?, friendly_id = ?, model = ?, key_issued_at = ?, seen_at = NULL\n                     WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "afc0a9900df8ba9ca6c8b80fc42fd8180a0963664b2206de14466cbc1d38cff3"
+}

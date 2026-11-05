@@ -14,7 +14,9 @@ path = "src/main.rs"
 afterimage-device-api = { path = "../../gen/device-api" }
 afterimage-trmnl = { path = "../trmnl" }
 
-aws-smithy-http-server = "0.69.1"
+# Document and Number, to read log entries; Cargo unifies this 1.x requirement with
+# the release the generated crate uses. The smithy server runtime comes through the
+# generated crate (`afterimage_device_api::server`), so codegen alone picks its version.
 aws-smithy-types = "1.9.1"
 base64 = "0.23.1"
 getrandom = "0.4.3"

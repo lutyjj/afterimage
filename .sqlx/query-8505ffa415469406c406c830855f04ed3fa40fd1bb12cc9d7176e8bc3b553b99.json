@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "UPDATE devices SET key_hash = ?, model = ? WHERE mac = ? RETURNING friendly_id",
+  "query": "SELECT friendly_id FROM devices WHERE key_hash = ?",
   "describe": {
     "columns": [
       {
@@ -16,11 +16,11 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 1
     },
     "nullable": [
       false
     ]
   },
-  "hash": "501fc3beee55b22fe121523a6132b90209ef10910db534ee0d683a2d7875604d"
+  "hash": "8505ffa415469406c406c830855f04ed3fa40fd1bb12cc9d7176e8bc3b553b99"
 }

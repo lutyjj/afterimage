@@ -8,18 +8,25 @@ let
   fs = lib.fileset;
   root = ../..;
   buildConfig = ../../smithy-build.json;
+  maven = (lib.importJSON buildConfig).maven;
 
   # The codegen plugins resolve from Maven Central, so they are fetched once into a
-  # fixed-output Maven repository keyed by smithy-build.json alone.
+  # fixed-output Maven repository. Its name carries a hash of the Maven section of
+  # smithy-build.json: a dependency change renames the repository, and Nix fetches
+  # it again and checks it against `outputHash` instead of reusing the old one.
+  #
+  # Update after changing that section: set `outputHash = lib.fakeHash;`, run
+  # `nix build .#contract.plugins`, and copy the hash Nix reports.
   #
   # Workaround for smithy-lang/smithy-rs#4351: codegen-core 0.1.37 depends on
   # kotlin-stdlib-jdk8 at version "unspecified", which no repository serves.
-  # smithy-build.json pins a real version, which wins mediation; online, the
-  # resolver tolerates Maven Central's 404 for the unspecified one, and offline the
-  # empty descriptor below gives the same answer. Drop the pin and the descriptor
-  # once a codegen-server release resolves without them.
+  # smithy-build.json pins 2.1.0, the version codegen-core manages for its other
+  # Kotlin artifacts, which wins mediation; online, the resolver tolerates Maven
+  # Central's 404 for the unspecified one, and offline the empty descriptor below
+  # gives the same answer. Drop the pin and the descriptor once a codegen-server
+  # release resolves without them.
   plugins = stdenvNoCC.mkDerivation {
-    name = "afterimage-smithy-plugins";
+    name = "afterimage-smithy-plugins-${builtins.substring 0 12 (builtins.hashString "sha256" (builtins.toJSON maven))}";
     src = fs.toSource {
       inherit root;
       fileset = buildConfig;
@@ -28,7 +35,7 @@ let
 
     buildPhase = ''
       runHook preBuild
-      mkdir model
+      mkdir -p model/smithy
       HOME=$TMPDIR SMITHY_MAVEN_CACHE=$out smithy validate
       runHook postBuild
     '';
@@ -55,7 +62,7 @@ let
     dontFixup = true;
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-RW7yrGAS2h03+nuZNx0HNSjCkI6aJfOQ+UJ8/gjGngQ=";
+    outputHash = "sha256-agvTMbdp6ShIYC9XvoqrR0d/9xPDU6HbO0EOITOZwSQ=";
   };
 in
 stdenvNoCC.mkDerivation {
@@ -66,25 +73,24 @@ stdenvNoCC.mkDerivation {
     inherit root;
     fileset = fs.unions [
       buildConfig
-      (fs.fileFilter (file: file.hasExt "smithy") ../../model)
+      ../../model/smithy
+      ../../tools/generate
     ];
   };
   nativeBuildInputs = [ smithy-cli ];
 
   env.SMITHY_MAVEN_REPOS = "file://${plugins}";
 
+  # tools/generate owns the layout of gen/, in a checkout and here.
   buildPhase = ''
     runHook preBuild
-    HOME=$TMPDIR SMITHY_MAVEN_CACHE=$TMPDIR/maven smithy build
+    HOME=$TMPDIR SMITHY_MAVEN_CACHE=$TMPDIR/maven sh tools/generate
     runHook postBuild
   '';
 
-  # The same layout tools/generate writes into gen/.
   installPhase = ''
     runHook preInstall
-    mkdir $out
-    cp -r build/smithy/source/rust-server-codegen $out/device-api
-    cp build/smithy/source/openapi/DeviceApi.openapi.json $out/device-api.openapi.json
+    cp -r gen $out
     runHook postInstall
   '';
 

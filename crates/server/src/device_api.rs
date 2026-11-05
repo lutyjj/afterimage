@@ -3,16 +3,16 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use aws_smithy_http_server::{AddExtensionLayer, Extension};
 use aws_smithy_types::{Document, Number};
+use afterimage_device_api::server::{AddExtensionLayer, Extension};
 use afterimage_device_api::{DeviceApi, DeviceApiConfig, error, input, output};
 use afterimage_trmnl::{DisplayStatus, Readings, SetupStatus};
 use tokio::net::TcpListener;
 
 use crate::devices::{self, Refusal, Registry, Setup};
 
-/// The `refresh_rate` sent with statuses the firmware answers with its own fast
-/// poll (202 and 500); it is required, and 0 would mean no wait at all.
+/// The `refresh_rate` sent with 202, which the firmware answers with its own fast
+/// poll; it is required, and 0 would mean no wait at all.
 const RETRY_SECONDS: i32 = 60;
 /// Log entries kept from one batch. The firmware stores 10 and sends them with the
 /// new ones; more than this is not firmware and is dropped.
@@ -20,7 +20,8 @@ const LOG_ENTRIES: usize = 32;
 /// Characters kept from one log field.
 const LOG_FIELD_CHARS: usize = 512;
 
-/// Shown under the friendly ID after setup.
+/// Shown under the friendly ID after setup. Messages fit the firmware's 128-byte
+/// message buffer.
 const CLAIM_MESSAGE: &str = "Claim this device in Afterimage with this code.";
 
 /// Serves the device API on `listener` until `shutdown` completes.
@@ -91,8 +92,17 @@ fn refusal_message(refusal: Refusal) -> &'static str {
         Refusal::InvalidMac => "Afterimage could not read this device's MAC address.",
         Refusal::InvalidModel => "Afterimage could not read this device's model.",
         Refusal::UnclaimedLimit => "Too many devices are waiting to be claimed in Afterimage.",
+        Refusal::KeyInUse => {
+            "Afterimage has this device. It can set up again 30 minutes after its last check-in."
+        }
     }
 }
+
+/// Every device is unclaimed until accounts can claim them. A key the server does
+/// not know gets the same answer, so the device keeps showing its code: the only
+/// other answer that moves it, 500, wipes its Wi-Fi settings, which takes a person
+/// at the device to undo.
+const CHECK_IN_STATUS: DisplayStatus = DisplayStatus::Unclaimed;
 
 async fn get_display(
     input: input::GetDisplayInput,
@@ -108,11 +118,13 @@ async fn get_display(
         .check_in(&input.access_token, &readings)
         .await
         .map_err(|error| internal_failure(&error))?;
-    if let Some(device) = &device {
+    if let Some(device) = device {
         tracing::debug!(friendly_id = device.friendly_id, ?readings, "check-in");
+    } else {
+        tracing::info!("check-in with a key no device holds");
     }
     Ok(output::GetDisplayOutput {
-        status: display_status(device.as_ref()).code(),
+        status: CHECK_IN_STATUS.code(),
         refresh_rate: RETRY_SECONDS,
         reset_firmware: false,
         update_firmware: false,
@@ -125,28 +137,15 @@ async fn get_display(
 }
 
 async fn get_current_screen(
-    input: input::GetCurrentScreenInput,
-    Extension(registry): Extension<Arc<Registry>>,
+    _input: input::GetCurrentScreenInput,
 ) -> Result<output::GetCurrentScreenOutput, error::GetCurrentScreenError> {
-    let device = registry
-        .find(&input.access_token)
-        .await
-        .map_err(|error| internal_failure(&error))?;
     Ok(output::GetCurrentScreenOutput {
-        status: display_status(device.as_ref()).code(),
+        status: CHECK_IN_STATUS.code(),
         refresh_rate: RETRY_SECONDS,
         image_url: None,
         filename: None,
         rendered_at: None,
     })
-}
-
-/// Every known device is unclaimed until accounts can claim them.
-fn display_status(device: Option<&devices::KnownDevice>) -> DisplayStatus {
-    match device {
-        Some(_) => DisplayStatus::Unclaimed,
-        None => DisplayStatus::Reset,
-    }
 }
 
 async fn create_device_log(
@@ -163,22 +162,27 @@ async fn create_device_log(
         }
         .into());
     };
-    for entry in input.logs.iter().take(LOG_ENTRIES) {
-        emit(&device.friendly_id, entry);
-    }
-    if input.logs.len() > LOG_ENTRIES {
-        tracing::warn!(
-            friendly_id = device.friendly_id,
-            dropped = input.logs.len() - LOG_ENTRIES,
-            "device sent more log entries than firmware keeps"
-        );
-    }
+    write_log(&device.friendly_id, &input.logs);
     Ok(output::CreateDeviceLogOutput {})
 }
 
-/// Writes one firmware log entry to the server's log. Fields are written with their
-/// `Debug` form, so device text cannot add lines or escape sequences to the log.
-fn emit(friendly_id: &str, entry: &Document) {
+/// Writes a device's log batch to the server's log: at most [`LOG_ENTRIES`]
+/// entries and [`LOG_FIELD_CHARS`] characters per field. Fields are written in
+/// their `Debug` form, so device text cannot add lines or escape sequences.
+fn write_log(friendly_id: &str, entries: &[Document]) {
+    for entry in entries.iter().take(LOG_ENTRIES) {
+        write_entry(friendly_id, entry);
+    }
+    if entries.len() > LOG_ENTRIES {
+        tracing::warn!(
+            friendly_id,
+            dropped = entries.len() - LOG_ENTRIES,
+            "device sent more log entries than firmware keeps"
+        );
+    }
+}
+
+fn write_entry(friendly_id: &str, entry: &Document) {
     let Document::Object(fields) = entry else {
         tracing::warn!(friendly_id, "device log entry is not an object");
         return;
@@ -209,5 +213,82 @@ fn internal_failure(error: &devices::Error) -> error::InternalFailure {
     tracing::error!(%error, "device API request failed");
     error::InternalFailure {
         message: Some("The server could not complete the request.".to_owned()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::io::Write;
+    use std::sync::Mutex;
+
+    use super::*;
+
+    #[derive(Clone, Default)]
+    struct Capture(Arc<Mutex<Vec<u8>>>);
+
+    impl Write for Capture {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// The server's log lines while `write_log` handles `entries`.
+    fn logged(entries: &[Document]) -> Vec<String> {
+        let capture = Capture::default();
+        let writer = capture.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || writer.clone())
+            .with_ansi(false)
+            .with_max_level(tracing::Level::DEBUG)
+            .finish();
+        tracing::subscriber::with_default(subscriber, || write_log("K7QM2X", entries));
+        let text = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
+        text.lines().map(str::to_owned).collect()
+    }
+
+    fn entry(message: &str) -> Document {
+        Document::Object(HashMap::from([
+            ("level".to_owned(), Document::String("info".to_owned())),
+            ("message".to_owned(), Document::String(message.to_owned())),
+        ]))
+    }
+
+    /// The device's message is the event's message, written in its `Debug` form.
+    #[test]
+    fn writes_one_escaped_line_per_entry() {
+        let lines = logged(&[entry("first\nforged line\u{1b}[2J"), entry("second")]);
+        assert_eq!(lines.len(), 2, "{lines:?}");
+        assert!(
+            lines[0].ends_with(r#""first\nforged line\u{1b}[2J""#),
+            "{}",
+            lines[0]
+        );
+        assert!(lines[1].ends_with(r#""second""#), "{}", lines[1]);
+    }
+
+    #[test]
+    fn keeps_32_entries_and_counts_the_rest() {
+        let entries: Vec<_> = (0..40).map(|index| entry(&index.to_string())).collect();
+        let lines = logged(&entries);
+        assert_eq!(
+            lines
+                .iter()
+                .filter(|line| line.contains(" device:"))
+                .count(),
+            32
+        );
+        assert!(lines.last().unwrap().contains("dropped=8"), "{lines:?}");
+    }
+
+    #[test]
+    fn truncates_long_fields() {
+        let lines = logged(&[entry(&"x".repeat(600))]);
+        assert_eq!(lines[0].matches('x').count(), LOG_FIELD_CHARS);
     }
 }

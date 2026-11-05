@@ -15,12 +15,10 @@ pub const DEVICE_OPERATIONS: [(&str, &str); 4] = [
     ("post", "/api/log"),
 ];
 
-/// Where TRMNL publishes its API document.
-pub const TRMNL_DOCUMENT: &str = "https://trmnl.com/api-docs/openapi.json";
-
 /// The device contract taken from TRMNL's document, with where and when it came from.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Excerpt {
+    /// Where the document was fetched from.
     pub source: String,
     /// The UTC date the document was fetched, as `YYYY-MM-DD`.
     pub retrieved: String,

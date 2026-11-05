@@ -1,6 +1,7 @@
 #!/bin/sh
-# Generates the contract into gen/, the layout the Nix build (deploy/nix/contract.nix)
-# produces: the device API's Rust server crate and its OpenAPI document.
+# Generates the contract into gen/: the device API's Rust server crate and its OpenAPI
+# document. The Nix contract build (deploy/nix/contract.nix) runs this script too, so
+# it alone owns the layout.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"

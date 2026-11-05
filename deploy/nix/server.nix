@@ -27,11 +27,9 @@ rustPlatform.buildRustPackage {
 
   cargoLock.lockFile = ../../Cargo.lock;
 
-  # The layout tools/generate writes in a checkout.
+  # The generated contract, laid out as tools/generate writes it in a checkout.
   postPatch = ''
-    mkdir gen
-    cp -r ${contract}/device-api gen/device-api
-    cp ${contract}/device-api.openapi.json gen/device-api.openapi.json
+    cp -r --no-preserve=mode ${contract} gen
   '';
 
   # Queries are checked against .sqlx/, which tools/prepare-queries writes.

@@ -35,7 +35,8 @@ impl FromStr for Mac {
         let mut parts = text.trim().split(separator);
         for octet in &mut octets {
             let part = parts.next().ok_or(MacError)?;
-            if part.len() != 2 {
+            // from_str_radix also takes a sign, as in `+1`.
+            if part.len() != 2 || !part.bytes().all(|b| b.is_ascii_hexdigit()) {
                 return Err(MacError);
             }
             *octet = u8::from_str_radix(part, 16).map_err(|_| MacError)?;
@@ -85,6 +86,7 @@ mod tests {
             "41:B4:10:39:A1:2",
             "41:B4:10:39:A1:ZZ",
             "41B410:39:A1:24",
+            "+1:+2:+3:+4:+5:+6",
         ] {
             assert_eq!(text.parse::<Mac>(), Err(MacError), "{text:?}");
         }

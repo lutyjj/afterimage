@@ -3,8 +3,12 @@
 # Review the diff: a changed excerpt means TRMNL changed the device contract.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+source=https://trmnl.com/api-docs/openapi.json
 target="$root/model/trmnl/device-api.json"
-curl -fsS https://trmnl.com/api-docs/openapi.json |
+# The workspace includes the server, which builds on the generated contract.
+[ -d "$root/gen/device-api" ] || "$root/tools/generate"
+trap 'rm -f "$target.new"' EXIT
+curl -fsS "$source" |
   cargo run --quiet --manifest-path "$root/Cargo.toml" -p afterimage-conformance --bin trmnl-excerpt -- \
-    --retrieved "$(date -u +%F)" > "$target.new"
+    --source "$source" --retrieved "$(date -u +%F)" > "$target.new"
 mv "$target.new" "$target"

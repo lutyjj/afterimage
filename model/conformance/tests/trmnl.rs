@@ -3,7 +3,7 @@
 //! The excerpt in `model/trmnl/device-api.json` is the oracle for names, paths,
 //! requirements and response types; `tools/trmnl-excerpt` refreshes it. Header
 //! types are the one deliberate difference: the model takes every header as text
-//! (see `model/device.smithy`).
+//! (see `model/smithy/device.smithy`).
 
 use std::path::Path;
 

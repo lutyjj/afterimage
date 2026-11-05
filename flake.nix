@@ -31,9 +31,9 @@
         inherit (scope.${system}) contract server;
       });
 
-      # The server's build runs every test.
+      # The server's build runs every test; lint runs clippy and rustfmt.
       checks = forSystems (system: {
-        inherit (scope.${system}) server;
+        inherit (scope.${system}) server lint;
       });
 
       devShells = forSystems (system: {

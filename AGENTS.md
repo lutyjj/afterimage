@@ -29,9 +29,10 @@ Afterimage is a self-hosted server for TRMNL e-paper displays. [The design](docs
 
 ## Contract and code
 
-For API changes, update `model/` first, then regenerate and implement. Generated
-output is never edited by hand. Each project builds on its own and depends on
-the others only through code generated from the model.
+For API changes, update `model/smithy/` first, then regenerate and implement.
+Generated output is never edited by hand. Each project builds on its own and
+depends on the others only through code generated from the model, except that
+any Rust project may use the shared library `crates/trmnl`.
 
 The flake owns the toolchains; do not install unmanaged versions on the host.
 The [README](README.md#development) lists the commands.

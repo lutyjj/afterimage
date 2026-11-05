@@ -11,6 +11,7 @@ lib.makeScope pkgs.newScope (self: {
 
   contract = self.callPackage ./contract.nix { };
   server = self.callPackage ./server.nix { };
+  lint = self.callPackage ./lint.nix { };
 
   devShell = self.callPackage ./devshell.nix { };
 })

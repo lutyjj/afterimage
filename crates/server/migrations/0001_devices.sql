@@ -9,6 +9,8 @@ CREATE TABLE devices (
     -- The firmware's DEVICE_MODEL.
     model TEXT NOT NULL,
     created_at INTEGER NOT NULL,
+    key_issued_at INTEGER NOT NULL,
+    -- The last check-in with the current key; NULL until the device uses it.
     seen_at INTEGER,
     -- The latest readings; a check-in that omits one keeps the last known value.
     battery_voltage REAL,

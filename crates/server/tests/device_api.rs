@@ -1,18 +1,21 @@
 //! The device API as TRMNL firmware sees it: requests carry the headers and bodies
 //! firmware 1.8.18 builds (`lib/trmnl/src/api-client/request_headers.cpp`,
 //! `serialize_log.cpp`), and answers are checked against what the firmware does
-//! with each status value.
+//! with each status value: on check-in, 202 shows the device's code and 500 wipes
+//! its Wi-Fi settings (`display_session.cpp`, `bl.cpp`), so no answer here is 500.
 
+use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::{Arc, Mutex};
 
 use afterimage_server::clock::Clock;
 use afterimage_server::device_api::serve;
-use afterimage_server::devices::{CLAIM_WINDOW_SECONDS, Registry, UNCLAIMED_LIMIT};
-use afterimage_server::secrets::{OsEntropy, key_hash};
+use afterimage_server::devices::{QUIET_SECONDS, Registry, UNCLAIMED_LIMIT, UNUSED_KEY_SECONDS};
+use afterimage_server::secrets::{Entropy, OsEntropy, key_hash};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
+use sqlx::Row;
 use tempfile::TempDir;
 use tokio::net::TcpListener;
 
@@ -30,16 +33,34 @@ impl ManualClock {
     }
 }
 
+/// Draws friendly IDs from a script, repeating the last one; keys stay random.
+struct ScriptedIds(Mutex<VecDeque<[u8; 6]>>);
+
+impl Entropy for ScriptedIds {
+    fn fill(&self, buffer: &mut [u8]) {
+        if buffer.len() != 6 {
+            return OsEntropy.fill(buffer);
+        }
+        let mut script = self.0.lock().unwrap();
+        let next = if script.len() > 1 {
+            script.pop_front().unwrap()
+        } else {
+            script[0]
+        };
+        buffer.copy_from_slice(&next);
+    }
+}
+
 struct Server {
     url: String,
     clock: Arc<ManualClock>,
-    database: PathBuf,
+    data: TempDir,
     http: reqwest::Client,
-    _data: TempDir,
 }
 
 const FIRMWARE: &str = "1.8.18";
 const MODEL: &str = "og";
+const UNKNOWN_KEY: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 /// What a device reports when nothing in particular is under test.
 const READINGS: Readings = Readings {
@@ -55,10 +76,13 @@ struct Readings {
 }
 
 async fn start() -> Server {
+    start_with(Arc::new(OsEntropy)).await
+}
+
+async fn start_with(entropy: Arc<dyn Entropy>) -> Server {
     let data = TempDir::new().unwrap();
-    let database = data.path().join("afterimage.db");
     let clock = Arc::new(ManualClock(AtomicI64::new(1_800_000_000)));
-    let registry = Registry::open(&database, clock.clone(), Arc::new(OsEntropy))
+    let registry = Registry::open(&data.path().join("afterimage.db"), clock.clone(), entropy)
         .await
         .unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -67,10 +91,13 @@ async fn start() -> Server {
     Server {
         url,
         clock,
-        database,
+        data,
         http: reqwest::Client::new(),
-        _data: data,
     }
+}
+
+async fn json(response: reqwest::Response) -> Value {
+    serde_json::from_slice(&response.bytes().await.unwrap()).unwrap()
 }
 
 impl Server {
@@ -98,7 +125,7 @@ impl Server {
             StatusCode::OK,
             "setup is HTTP 200 whatever the outcome"
         );
-        serde_json::from_slice(&response.bytes().await.unwrap()).unwrap()
+        json(response).await
     }
 
     /// Sets up a new device and returns its key and friendly ID.
@@ -153,7 +180,7 @@ impl Server {
             StatusCode::OK,
             "a check-in is HTTP 200 whatever the outcome"
         );
-        serde_json::from_slice(&response.bytes().await.unwrap()).unwrap()
+        json(response).await
     }
 
     async fn current(&self, key: &str) -> Value {
@@ -166,7 +193,7 @@ impl Server {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
-        serde_json::from_slice(&response.bytes().await.unwrap()).unwrap()
+        json(response).await
     }
 
     /// `POST /api/log` with `buildLogHeaders` and the given body.
@@ -185,10 +212,19 @@ impl Server {
     }
 
     async fn stored(&self, query: &'static str) -> Vec<sqlx::sqlite::SqliteRow> {
-        let pool = sqlx::SqlitePool::connect(&format!("sqlite://{}", self.database.display()))
+        let path = self.data.path().join("afterimage.db");
+        let pool = sqlx::SqlitePool::connect(&format!("sqlite://{}", path.display()))
             .await
             .unwrap();
         sqlx::query(query).fetch_all(&pool).await.unwrap()
+    }
+
+    /// Every file of the database, the write-ahead log included.
+    fn database_files(&self) -> Vec<PathBuf> {
+        std::fs::read_dir(self.data.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect()
     }
 }
 
@@ -252,63 +288,100 @@ async fn an_unclaimed_device_shows_its_code() {
         );
     }
     let answer = server.display(&key, &READINGS).await;
-    assert_eq!(answer["reset_firmware"], false);
+    assert_eq!(
+        answer["reset_firmware"], false,
+        "true would wipe the device"
+    );
     assert_eq!(answer["update_firmware"], false);
 }
 
 #[tokio::test]
-async fn an_unknown_key_resets_the_device() {
+async fn an_unknown_key_leaves_the_device_as_it_is() {
     let server = start().await;
-    let key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-    assert_eq!(
-        server.display(key, &READINGS).await["status"],
-        500,
-        "500 makes the firmware run setup again"
+    assert_eq!(server.display(UNKNOWN_KEY, &READINGS).await["status"], 202);
+    assert_eq!(server.current(UNKNOWN_KEY).await["status"], 202);
+    assert!(server.stored("SELECT id FROM devices").await.is_empty());
+}
+
+#[tokio::test]
+async fn a_device_that_checks_in_keeps_its_key_for_good() {
+    let server = start().await;
+    let (key, friendly_id) = server.register(&mac(1)).await;
+    for _ in 0..48 {
+        server.clock.advance(60 * 60);
+        assert_eq!(server.display(&key, &READINGS).await["status"], 202);
+    }
+    // Setup, which drops unused registrations, leaves this one alone.
+    server.register(&mac(2)).await;
+    let rows = server.stored("SELECT friendly_id FROM devices").await;
+    assert_eq!(rows.len(), 2);
+    assert!(
+        rows.iter()
+            .any(|row| row.get::<String, _>(0) == friendly_id)
     );
-    assert_eq!(server.current(key).await["status"], 500);
 }
 
 #[tokio::test]
-async fn setup_again_replaces_the_key_and_keeps_the_code() {
+async fn setup_again_waits_until_the_key_is_quiet() {
     let server = start().await;
-    let (old_key, friendly_id) = server.register(&mac(1)).await;
-    let (new_key, same_id) = server.register(&mac(1)).await;
+    let (old_key, old_id) = server.register(&mac(1)).await;
+    server.display(&old_key, &READINGS).await;
+
+    server.clock.advance(QUIET_SECONDS - 1);
+    let answer = server.setup(&mac(1)).await;
+    assert_eq!(
+        answer["status"], 404,
+        "a spoofed MAC cannot take a running device's key"
+    );
+    assert!(answer.get("api_key").is_none());
+    assert!(answer["message"].as_str().unwrap().contains("30 minutes"));
+    assert_eq!(server.display(&old_key, &READINGS).await["status"], 202);
+
+    server.clock.advance(QUIET_SECONDS);
+    let (new_key, new_id) = server.register(&mac(1)).await;
     assert_ne!(new_key, old_key);
-    assert_eq!(same_id, friendly_id);
-    assert_eq!(server.display(&old_key, &READINGS).await["status"], 500);
-    assert_eq!(server.display(&new_key, &READINGS).await["status"], 202);
+    assert_ne!(new_id, old_id, "a new key comes with a new code");
+
+    server.display(&old_key, &READINGS).await;
+    let row = &server.stored("SELECT seen_at FROM devices").await[0];
+    assert_eq!(
+        row.get::<Option<i64>, _>(0),
+        None,
+        "the old key no longer reaches the device"
+    );
+    server.display(&new_key, &READINGS).await;
+    let row = &server.stored("SELECT seen_at FROM devices").await[0];
+    assert!(row.get::<Option<i64>, _>(0).is_some());
 }
 
 #[tokio::test]
-async fn concurrent_setups_of_one_device_leave_one_device_with_one_key() {
+async fn concurrent_setups_of_one_device_register_it_once() {
     let server = Arc::new(start().await);
     let setups: Vec<_> = (0..8)
         .map(|_| {
             let server = Arc::clone(&server);
-            tokio::spawn(async move { server.register(&mac(1)).await })
+            tokio::spawn(async move { server.setup(&mac(1)).await })
         })
         .collect();
-    let mut answers = Vec::new();
+    let mut keys = Vec::new();
     for setup in setups {
-        answers.push(setup.await.unwrap());
-    }
-    assert!(
-        answers.iter().all(|(_, id)| *id == answers[0].1),
-        "one friendly ID"
-    );
-    let mut working = 0;
-    for (key, _) in &answers {
-        if server.display(key, &READINGS).await["status"] == 202 {
-            working += 1;
+        let answer = setup.await.unwrap();
+        match answer["status"].as_i64() {
+            Some(200) => keys.push(answer["api_key"].as_str().unwrap().to_owned()),
+            Some(404) => {}
+            other => panic!("unexpected setup status {other:?}"),
         }
     }
-    assert_eq!(working, 1, "only the last key issued works");
+    assert_eq!(
+        keys.len(),
+        1,
+        "one setup registers it; the rest find its key in use"
+    );
     assert_eq!(server.stored("SELECT id FROM devices").await.len(), 1);
 }
 
 #[tokio::test]
 async fn records_readings_and_keeps_the_last_known_value() {
-    use sqlx::Row;
     let server = start().await;
     let (key, _) = server.register(&mac(1)).await;
     server.display(&key, &READINGS).await;
@@ -320,7 +393,9 @@ async fn records_readings_and_keeps_the_last_known_value() {
     };
     server.display(&key, &garbled).await;
     let row = &server
-        .stored("SELECT battery_voltage, battery_percent, signal_dbm, firmware_version, seen_at, created_at FROM devices")
+        .stored(
+            "SELECT battery_voltage, battery_percent, signal_dbm, firmware_version, seen_at, created_at FROM devices",
+        )
         .await[0];
     assert_eq!(
         row.get::<Option<f64>, _>(0),
@@ -339,15 +414,24 @@ async fn records_readings_and_keeps_the_last_known_value() {
 
 #[tokio::test]
 async fn stores_only_a_hash_of_the_key() {
-    use sqlx::Row;
     let server = start().await;
     let (key, _) = server.register(&mac(1)).await;
-    let stored = std::fs::read(&server.database).unwrap();
+    let files = server.database_files();
     assert!(
-        !stored
-            .windows(key.len())
-            .any(|window| window == key.as_bytes())
+        files
+            .iter()
+            .any(|path| path.to_string_lossy().ends_with("-wal"))
     );
+    for path in files {
+        let bytes = std::fs::read(&path).unwrap();
+        assert!(
+            !bytes
+                .windows(key.len())
+                .any(|window| window == key.as_bytes()),
+            "{} holds the key",
+            path.display()
+        );
+    }
     let row = &server.stored("SELECT key_hash FROM devices").await[0];
     assert_eq!(row.get::<Vec<u8>, _>(0), key_hash(&key));
 }
@@ -370,32 +454,36 @@ async fn refuses_new_devices_beyond_the_unclaimed_limit() {
             .unwrap()
             .contains("waiting to be claimed")
     );
+    server.clock.advance(QUIET_SECONDS);
     let (key, _) = server.register(&mac(0)).await;
     assert_eq!(
         server.display(&key, &READINGS).await["status"],
         202,
-        "a known device can still set up"
+        "a known device can still set up again"
     );
 }
 
 #[tokio::test]
-async fn an_unclaimed_device_starts_over_after_the_claim_window() {
+async fn an_unused_registration_frees_its_place_after_a_day() {
     let server = start().await;
+    let mut keys = Vec::new();
     for index in 0..u8::try_from(UNCLAIMED_LIMIT).unwrap() {
-        server.register(&mac(index)).await;
+        keys.push(server.register(&mac(index)).await.0);
     }
-    let (key, _) = server.register(&mac(0)).await;
-    server.clock.advance(CLAIM_WINDOW_SECONDS - 1);
-    assert_eq!(server.display(&key, &READINGS).await["status"], 202);
-    server.clock.advance(1);
-    assert_eq!(server.display(&key, &READINGS).await["status"], 500);
-    assert_eq!(server.current(&key).await["status"], 500);
+    server.display(&keys[1], &READINGS).await;
+    server.clock.advance(UNUSED_KEY_SECONDS - 1);
     assert_eq!(
         server.setup("02:00:00:00:00:01").await["status"],
-        200,
-        "expired devices free their places"
+        404,
+        "unused registrations hold their places for a day"
     );
-    assert_eq!(server.stored("SELECT id FROM devices").await.len(), 1);
+    server.clock.advance(1);
+    assert_eq!(server.setup("02:00:00:00:00:01").await["status"], 200);
+    assert_eq!(
+        server.stored("SELECT id FROM devices").await.len(),
+        2,
+        "the device that checked in stays"
+    );
 }
 
 #[tokio::test]
@@ -411,6 +499,40 @@ async fn refuses_setup_it_cannot_read() {
 }
 
 #[tokio::test]
+async fn draws_another_code_when_one_is_taken() {
+    let taken = *b"AAAAAA";
+    let server = start_with(Arc::new(ScriptedIds(Mutex::new(VecDeque::from([
+        taken, taken, *b"BBBBBB",
+    ])))))
+    .await;
+    let (_, first) = server.register(&mac(1)).await;
+    let (_, second) = server.register(&mac(2)).await;
+    assert_ne!(first, second);
+}
+
+/// A server failure is HTTP 500 with no body `status`: the firmware retries an
+/// HTTP error, while a body `status` of 500 would wipe the device.
+#[tokio::test]
+async fn a_server_failure_is_an_http_error_the_firmware_retries() {
+    let server = start_with(Arc::new(ScriptedIds(Mutex::new(VecDeque::from([
+        *b"AAAAAA",
+    ])))))
+    .await;
+    server.register(&mac(1)).await;
+    let response = server
+        .http
+        .get(format!("{}/api/setup", server.url))
+        .header("ID", mac(2))
+        .header("Model", MODEL)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    let body = json(response).await;
+    assert!(body.get("status").is_none(), "{body}");
+}
+
+#[tokio::test]
 async fn takes_firmware_log_batches_from_known_devices() {
     let server = start().await;
     let (key, _) = server.register(&mac(1)).await;
@@ -419,9 +541,8 @@ async fn takes_firmware_log_batches_from_known_devices() {
         server.log(&key, batch.to_string()).await,
         StatusCode::NO_CONTENT
     );
-    let unknown = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     assert_eq!(
-        server.log(unknown, batch.to_string()).await,
+        server.log(UNKNOWN_KEY, batch.to_string()).await,
         StatusCode::UNAUTHORIZED
     );
 }

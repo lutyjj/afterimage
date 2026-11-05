@@ -1,9 +1,16 @@
 //! The device lifecycle and its storage.
 //!
 //! Any device may run setup: it gets a key and a friendly ID, and waits for an
-//! account to claim it by that ID. Setup for a MAC the server knows issues a new key
-//! and keeps the ID. A device still unclaimed after [`CLAIM_WINDOW_SECONDS`] starts
-//! over: its key stops working, and its next setup gives it a new ID.
+//! account to claim it by that ID. The server never invalidates a key a device is
+//! using, because the firmware has no way back from a lost key except a wipe of its
+//! Wi-Fi settings (see [`afterimage_trmnl::DisplayStatus::Reset`]):
+//!
+//! - Setup for a known MAC issues a new key only once the current one has been
+//!   quiet for [`QUIET_SECONDS`]. Anyone on the network can present a MAC, so the
+//!   new key comes with a new friendly ID, which a spoofer cannot show on the real
+//!   device's screen.
+//! - A registration whose key was never used is dropped [`UNUSED_KEY_SECONDS`]
+//!   after the key was issued, which frees its place under [`UNCLAIMED_LIMIT`].
 
 use std::path::Path;
 use std::str::FromStr;
@@ -16,8 +23,11 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePo
 use crate::clock::Clock;
 use crate::secrets::{self, Entropy};
 
-/// How long a device may wait to be claimed.
-pub const CLAIM_WINDOW_SECONDS: i64 = 24 * 60 * 60;
+/// How long a key that has never checked in keeps its registration.
+pub const UNUSED_KEY_SECONDS: i64 = 24 * 60 * 60;
+/// How long a key must go without a check-in before setup replaces it. Unclaimed
+/// devices check in every minute or so, so a running device keeps its key.
+pub const QUIET_SECONDS: i64 = 30 * 60;
 /// Devices that may wait to be claimed at once. Setup refuses a new MAC beyond it,
 /// which bounds what anyone on the network can make the server store.
 pub const UNCLAIMED_LIMIT: i64 = 32;
@@ -44,6 +54,8 @@ pub enum Refusal {
     InvalidModel,
     /// [`UNCLAIMED_LIMIT`] devices are already waiting to be claimed.
     UnclaimedLimit,
+    /// The MAC's current key checked in within [`QUIET_SECONDS`].
+    KeyInUse,
 }
 
 /// A device found by its key.
@@ -93,11 +105,12 @@ impl Registry {
         })
     }
 
-    /// Registers the device with this MAC, or issues it a new key if it is known.
+    /// Registers the device with this MAC, or issues a known one a new key and
+    /// friendly ID once its current key is quiet.
     ///
     /// # Errors
     ///
-    /// When storage fails.
+    /// When storage fails, or no free friendly ID turns up.
     pub async fn setup(&self, mac: &str, model: &str) -> Result<Setup, Error> {
         let Ok(mac) = Mac::from_str(mac) else {
             return Ok(Setup::Refused(Refusal::InvalidMac));
@@ -111,27 +124,52 @@ impl Registry {
         }
         let mac = mac.to_string();
         let now = self.clock.now();
-        let expired = now - CLAIM_WINDOW_SECONDS;
+        let unused_before = now - UNUSED_KEY_SECONDS;
+        let quiet_before = now - QUIET_SECONDS;
         let key = secrets::new_key(&*self.entropy);
         let key_hash = secrets::key_hash(&key);
 
-        // IMMEDIATE takes the write lock up front, so the count and the insert below
-        // see the same set of devices as every other setup.
+        // IMMEDIATE takes the write lock up front, so the lookups and writes below
+        // see the same devices as every other setup.
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
-        sqlx::query!("DELETE FROM devices WHERE created_at <= ?", expired)
-            .execute(&mut *tx)
-            .await?;
-        let known = sqlx::query_scalar!(
-            "UPDATE devices SET key_hash = ?, model = ? WHERE mac = ? RETURNING friendly_id",
-            key_hash,
-            model,
+        sqlx::query!(
+            "DELETE FROM devices WHERE seen_at IS NULL AND key_issued_at <= ?",
+            unused_before
+        )
+        .execute(&mut *tx)
+        .await?;
+        let known = sqlx::query!(
+            r#"SELECT id, COALESCE(seen_at, key_issued_at) AS "active_at!: i64"
+               FROM devices WHERE mac = ?"#,
             mac
         )
         .fetch_optional(&mut *tx)
         .await?;
-        if let Some(friendly_id) = known {
-            tx.commit().await?;
-            return Ok(Setup::Registered { key, friendly_id });
+
+        if let Some(known) = known {
+            if known.active_at > quiet_before {
+                tx.commit().await?;
+                return Ok(Setup::Refused(Refusal::KeyInUse));
+            }
+            for friendly_id in self.friendly_ids() {
+                let replaced = sqlx::query!(
+                    "UPDATE OR IGNORE devices
+                     SET key_hash = ?, friendly_id = ?, model = ?, key_issued_at = ?, seen_at = NULL
+                     WHERE id = ?",
+                    key_hash,
+                    friendly_id,
+                    model,
+                    now,
+                    known.id
+                )
+                .execute(&mut *tx)
+                .await?;
+                if replaced.rows_affected() == 1 {
+                    tx.commit().await?;
+                    return Ok(Setup::Registered { key, friendly_id });
+                }
+            }
+            return Err(Error::FriendlyIdsExhausted);
         }
 
         let unclaimed = sqlx::query_scalar!("SELECT COUNT(*) FROM devices")
@@ -141,16 +179,16 @@ impl Registry {
             tx.commit().await?;
             return Ok(Setup::Refused(Refusal::UnclaimedLimit));
         }
-        for _ in 0..FRIENDLY_ID_ATTEMPTS {
-            let friendly_id = secrets::new_friendly_id(&*self.entropy);
+        for friendly_id in self.friendly_ids() {
             let inserted = sqlx::query!(
-                "INSERT INTO devices (mac, friendly_id, key_hash, model, created_at)
-                 VALUES (?, ?, ?, ?, ?)
+                "INSERT INTO devices (mac, friendly_id, key_hash, model, created_at, key_issued_at)
+                 VALUES (?, ?, ?, ?, ?, ?)
                  ON CONFLICT (friendly_id) DO NOTHING",
                 mac,
                 friendly_id,
                 key_hash,
                 model,
+                now,
                 now
             )
             .execute(&mut *tx)
@@ -161,6 +199,11 @@ impl Registry {
             }
         }
         Err(Error::FriendlyIdsExhausted)
+    }
+
+    /// Candidate friendly IDs; the caller keeps the first no other device holds.
+    fn friendly_ids(&self) -> impl Iterator<Item = String> + '_ {
+        (0..FRIENDLY_ID_ATTEMPTS).map(|_| secrets::new_friendly_id(&*self.entropy))
     }
 
     /// Records a check-in: the time, and each reading the device reported.
@@ -175,7 +218,6 @@ impl Registry {
     ) -> Result<Option<KnownDevice>, Error> {
         let key_hash = secrets::key_hash(key);
         let now = self.clock.now();
-        let expired = now - CLAIM_WINDOW_SECONDS;
         let friendly_id = sqlx::query_scalar!(
             "UPDATE devices SET
                  seen_at = ?,
@@ -183,15 +225,14 @@ impl Registry {
                  battery_percent = COALESCE(?, battery_percent),
                  signal_dbm = COALESCE(?, signal_dbm),
                  firmware_version = COALESCE(?, firmware_version)
-             WHERE key_hash = ? AND created_at > ?
+             WHERE key_hash = ?
              RETURNING friendly_id",
             now,
             readings.battery_voltage,
             readings.battery_percent,
             readings.signal_dbm,
             readings.firmware_version,
-            key_hash,
-            expired
+            key_hash
         )
         .fetch_optional(&self.pool)
         .await?;
@@ -205,11 +246,9 @@ impl Registry {
     /// When storage fails.
     pub async fn find(&self, key: &str) -> Result<Option<KnownDevice>, Error> {
         let key_hash = secrets::key_hash(key);
-        let expired = self.clock.now() - CLAIM_WINDOW_SECONDS;
         let friendly_id = sqlx::query_scalar!(
-            "SELECT friendly_id FROM devices WHERE key_hash = ? AND created_at > ?",
-            key_hash,
-            expired
+            "SELECT friendly_id FROM devices WHERE key_hash = ?",
+            key_hash
         )
         .fetch_optional(&self.pool)
         .await?;

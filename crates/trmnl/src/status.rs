@@ -3,7 +3,8 @@
 pub enum SetupStatus {
     /// The answer carries the device's key and friendly ID, which it stores.
     Registered,
-    /// The firmware shows its friendly ID and a message, then sleeps and asks again.
+    /// The firmware shows the image at `image_url`, or else `message`, then sleeps
+    /// for its default interval and asks again.
     NotRegistered,
 }
 
@@ -19,16 +20,18 @@ impl SetupStatus {
 
 /// The `status` of a check-in answer. The HTTP status is 200 either way.
 ///
-/// The firmware acts on these three values (`display_session.cpp`); any other
+/// Firmware 1.8.18 acts on these three values (`display_session.cpp`); any other
 /// value leaves the screen as it is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisplayStatus {
     /// Download and show `image_url`.
     Show,
-    /// No account has claimed the device: it shows its friendly ID and checks in
-    /// again soon.
+    /// The device shows its friendly ID and checks in again soon.
     Unclaimed,
-    /// The key is not valid: the device forgets it and runs setup again.
+    /// The device erases its saved Wi-Fi networks and every stored setting, the
+    /// server URL included, and restarts into its setup portal
+    /// (`resetDeviceCredentials` in `bl.cpp`), where a person must provision it
+    /// again. `reset_firmware: true` does the same.
     Reset,
 }
 

@@ -5,10 +5,11 @@ namespace afterimage.device
 use aws.protocols#restJson1
 use smithy.framework#ValidationException
 
-/// The API that TRMNL firmware calls. Paths, headers and fields follow TRMNL's
+/// The device API TRMNL documents. Paths, headers and fields follow TRMNL's
 /// published OpenAPI document; `model/trmnl/device-api.json` is the excerpt that
 /// the conformance test compares against. Status values and header formats follow
-/// the firmware, which is where the published document is incomplete.
+/// the firmware (release 1.8.18), which is where the published document is
+/// incomplete.
 ///
 /// Headers are text on the wire and the firmware's values do not always match the
 /// published types (`Battery-Capacity` is `3000/3500`, `Battery-Charging` is `1`),
@@ -30,9 +31,10 @@ service DeviceApi {
 
 /// Registers a device by its MAC address and issues its access key.
 ///
-/// The HTTP status is always 200 and `status` carries the outcome: 200 when the
-/// device is registered, 404 when it is not, after which the firmware shows its
-/// friendly ID and sleeps before it asks again.
+/// The HTTP status is always 200 and `status` carries the outcome. On 200 the
+/// firmware stores the key and the friendly ID and shows the ID with `message`. On
+/// 404 it shows the image at `image_url`, or else `message`, then sleeps for its
+/// default interval and asks again.
 @suppress(["HttpMethodSemantics"])
 @http(method: "GET", uri: "/api/setup", code: 200)
 operation SetupDevice {
@@ -74,9 +76,10 @@ operation SetupDevice {
 /// The device's check-in: it reports its state and learns what to show next.
 ///
 /// The HTTP status is always 200 and `status` carries the outcome. The firmware
-/// acts on three values: 0 shows `image_url`, 202 shows the device's friendly ID
-/// because no account has claimed it, and 500 makes the device forget its key
-/// and run setup again.
+/// acts on three values: 0 shows `image_url`; 202 shows the device's friendly ID
+/// and polls again soon; 500, like `reset_firmware`, erases the device's saved
+/// Wi-Fi networks and every stored setting, the server URL included, and restarts
+/// it into its setup portal, where a person must provision it again.
 @suppress(["HttpMethodSemantics"])
 @http(method: "GET", uri: "/api/display", code: 200)
 operation GetDisplay {
@@ -190,7 +193,8 @@ operation GetDisplay {
     }
 }
 
-/// The screen the device shows now, with the same `status` values as GetDisplay.
+/// The screen the device shows now. TRMNL documents this operation; firmware 1.8.18
+/// does not call it. The server answers with the status GetDisplay would give.
 @readonly
 @http(method: "GET", uri: "/api/display/current", code: 200)
 operation GetCurrentScreen {
