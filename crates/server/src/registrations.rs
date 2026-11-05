@@ -127,8 +127,9 @@ impl Registrations {
         let key = secrets::new_key(&*self.entropy);
         let key_hash = secrets::key_hash(&key);
 
-        // IMMEDIATE takes the write lock up front, so the count and the insert below
-        // see the same registrations as every other setup.
+        // IMMEDIATE takes the write lock up front (the leading DELETE would take it
+        // too), so the count and the insert below see the same registrations as every
+        // other setup.
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         sqlx::query!("DELETE FROM registrations WHERE expires_at <= ?", now)
             .execute(&mut *tx)

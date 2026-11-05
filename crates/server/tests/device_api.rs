@@ -391,8 +391,8 @@ async fn concurrent_setups_each_get_their_own_key_and_code() {
     }
 }
 
-/// The unclaimed limit holds under concurrent setups: `BEGIN IMMEDIATE` serializes
-/// each setup's count and insert.
+/// The unclaimed limit holds under concurrent setups: each setup counts and inserts
+/// inside one write transaction.
 #[tokio::test]
 async fn concurrent_setups_at_the_limit_take_the_last_place_once() {
     let server = Arc::new(start().await);

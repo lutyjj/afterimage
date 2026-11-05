@@ -75,7 +75,13 @@ async fn setup_device(
             }
         }
         Setup::Refused(refusal) => {
-            tracing::info!(?refusal, mac = ?input.id, model = ?input.model, "setup refused");
+            // The headers are untrusted text; only a parsed MAC reaches the log.
+            let mac = input.id.parse::<Mac>().ok();
+            tracing::info!(
+                ?refusal,
+                mac = mac.map(tracing::field::display),
+                "setup refused"
+            );
             output::SetupDeviceOutput {
                 status: SetupStatus::NotRegistered.code(),
                 api_key: None,
