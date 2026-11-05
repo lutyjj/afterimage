@@ -73,7 +73,7 @@ pub struct Drawing {
 impl Drawing {
     /// # Panics
     ///
-    /// When the HTTP client cannot be built, which only a broken TLS setup causes.
+    /// When even an HTTP client that trusts no certificate cannot be built.
     #[must_use]
     pub fn new(secrets: Secrets, time_zone: jiff::tz::TimeZone) -> Self {
         let mut templates = Environment::new();
@@ -86,11 +86,22 @@ impl Drawing {
         templates.add_function("now", |state: &State| {
             state.lookup("__render_time").unwrap_or_default()
         });
-        let http = reqwest::Client::builder()
-            .timeout(FETCH_TIMEOUT)
-            .user_agent(concat!("afterimage/", env!("CARGO_PKG_VERSION")))
-            .build()
-            .expect("the HTTP client builds");
+        let builder = || {
+            reqwest::Client::builder()
+                .timeout(FETCH_TIMEOUT)
+                .user_agent(concat!("afterimage/", env!("CARGO_PKG_VERSION")))
+        };
+        // HTTPS trusts the host's certificate store, so a source behind a private CA
+        // works where the host trusts it. A host with no store, such as a bare
+        // container, still serves devices; its HTTPS sources fail with a
+        // certificate error until it has one.
+        let http = builder().build().unwrap_or_else(|error| {
+            tracing::warn!(%error, "HTTPS data sources will fail until this host has CA certificates");
+            builder()
+                .tls_certs_only([])
+                .build()
+                .expect("a client that trusts no certificate needs no store")
+        });
         Self {
             templates,
             http,
