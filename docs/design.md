@@ -31,13 +31,14 @@ Each component builds on its own and depends on the others only through generate
 ## Devices
 
 1. **Setup.** The device joins Wi-Fi through its captive portal, configured with this server's URL, and calls `/api/setup` with its MAC (`ID`) and `Model`. The server creates an unclaimed device with an access key and a friendly ID, and returns a setup screen showing that ID. A user claims the device by entering the ID in the web UI.
-2. **Check-in.** The device calls `/api/display` with its `Access-Token` and its state (`Battery-Voltage`, `Percent-Charged`, `RSSI`, `FW-Version`). The server answers with the image URL of the screen due now and a `refresh_rate` that wakes the device at its refresh interval or the next scheduled change, whichever comes first. It publishes the reported state to MQTT.
-3. **Firmware update.** The server reads the latest stable firmware for each model from TRMNL's `GET /api/firmware`, downloads it once and serves it from its own URL, so devices without internet access can update. An install request sets `update_firmware` and `firmware_url` in the device's next check-in answer.
-4. **Logs.** The server writes `/api/log` entries to its own structured log and stores none.
+2. **Model.** The reported `Model` selects the device's render profile from TRMNL's `GET /api/models` and its firmware board. TRMNL publishes no mapping between these names (the Seeed 7.5" kit reports `xiao_epaper_display`, renders as `og_plus` and updates from `seeed_OG_DIY_Kit`), so the server owns that table. A user can change a device's render profile.
+3. **Check-in.** The device calls `/api/display` with its `Access-Token` and its state (`Battery-Voltage`, `Percent-Charged`, `RSSI`, `FW-Version`). The server answers with the image URL of the screen due now and a `refresh_rate` that wakes the device at its refresh interval or the next scheduled change, whichever comes first. It publishes the reported state to MQTT.
+4. **Firmware update.** TRMNL publishes over-the-air images for its own hardware at `GET /api/firmware`, and full flash images for every supported board at `GET /api/firmware/flash`. For a board with only a flash image, the server cuts the app image out at the offset the image's partition table gives, and checks its checksum and SHA-256 before serving it. The server downloads each image once and serves it from its own URL, so devices without internet access can update. An install request sets `update_firmware` and `firmware_url` in the device's next check-in answer.
+5. **Logs.** The server writes `/api/log` entries to its own structured log and stores none.
 
 ## MQTT
 
-The server publishes each device's battery, signal, firmware version, last check-in and current screen with Home Assistant MQTT discovery, plus a firmware update entity whose install command starts step 3. History belongs to whoever consumes the topics.
+The server publishes each device's battery, signal, firmware version, last check-in and current screen with Home Assistant MQTT discovery, plus a firmware update entity whose install command starts step 4. History belongs to whoever consumes the topics.
 
 ## Screens and schedule
 
@@ -53,4 +54,4 @@ Users sign in through OIDC or with a local password. Both implement one sign-in 
 
 ## Open questions
 
-1. **Renderer.** Playwright with TRMNL's design system (MIT; its CSS and JavaScript runtime, pinned to a release from `GET /api/framework`), or Typst rendered to an image in Rust. A spike renders the same screen both ways and compares appearance on a device, render time, memory and code size. The answer also picks the template language and the renderer's implementation language.
+1. **Renderer.** Playwright with TRMNL's design system (MIT; its CSS and JavaScript runtime, pinned to a release from `GET /api/framework`), or Typst rendered to an image in Rust. The `spike/renderer` branch measures both on one screen: Typst renders in 13 ms with 19 MiB, the design system in 1.3 s with about 1 GiB, most of it spent loading its 19 MB stylesheet. Appearance on a device is not compared yet. The answer also picks the template language and the renderer's implementation language.
