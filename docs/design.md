@@ -49,10 +49,8 @@ The renderer turns a template and its data into an image for one device model: t
 
 SQLite holds accounts, devices (MAC, access key, model, settings, owner), screens, data sources and schedules. Rendered images and firmware files live in a cache directory that the server rebuilds when it is lost.
 
-Users sign in through OIDC. An account owns devices and screens; there are no roles.
+Users sign in through OIDC or with a local password. Both implement one sign-in interface, so handlers and storage see an account, never the method. An account owns devices and screens; there are no roles.
 
 ## Open questions
 
-1. **Renderer.** Playwright with TRMNL's design system (its CSS and JavaScript runtime, pinned to a release from `GET /api/framework`), or Typst rendered to an image in Rust. A spike renders the same screen both ways on a device and compares appearance, memory and code size. The answer also picks the template language and the renderer's implementation language.
-2. **Design system license.** Its `package.json` declares MIT, but GitHub cannot classify the repository's license file. Confirm redistribution rights before vendoring it.
-3. **Local sign-in.** Whether self-hosters without an OIDC provider need password accounts.
+1. **Renderer.** Playwright with TRMNL's design system (MIT; its CSS and JavaScript runtime, pinned to a release from `GET /api/framework`), or Typst rendered to an image in Rust. A spike renders the same screen both ways and compares appearance on a device, render time, memory and code size. The answer also picks the template language and the renderer's implementation language.
