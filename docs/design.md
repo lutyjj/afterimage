@@ -4,6 +4,12 @@ Afterimage is a self-hosted server for TRMNL e-paper displays. It onboards devic
 
 It does not run TRMNL community recipes, host plugins for other people, or implement TRMNL's cloud management API.
 
+## Principles
+
+- **Faithful.** The device API follows TRMNL's published contract exactly, so every device running TRMNL firmware works unchanged.
+- **Generated.** Device models, palettes, firmware lists and design tokens come from TRMNL's published sources; nobody copies their values into code.
+- **Generic.** Components, interfaces and screen elements serve every device and data source. Facts about one device live in data, never in a code path.
+
 ## Contract
 
 The Smithy model in `model/` is the single source of truth. One build generates the Rust server stubs (smithy-rs), the TypeScript client (smithy-typescript) and an OpenAPI document from it. No component defines an operation, shape or error outside the model.
@@ -31,7 +37,7 @@ Each component builds on its own and depends on the others only through generate
 ## Devices
 
 1. **Setup.** The device joins Wi-Fi through its captive portal, configured with this server's URL, and calls `/api/setup` with its MAC (`ID`) and `Model`. The server creates an unclaimed device with an access key and a friendly ID, and returns a setup screen showing that ID. A user claims the device by entering the ID in the web UI.
-2. **Model.** The reported `Model` selects the device's render profile from TRMNL's `GET /api/models` and its firmware board. TRMNL publishes no mapping between these names (the Seeed 7.5" kit reports `xiao_epaper_display`, renders as `og_plus` and updates from `seeed_OG_DIY_Kit`), so the server owns that table. A user can change a device's render profile.
+2. **Model.** The reported `Model` selects the device's render profile from TRMNL's `GET /api/models` and its firmware board from TRMNL's firmware lists. TRMNL publishes no mapping from the name a firmware build reports to either list, so the server keeps that mapping as data. A user can change a device's render profile.
 3. **Check-in.** The device calls `/api/display` with its `Access-Token` and its state (`Battery-Voltage`, `Percent-Charged`, `RSSI`, `FW-Version`). The server answers with the image URL of the screen due now and a `refresh_rate` that wakes the device at its refresh interval or the next scheduled change, whichever comes first. It publishes the reported state to MQTT.
 4. **Firmware update.** TRMNL publishes over-the-air images for its own hardware at `GET /api/firmware`, and full flash images for every supported board at `GET /api/firmware/flash`. For a board with only a flash image, the server cuts the app image out at the offset the image's partition table gives, and checks its checksum and SHA-256 before serving it. The server downloads each image once and serves it from its own URL, so devices without internet access can update. An install request sets `update_firmware` and `firmware_url` in the device's next check-in answer.
 5. **Logs.** The server writes `/api/log` entries to its own structured log and stores none.
@@ -54,4 +60,4 @@ Users sign in through OIDC or with a local password. Both implement one sign-in 
 
 ## Open questions
 
-1. **Renderer.** Playwright with TRMNL's design system (MIT; its CSS and JavaScript runtime, pinned to a release from `GET /api/framework`), or Typst rendered to an image in Rust. The `spike/renderer` branch measures both on one screen: Typst renders in 13 ms with 19 MiB, the design system in 1.3 s with about 1 GiB, most of it spent loading its 19 MB stylesheet. Appearance on a device is not compared yet. The answer also picks the template language and the renderer's implementation language.
+1. **Renderer.** Playwright with TRMNL's design system (MIT; its CSS and JavaScript runtime, pinned to a release from `GET /api/framework`), or Typst rendered to an image in Rust. The `spike/renderer` branch measures both on one screen: Typst renders in 13 ms with 19 MiB, the design system in 1.3 s with about 1 GiB, most of it spent loading its 19 MB stylesheet. Appearance on a device is not compared yet. TRMNL's design carries over either way: the design system's public tokens (palette, gaps, type scale, dither patterns) can generate Typst components, and the renderer API admits a second implementation that runs the design system itself. The answer also picks the template language and the renderer's implementation language.
