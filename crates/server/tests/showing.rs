@@ -538,7 +538,18 @@ async fn a_new_playlist_starts_at_its_first_entry() {
         other
     );
 
-    // Deleting a screen of the playlist starts it over too.
+    // Deleting a screen of the playlist starts it over too. With [other, first,
+    // second, last], the device shows `first`; deleting `other` leaves [first,
+    // second, last], and the next check-in starts at `first` rather than taking
+    // the old position and skipping `second` for `last`.
+    let last = screen(&server, "Last", text("Last")).await;
+    play(
+        &server,
+        id,
+        json!([{ "screenId": other }, { "screenId": first }, { "screenId": second }, { "screenId": last }]),
+    )
+    .await;
+    server.display(&key, &READINGS).await;
     server.display(&key, &READINGS).await;
     assert_eq!(
         showing(server.call("GET", &device_path, None).await.1),
@@ -546,7 +557,7 @@ async fn a_new_playlist_starts_at_its_first_entry() {
     );
     assert_eq!(
         server
-            .call("DELETE", &format!("/manage/screens/{second}"), None)
+            .call("DELETE", &format!("/manage/screens/{other}"), None)
             .await
             .0,
         StatusCode::NO_CONTENT
@@ -554,7 +565,7 @@ async fn a_new_playlist_starts_at_its_first_entry() {
     server.display(&key, &READINGS).await;
     assert_eq!(
         showing(server.call("GET", &device_path, None).await.1),
-        other
+        first
     );
 
     // The image a check-in named stays downloadable after the next one changes it.
@@ -562,4 +573,60 @@ async fn a_new_playlist_starts_at_its_first_entry() {
         download(&server, &shown, &key).await.status(),
         StatusCode::OK
     );
+}
+
+#[tokio::test]
+async fn a_device_whose_first_screen_fails_shows_why_and_a_lost_image_is_drawn_again() {
+    let down = Source::default();
+    let url = down.serve().await;
+    let server = start().await;
+    server.sign_up().await;
+    let (device, key) = server.claim(&mac(1)).await;
+    let id = device["id"].as_i64().unwrap();
+    // The first check-in after the claim draws the server's own screen.
+    server.display(&key, &READINGS).await;
+    let broken = screen(
+        &server,
+        "Broken",
+        json!({ "sources": { "down": { "url": url } }, "content": { "title": { "text": "{{ down.value }}" } } }),
+    )
+    .await;
+    play(&server, id, json!([{ "screenId": broken }])).await;
+    // Its file goes missing.
+    std::fs::remove_dir_all(server.data.path().join("images").join(id.to_string())).unwrap();
+
+    // The failing screen cannot keep an image whose file is gone: the device gets
+    // the server's screen saying what went wrong, and can download it.
+    let answer = server.display(&key, &READINGS).await;
+    assert_eq!(answer["status"], 0, "{answer}");
+    assert_eq!(
+        download(&server, &answer, &key).await.status(),
+        StatusCode::OK
+    );
+    let (_, body) = server
+        .call("GET", &format!("/manage/devices/{id}"), None)
+        .await;
+    assert!(
+        body["device"]["showing"].get("screenId").is_none(),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn a_device_reporting_a_model_afterimage_cannot_draw_gets_one_it_can() {
+    let server = start().await;
+    server.sign_up().await;
+    // openframe is in TRMNL's catalogue and takes WebP images.
+    let answer = server.setup_as(&mac(1), "openframe").await;
+    let (key, code) = (
+        answer["api_key"].as_str().unwrap().to_owned(),
+        answer["friendly_id"].as_str().unwrap().to_owned(),
+    );
+    let (status, body) = server
+        .call("POST", "/manage/devices", Some(json!({ "code": code })))
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    assert_ne!(body["device"]["display"]["model"], "openframe");
+    let answer = server.display(&key, &READINGS).await;
+    assert_eq!(answer["status"], 0, "{answer}");
 }

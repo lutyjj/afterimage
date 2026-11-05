@@ -12,6 +12,7 @@
 
 use std::sync::Arc;
 
+use afterimage_render_typst::Renderer;
 use afterimage_trmnl::Readings;
 use afterimage_trmnl::catalog::Catalog;
 use sqlx::{Sqlite, SqlitePool, Transaction};
@@ -166,7 +167,8 @@ impl Devices {
                 .and_then(|(width, height)| {
                     Some((u32::try_from(width).ok()?, u32::try_from(height).ok()?))
                 });
-            let (model, palette) = Catalog::get().default_display(&registration.model, size);
+            let (model, palette) =
+                Catalog::get().default_display(&registration.model, size, Renderer::supports);
             let name = name.map_or_else(|| format!("Device {code}"), str::to_owned);
             let id = sqlx::query_scalar!(
                 "INSERT INTO devices

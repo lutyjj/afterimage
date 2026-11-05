@@ -9,8 +9,10 @@
 //! Each problem names where in the document it arose, as a JSON Pointer, so the
 //! editor can point at it.
 //!
-//! A drawing is bounded: it ends within [`DRAW_TIME`], which a device's check-in
-//! waits on, and a document expands to at most [`MAX_COMPONENTS`] components and
+//! A drawing is bounded, since a device's check-in waits on it: its fetches end
+//! within [`FETCH_TIME`], its templates run for at most [`RESOLVE_TIME`], and it
+//! gives up when it cannot start its templates or its render within
+//! [`PLACE_TIME`]. A document expands to at most [`MAX_COMPONENTS`] components and
 //! [`MAX_IMAGES`] images.
 
 use std::collections::BTreeMap;
@@ -30,10 +32,13 @@ use crate::time_zone::TimeZone;
 
 /// How long a data source or image may take.
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
-/// How long a whole drawing may take. Firmware 1.8.18 waits 15 seconds for the
-/// check-in's answer (`HTTP_DEFAULT_TIMEOUT_MS`, `http_retry_request.h`), and the
-/// render and the answer come after the fetches.
-const DRAW_TIME: Duration = Duration::from_secs(12);
+/// How long a drawing's fetches may take together. Firmware 1.8.18 waits 15
+/// seconds for the check-in's answer (`HTTP_DEFAULT_TIMEOUT_MS`,
+/// `http_retry_request.h`), and templates and the render come after the fetches.
+const FETCH_TIME: Duration = Duration::from_secs(11);
+/// How long after it starts a drawing may still wait for a CPU place to begin
+/// its templates or its render; past it, it gives up rather than answer late.
+const PLACE_TIME: Duration = Duration::from_secs(13);
 /// How long templates may run over one document.
 const RESOLVE_TIME: Duration = Duration::from_secs(2);
 /// Largest data source answer read.
@@ -154,7 +159,8 @@ impl Drawing {
         palette: &Palette,
         now: i64,
     ) -> Drawn {
-        let deadline = Instant::now() + DRAW_TIME;
+        let started = Instant::now();
+        let deadline = started + FETCH_TIME;
         #[allow(clippy::cast_precision_loss)]
         let base = context! {
             device => Template::from(Serde(device)),
@@ -175,7 +181,11 @@ impl Drawing {
             })
             .collect();
         let scope = context! { ..Template::from(Serde(&data)), ..base };
-        let (screen, mut resolver) = match self.resolve(resolver, document.clone(), scope).await {
+        let places_by = started + PLACE_TIME;
+        let (screen, mut resolver) = match self
+            .resolve(resolver, document.clone(), scope, places_by)
+            .await
+        {
             Ok(done) => done,
             Err(message) => {
                 return Drawn {
@@ -190,7 +200,7 @@ impl Drawing {
         };
         let images = self.fetch_images(&mut resolver, deadline).await;
         let mut problems = resolver.finish();
-        let image = match self.render(screen, images, model, palette).await {
+        let image = match self.render(screen, images, model, palette, places_by).await {
             Ok(image) => Some(image),
             Err(message) => {
                 problems.push(Problem {
@@ -221,7 +231,22 @@ impl Drawing {
         model: &Model,
         palette: &Palette,
     ) -> Result<Image, String> {
-        self.render(resolved, BTreeMap::new(), model, palette).await
+        self.render(
+            resolved,
+            BTreeMap::new(),
+            model,
+            palette,
+            Instant::now() + PLACE_TIME,
+        )
+        .await
+    }
+
+    /// One of the places, or a failure once `by` passes without one.
+    async fn place(&self, by: Instant) -> Result<tokio::sync::OwnedSemaphorePermit, String> {
+        tokio::time::timeout_at(by, Arc::clone(&self.places).acquire_owned())
+            .await
+            .map_err(|_| "the server is busy drawing other screens; try again".to_owned())?
+            .map_err(|error| error.to_string())
     }
 
     /// Resolves the document's templates. They run over data of any size, so they
@@ -231,11 +256,9 @@ impl Drawing {
         mut resolver: Resolver,
         document: Value,
         scope: Template,
+        by: Instant,
     ) -> Result<(Value, Resolver), String> {
-        let place = Arc::clone(&self.places)
-            .acquire_owned()
-            .await
-            .map_err(|error| error.to_string())?;
+        let place = self.place(by).await?;
         tokio::task::spawn_blocking(move || {
             let _place = place;
             let screen = resolver.document(&document, &scope);
@@ -251,13 +274,11 @@ impl Drawing {
         images: BTreeMap<String, Vec<u8>>,
         model: &Model,
         palette: &Palette,
+        by: Instant,
     ) -> Result<Image, String> {
         // The place moves into the blocking task, so it stays held until the render
         // ends even when the caller stops waiting.
-        let place = Arc::clone(&self.places)
-            .acquire_owned()
-            .await
-            .map_err(|error| error.to_string())?;
+        let place = self.place(by).await?;
         let renderer = Arc::clone(&self.renderer);
         let (model, palette) = (model.clone(), palette.clone());
         tokio::task::spawn_blocking(move || {
@@ -392,8 +413,8 @@ pub fn drawable(model: &str, palette: &str) -> Option<(&'static Model, &'static 
 
 fn too_late() -> String {
     format!(
-        "gave no answer in time: a screen is drawn within {} seconds",
-        DRAW_TIME.as_secs()
+        "gave no answer in time: a screen's data and images are fetched within {} seconds",
+        FETCH_TIME.as_secs()
     )
 }
 

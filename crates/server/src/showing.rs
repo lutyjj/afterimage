@@ -6,6 +6,7 @@
 //! blank the display; a device with no image yet shows what went wrong. With no
 //! current entry, the device shows a screen saying so.
 
+use afterimage_render_typst::Renderer;
 use afterimage_trmnl::catalog::{Catalog, Model, Palette};
 use serde_json::{Value, json};
 
@@ -43,8 +44,9 @@ pub enum Error {
 /// its firmware when they can no longer be drawn, as after a catalogue refresh.
 #[must_use]
 pub fn display(device: &Device) -> (&'static Model, &'static Palette) {
-    drawing::drawable(&device.display.model, &device.display.palette)
-        .unwrap_or_else(|| Catalog::get().default_display(&device.firmware_model, None))
+    drawing::drawable(&device.display.model, &device.display.palette).unwrap_or_else(|| {
+        Catalog::get().default_display(&device.firmware_model, None, Renderer::supports)
+    })
 }
 
 /// The device as templates read it.

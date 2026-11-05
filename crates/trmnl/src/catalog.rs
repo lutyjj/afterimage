@@ -123,25 +123,30 @@ impl Catalog {
             .is_some_and(|model| model.palette_ids.iter().any(|id| id == palette))
     }
 
-    /// The display a newly claimed device starts with. A model whose name is the one
-    /// the firmware reports wins. Otherwise the panel size decides: among models of
-    /// that size, TRMNL's own hardware first, then the one with the most gray levels.
-    /// A device of an unknown size gets the catalogue's most widely shown TRMNL
-    /// display, its first `trmnl` model at the most common size, at its lowest depth.
+    /// The display a newly claimed device starts with, among those `drawable`
+    /// accepts. A model whose name is the one the firmware reports wins. Otherwise
+    /// the panel size decides: among models of that size, TRMNL's own hardware
+    /// first, then the one with the most gray levels. A device of an unknown size
+    /// gets the catalogue's most widely shown TRMNL display, its first `trmnl` model
+    /// at the most common size, at its lowest depth.
     #[must_use]
     pub fn default_display(
         &self,
         firmware_model: &str,
         size: Option<(u32, u32)>,
+        drawable: impl Fn(&Model, &Palette) -> bool,
     ) -> (&Model, &Palette) {
+        let usable = |model: &&Model| drawable(model, self.default_palette(model));
         let model = self
             .model(firmware_model)
+            .filter(usable)
             .or_else(|| {
                 let (width, height) = size?;
                 self.models
                     .iter()
                     .filter(|model| model.width == width && model.height == height)
                     .filter(|model| self.default_palette(model).rgb().is_some())
+                    .filter(usable)
                     .max_by_key(|model| (model.kind == "trmnl", self.gray_levels(model)))
             })
             .unwrap_or_else(|| self.fallback_model());
@@ -213,7 +218,7 @@ mod tests {
 
     #[test]
     fn a_model_name_the_firmware_reports_wins() {
-        let (model, palette) = Catalog::get().default_display("v2", Some((800, 480)));
+        let (model, palette) = Catalog::get().default_display("v2", Some((800, 480)), |_, _| true);
         assert_eq!(model.name, "v2");
         assert_eq!(palette.id, "gray-16", "four bits give sixteen grays");
     }
@@ -221,7 +226,8 @@ mod tests {
     #[test]
     fn otherwise_the_panel_size_picks_trmnl_hardware_with_the_most_grays() {
         let catalog = Catalog::get();
-        let (model, palette) = catalog.default_display("xiao_epaper_display", Some((800, 480)));
+        let (model, palette) =
+            catalog.default_display("xiao_epaper_display", Some((800, 480)), |_, _| true);
         assert_eq!(model.kind, "trmnl");
         assert_eq!((model.width, model.height), (800, 480));
         let most = catalog
@@ -238,9 +244,9 @@ mod tests {
     #[test]
     fn an_unknown_size_gets_a_trmnl_display_at_its_lowest_depth() {
         let catalog = Catalog::get();
-        let (model, _) = catalog.default_display("unknown", None);
+        let (model, _) = catalog.default_display("unknown", None, |_, _| true);
         assert_eq!(model.kind, "trmnl");
-        let (same_size, _) = catalog.default_display("unknown", Some((1, 1)));
+        let (same_size, _) = catalog.default_display("unknown", Some((1, 1)), |_, _| true);
         assert_eq!(model, same_size);
         assert!(
             catalog
@@ -249,5 +255,15 @@ mod tests {
                 .filter(|m| m.kind == "trmnl" && (m.width, m.height) == (model.width, model.height))
                 .all(|m| m.bit_depth >= model.bit_depth)
         );
+    }
+
+    #[test]
+    fn the_default_skips_displays_the_caller_cannot_draw() {
+        let catalog = Catalog::get();
+        let not_openframe = |model: &Model, _: &Palette| model.name != "openframe";
+        let (model, _) = catalog.default_display("openframe", None, not_openframe);
+        assert_ne!(model.name, "openframe");
+        let (model, _) = catalog.default_display("openframe", None, |_, _| true);
+        assert_eq!(model.name, "openframe");
     }
 }
