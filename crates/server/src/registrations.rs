@@ -69,8 +69,9 @@ pub enum CheckIn {
     Unclaimed { friendly_id: String },
     /// A device holds the registration.
     Claimed { registration_id: i64 },
-    /// The device was removed with a reset. The answer erases its settings, and the
-    /// registration is gone.
+    /// The device was removed with a reset: the answer erases its settings. Every
+    /// check-in with the key gets it until the registration ends, in case an answer
+    /// is lost; a device that obeyed never uses the key again.
     Reset,
 }
 
@@ -188,7 +189,7 @@ impl Registrations {
         let row = sqlx::query!(
             r#"UPDATE registrations SET
                  seen_at = ?,
-                 expires_at = CASE WHEN expires_at IS NULL THEN NULL ELSE ? END,
+                 expires_at = CASE WHEN expires_at IS NULL OR reset = 1 THEN expires_at ELSE ? END,
                  width = COALESCE(?, width),
                  height = COALESCE(?, height),
                  battery_voltage = COALESCE(?, battery_voltage),
@@ -214,9 +215,6 @@ impl Registrations {
             return Ok(CheckIn::Unknown);
         };
         if row.reset {
-            sqlx::query!("DELETE FROM registrations WHERE id = ?", row.id)
-                .execute(&self.pool)
-                .await?;
             return Ok(CheckIn::Reset);
         }
         Ok(if row.claimed {

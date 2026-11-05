@@ -7,12 +7,24 @@ use sqlx::SqlitePool;
 
 use crate::clock::Clock;
 
+/// Names a screen's templates read besides its data sources, which no data source
+/// may take: the time of the render, the device, the deployment's secrets, and in
+/// an `each` the element and the count left out.
+pub const TEMPLATE_NAMES: [&str; 5] = ["now", "device", "secrets", "item", "hidden"];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Screen {
     pub id: i64,
     pub name: String,
     /// JSON in the shape of the model's `ScreenDocument`.
     pub document: String,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Summary {
+    pub id: i64,
+    pub name: String,
     pub updated_at: i64,
 }
 
@@ -27,14 +39,15 @@ impl Screens {
         Self { pool, clock }
     }
 
+    /// The account's screens without their documents.
+    ///
     /// # Errors
     ///
     /// When storage fails.
-    pub async fn list(&self, account_id: i64) -> Result<Vec<Screen>, sqlx::Error> {
+    pub async fn list(&self, account_id: i64) -> Result<Vec<Summary>, sqlx::Error> {
         sqlx::query_as!(
-            Screen,
-            "SELECT id, name, document, updated_at FROM screens
-             WHERE account_id = ? ORDER BY name, id",
+            Summary,
+            "SELECT id, name, updated_at FROM screens WHERE account_id = ? ORDER BY name, id",
             account_id
         )
         .fetch_all(&self.pool)

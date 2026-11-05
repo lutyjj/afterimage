@@ -18,7 +18,8 @@ string ScreenName
 string Template
 
 /// A name a template reads: a lowercase letter, then lowercase letters, digits or
-/// underscores.
+/// underscores. A data source cannot take a name templates already read: `now`,
+/// `device`, `secrets`, `item` or `hidden`.
 @pattern("^[a-z][a-z0-9_]{0,31}$")
 string Identifier
 
@@ -476,8 +477,10 @@ operation DeleteScreen {
     ]
 }
 
-/// The names of the secrets the deployment provides, which data source templates
-/// read as `secrets.NAME`. Their values never leave the server.
+/// The names of the secrets the deployment provides, which data source requests read
+/// as `secrets.NAME`. The values never appear in an answer, but every account's
+/// requests may send them anywhere: a deployment gives its secrets to every account
+/// it lets sign in.
 @readonly
 @http(method: "GET", uri: "/manage/secrets")
 operation ListSecretNames {

@@ -223,9 +223,7 @@ where
                 Ok(None) => Ok(unauthenticated("This session has ended. Sign in again.")),
                 Err(error) => {
                     tracing::error!(%error, "a session could not be read");
-                    Ok(unauthenticated(
-                        "This session could not be read. Sign in again.",
-                    ))
+                    Ok(failure())
                 }
             }
         })
@@ -241,6 +239,18 @@ fn unauthenticated(message: &str) -> Response<BoxBody> {
         .header(header::CONTENT_TYPE, "application/json")
         .header("x-amzn-errortype", "Unauthenticated")
         .body(boxed(body))
+        .expect("a status and two static headers")
+}
+
+/// The model's `InternalFailure`, for a session that could not be read: the
+/// session may be fine, so the caller must not take it for a sign-out.
+fn failure() -> Response<BoxBody> {
+    let body = serde_json::json!({ "message": "The server could not complete the request." });
+    Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("x-amzn-errortype", "InternalFailure")
+        .body(boxed(body.to_string()))
         .expect("a status and two static headers")
 }
 

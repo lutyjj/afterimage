@@ -96,8 +96,9 @@ fn parse_public_url(text: &str) -> Result<String, String> {
         .strip_prefix("https://")
         .or_else(|| text.strip_prefix("http://"))
         .ok_or("must start with https:// or http://")?;
-    if rest.is_empty() || rest.contains(['?', '#']) {
-        return Err("must be a scheme and host, with no query or fragment".to_owned());
+    let host = rest.trim_end_matches('/');
+    if host.is_empty() || host.contains(['/', '?', '#', '@']) {
+        return Err("must be a scheme and host, with no path, query or fragment".to_owned());
     }
     Ok(text.trim_end_matches('/').to_owned())
 }
@@ -153,6 +154,7 @@ mod tests {
             "afterimage.example",
             "https://",
             "https://afterimage.example/?a=b",
+            "https://afterimage.example/sub",
         ] {
             assert!(parse(&["--public-url", url]).is_err(), "{url}");
         }

@@ -2,7 +2,10 @@
 
 mod common;
 
-use common::{READINGS, mac, start};
+use std::sync::Arc;
+
+use common::{READINGS, mac, start, start_with};
+use afterimage_server::keys::OsEntropy;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 use sqlx::Row;
@@ -43,8 +46,26 @@ async fn every_operation_but_signing_in_needs_a_session() {
             continue;
         }
         let concrete = path.replace("{deviceId}", "1").replace("{screenId}", "1");
-        let (status, body) = server.call(&method, &concrete, Some(json!({}))).await;
-        assert_eq!(status, StatusCode::UNAUTHORIZED, "{key}: {body}");
+        let response = server
+            .http
+            .request(
+                reqwest::Method::from_bytes(method.as_bytes()).unwrap(),
+                format!("{}{concrete}", server.url),
+            )
+            .header("Content-Type", "application/json")
+            .body("{}")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{key}");
+        // restJson1's error form, which the generated client decodes.
+        assert_eq!(
+            response.headers()["x-amzn-errortype"],
+            "Unauthenticated",
+            "{key}"
+        );
+        let body: Value = response.json().await.unwrap();
+        assert!(body["message"].is_string(), "{key}: {body}");
     }
 }
 
@@ -244,11 +265,14 @@ async fn claiming_a_device_set_up_again_keeps_it_and_retires_its_old_key() {
     assert_eq!(body["device"]["playlist"], json!([{ "screenId": screen }]));
     let (_, devices) = server.call("GET", "/manage/devices", None).await;
     assert_eq!(devices["devices"].as_array().unwrap().len(), 1);
-    let rows = server.stored("SELECT expires_at FROM registrations").await;
+    let rows = server
+        .stored("SELECT expires_at IS NULL FROM registrations ORDER BY id")
+        .await;
+    let claimed: Vec<bool> = rows.iter().map(|row| row.get(0)).collect();
     assert_eq!(
-        rows.len(),
-        1,
-        "the old and the leftover registrations are gone"
+        claimed,
+        [false, true],
+        "the old registration is gone; the leftover ends on its own"
     );
     assert_eq!(
         server
@@ -528,20 +552,158 @@ async fn a_device_removed_with_a_reset_is_erased_at_its_next_check_in() {
         .call("DELETE", &format!("/manage/devices/{id}?reset=true"), None)
         .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    let answer = server.display(&key, &READINGS).await;
+    for _ in 0..2 {
+        // Repeated, in case the device never received an answer.
+        let answer = server.display(&key, &READINGS).await;
+        assert_eq!(
+            (&answer["status"], &answer["reset_firmware"]),
+            (&json!(500), &json!(true))
+        );
+        server.clock.advance(60 * 60);
+    }
+    server
+        .clock
+        .advance(afterimage_server::registrations::IDLE_SECONDS);
+    server.register(&mac(2)).await;
+    let macs: Vec<String> = server
+        .stored("SELECT mac FROM registrations")
+        .await
+        .iter()
+        .map(|row| row.get(0))
+        .collect();
+    assert_eq!(macs, [mac(2)], "the reset registration ends");
+}
+
+#[tokio::test]
+async fn another_accounts_claim_leaves_a_waiting_device_alone() {
+    let server = start().await;
+    server.sign_up().await;
+    // The real device waits to be claimed; someone presents its MAC and claims that.
+    let (key, code) = server.register(&mac(1)).await;
+    let (_, spoofed) = server.register(&mac(1)).await;
+    let (status, _) = server
+        .call("POST", "/manage/devices", Some(json!({ "code": spoofed })))
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(server.display(&key, &READINGS).await["status"], 202);
+    let codes: Vec<String> = server
+        .stored("SELECT friendly_id FROM registrations WHERE expires_at IS NOT NULL")
+        .await
+        .iter()
+        .map(|row| row.get(0))
+        .collect();
+    assert_eq!(codes, [code], "the real device can still be claimed");
+}
+
+#[tokio::test]
+async fn a_data_source_cannot_take_a_name_templates_read() {
+    let server = start().await;
+    server.sign_up().await;
+    for name in ["now", "device", "secrets", "item", "hidden"] {
+        let mut document = document();
+        document["sources"] = json!({ name: { "url": "https://ha.example.test/" } });
+        let (status, body) = server
+            .call(
+                "POST",
+                "/manage/screens",
+                Some(json!({ "name": "Clash", "document": document })),
+            )
+            .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{name}: {body}");
+    }
+}
+
+#[tokio::test]
+async fn a_session_ends_after_thirty_days() {
+    let server = start().await;
+    server.sign_up().await;
+    server
+        .clock
+        .advance(afterimage_server::sessions::SESSION_SECONDS - 1);
     assert_eq!(
-        (&answer["status"], &answer["reset_firmware"]),
-        (&json!(500), &json!(true))
+        server.call("GET", "/manage/account", None).await.0,
+        StatusCode::OK
     );
-    assert!(
+    server.clock.advance(1);
+    assert_eq!(
+        server.call("GET", "/manage/account", None).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+}
+
+/// A provider at a port nothing listens on.
+const OIDC_SETTINGS: [&str; 10] = [
+    "--oidc-issuer",
+    "http://127.0.0.1:9",
+    "--oidc-client-id",
+    "afterimage",
+    "--oidc-client-secret",
+    "secret",
+    "--oidc-name",
+    "Example ID",
+    "--public-url",
+    "http://afterimage.example",
+];
+
+#[tokio::test]
+async fn with_password_sign_in_off_no_password_works() {
+    let settings: Vec<&str> = OIDC_SETTINGS
+        .iter()
+        .copied()
+        .chain(["--password-sign-in", "false"])
+        .collect();
+    let server = start_with(Arc::new(OsEntropy), &settings).await;
+    let (_, options) = server.call("GET", "/manage/auth", None).await;
+    assert_eq!(options["password"], false);
+    assert_eq!(options["oidc"]["name"], "Example ID");
+    let account = json!({ "name": "Ada", "username": "ada", "password": "correct horse battery" });
+    assert_eq!(
         server
-            .stored("SELECT id FROM registrations")
+            .call("POST", "/manage/auth/first-account", Some(account))
             .await
-            .is_empty()
+            .0,
+        StatusCode::CONFLICT
     );
+    let credentials = json!({ "username": "ada", "password": "correct horse battery" });
     assert_eq!(
-        server.display(&key, &READINGS).await["status"],
-        202,
-        "erased once"
+        server
+            .call("POST", "/manage/auth/password", Some(credentials))
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
     );
+}
+
+/// Sign-in that cannot finish sends the browser back to the web UI with the
+/// reason, and starts no session.
+#[tokio::test]
+async fn an_oidc_sign_in_that_cannot_finish_returns_to_the_web_ui() {
+    let server = start_with(Arc::new(OsEntropy), &OIDC_SETTINGS).await;
+    let http = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+    let get = |path: &str| http.get(format!("{}{path}", server.url)).send();
+
+    let started = get("/manage/auth/oidc").await.unwrap();
+    assert_eq!(started.status(), StatusCode::FOUND);
+    assert_eq!(
+        started.headers()["location"],
+        "http://afterimage.example/?signInError=unavailable"
+    );
+    assert!(started.headers().get("set-cookie").is_none());
+
+    for query in ["?code=c&state=s", "?error=access_denied", ""] {
+        let back = get(&format!("/manage/auth/oidc/callback{query}"))
+            .await
+            .unwrap();
+        assert_eq!(back.status(), StatusCode::FOUND, "{query}");
+        assert_eq!(
+            back.headers()["location"],
+            "http://afterimage.example/?signInError=refused",
+            "{query}"
+        );
+        assert!(back.headers().get("set-cookie").is_none(), "{query}");
+    }
+    assert!(server.stored("SELECT id FROM accounts").await.is_empty());
 }

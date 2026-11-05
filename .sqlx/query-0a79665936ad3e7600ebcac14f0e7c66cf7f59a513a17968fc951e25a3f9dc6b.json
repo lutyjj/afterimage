@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, document, updated_at FROM screens\n             WHERE account_id = ? ORDER BY name, id",
+  "query": "SELECT id, name, updated_at FROM screens WHERE account_id = ? ORDER BY name, id",
   "describe": {
     "columns": [
       {
@@ -26,19 +26,8 @@
         }
       },
       {
-        "name": "document",
-        "ordinal": 2,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "screens",
-            "name": "document"
-          }
-        }
-      },
-      {
         "name": "updated_at",
-        "ordinal": 3,
+        "ordinal": 2,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -54,9 +43,8 @@
     "nullable": [
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "f128af173500401078deddc346df4f2d3fb503c0a31a5b31aa94d7236aa0865d"
+  "hash": "0a79665936ad3e7600ebcac14f0e7c66cf7f59a513a17968fc951e25a3f9dc6b"
 }

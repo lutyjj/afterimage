@@ -1,9 +1,29 @@
 //! Screens and the secrets their data sources may read.
 
 use afterimage_management_api::server::Extension;
-use afterimage_management_api::{error, input, output};
+use afterimage_management_api::{error, input, model, output};
 
 use super::{Caller, Shared, internal, wire};
+use crate::screens::TEMPLATE_NAMES;
+
+/// Refuses a data source named like something templates already read.
+fn check(document: &model::ScreenDocument) -> Result<(), error::ValidationException> {
+    let taken = document
+        .sources
+        .iter()
+        .flat_map(|sources| sources.inner().keys())
+        .find(|name| TEMPLATE_NAMES.contains(&name.as_str()));
+    match taken {
+        Some(name) => Err(error::ValidationException {
+            message: format!(
+                "A data source cannot be named `{}`: templates read that name already.",
+                name.as_str()
+            ),
+            field_list: None,
+        }),
+        None => Ok(()),
+    }
+}
 
 fn not_found() -> error::NotFound {
     error::NotFound {
@@ -34,6 +54,7 @@ pub async fn create_screen(
     Extension(state): Shared,
     caller: Caller,
 ) -> Result<output::CreateScreenOutput, error::CreateScreenError> {
+    check(&input.document)?;
     let document = wire::stored_document(&input.document)?;
     let screen = state
         .screens
@@ -66,6 +87,7 @@ pub async fn update_screen(
     Extension(state): Shared,
     caller: Caller,
 ) -> Result<output::UpdateScreenOutput, error::UpdateScreenError> {
+    check(&input.document)?;
     let document = wire::stored_document(&input.document)?;
     let screen = state
         .screens

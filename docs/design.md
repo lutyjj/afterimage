@@ -51,9 +51,11 @@ Each component builds on its own and depends on the others only through generate
 
 The server publishes each device's battery, signal, firmware version, last check-in and current screen with Home Assistant MQTT discovery, plus a firmware update entity whose install command starts step 4. History belongs to whoever consumes the topics.
 
-## Screens and schedule
+## Screens and playlists
 
-A screen is a tree of generic components whose properties bind to named data sources. The components and their properties are shapes in the model, so the web UI edits screens without a template language. A data source is an HTTP endpoint returning JSON, such as a Home Assistant REST call; the screen refers to its credentials by name and never stores them. A schedule lists, per device, the screens it shows and when.
+A screen document holds its data sources and a tree of generic components. The components and their properties are shapes in the model, so the document reads the same as JSON, as YAML in the web UI's editor and in the API, and the server stores it in the model's serde form. A data source is an HTTP request answering JSON, such as a Home Assistant REST call. Text properties are MiniJinja templates (Jinja syntax, as in Home Assistant) that read each source by name, `now` and `device`; a template that is a single expression keeps its value's type, so a chart's series can be a list. Data source requests also read `secrets.NAME`, values the deployment provides as `AFTERIMAGE_SECRET_NAME` environment variables; screens name them and never hold them. Every account may use every secret in its requests, so a deployment gives its secrets to everyone it lets sign in.
+
+A device's playlist lists the screens it shows, each on some weekdays and between two times of day in the server's time zone. At each check-in the device shows the next current entry.
 
 The first release defines the components that TRMNL's 30 published plugins use most: view and layout (rows, columns, grid spans, alignment, gaps), title bar, item, title, label, value, description, image and divider, plus line and bar charts and three behaviours: fitting a value to its box, clamping text to a line count, and ending an overflowing list with a count of what is hidden. Table, progress, rich text and maps follow when a screen needs them; no published plugin uses table or progress.
 
@@ -69,6 +71,6 @@ Another engine replaces Typst by implementing the same operation and every compo
 
 ## Storage and accounts
 
-SQLite holds accounts, registrations (MAC, model, access key hash, friendly ID, end time, latest readings), devices (owner, name, settings, current registration), screens, data sources and schedules. Rendered images and firmware files live in a cache directory that the server rebuilds when it is lost.
+SQLite holds accounts, sessions, registrations (MAC, model, access key hash, friendly ID, end time, panel size, latest readings), devices (owner, name, display, refresh interval, current registration), screen documents and playlist entries. Rendered images and firmware files live in a cache directory that the server rebuilds when it is lost.
 
 Users sign in through OIDC or with a local password; either way the result is an account, and handlers and storage never see the method. The first account signs up with a password; further accounts come from the OIDC provider, whose client assignment decides who may sign in. A session is a random token in an httpOnly, `SameSite=Lax` cookie, `Secure` with the `__Host-` prefix over TLS; the database holds its SHA-256 and passwords as argon2id hashes. Every management operation but the five that start a session needs one, and a resource of another account answers as a missing one does. An account owns devices and screens; there are no roles.

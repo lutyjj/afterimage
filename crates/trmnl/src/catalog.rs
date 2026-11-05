@@ -48,6 +48,9 @@ impl Palette {
     /// The palette's colors as RGB triples: its fixed colors, or its grays spread
     /// evenly from black to white. `None` for a palette of more colors than an image
     /// format needs to be told about (12-bit and 24-bit color).
+    ///
+    /// TRMNL's list gives `bw` and the full-color palettes the same fields (two
+    /// grays, no colors), so only the id tells a gray palette from those.
     #[must_use]
     pub fn rgb(&self) -> Option<Vec<[u8; 3]>> {
         match &self.colors {

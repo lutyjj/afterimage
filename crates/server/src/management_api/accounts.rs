@@ -56,7 +56,7 @@ pub async fn create_first_account(
     tracing::info!(account = account.id, "first account created");
     Ok(output::CreateFirstAccountOutput {
         account: wire::account(account)?,
-        session: CookieName::Session.set(token, SESSION_SECONDS, secure),
+        session: Some(CookieName::Session.set(token, SESSION_SECONDS, secure)),
     })
 }
 
@@ -84,7 +84,7 @@ pub async fn sign_in(
         .map_err(|error| internal(&error))?;
     Ok(output::SignInOutput {
         account: wire::account(account)?,
-        session: CookieName::Session.set(token, SESSION_SECONDS, secure),
+        session: Some(CookieName::Session.set(token, SESSION_SECONDS, secure)),
     })
 }
 
@@ -176,7 +176,7 @@ pub async fn sign_out(
         .await
         .map_err(|error| internal(&error))?;
     Ok(output::SignOutOutput {
-        session: CookieName::Session.clear(secure),
+        session: Some(CookieName::Session.clear(secure)),
     })
 }
 

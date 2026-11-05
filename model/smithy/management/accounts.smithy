@@ -13,8 +13,8 @@ string Password
 @length(min: 1, max: 64)
 string AccountName
 
-/// The session cookie the server sets. It is httpOnly, so no script reads it: the
-/// browser stores it and sends it back.
+/// A cookie the server sets. It is httpOnly, so no script reads it: the browser
+/// stores it and sends it back. A browser client never sees this member.
 string SessionCookie
 
 /// Who is signed in. Every other operation acts for this account.
@@ -74,7 +74,6 @@ operation CreateFirstAccount {
         @required
         account: Account
 
-        @required
         @httpHeader("Set-Cookie")
         session: SessionCookie
     }
@@ -99,7 +98,6 @@ operation SignIn {
         @required
         account: Account
 
-        @required
         @httpHeader("Set-Cookie")
         session: SessionCookie
     }
@@ -177,7 +175,6 @@ operation CompleteOidcSignIn {
 operation SignOut {
     output := {
         /// Expires the session cookie.
-        @required
         @httpHeader("Set-Cookie")
         session: SessionCookie
     }

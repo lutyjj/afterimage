@@ -2,9 +2,11 @@
 //! `password-auth`), or an identity the OIDC provider verified. Both end in an [`Account`]; sessions ([`crate::sessions`])
 //! and every handler see only that.
 
+use std::num::NonZero;
 use std::sync::{Arc, LazyLock};
 
 use sqlx::SqlitePool;
+use tokio::sync::Semaphore;
 
 use crate::clock::Clock;
 
@@ -59,6 +61,11 @@ impl Accounts {
         username: &str,
         password: String,
     ) -> Result<Option<Account>, Error> {
+        // Checked before the hash as well as under the lock, so that sign-ups after
+        // the first cost no hash.
+        if self.exist().await? {
+            return Ok(None);
+        }
         let password_hash = hash(password).await?;
         let now = self.clock.now();
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
@@ -175,20 +182,35 @@ impl Accounts {
 static UNKNOWN_USER_HASH: LazyLock<String> =
     LazyLock::new(|| password_auth::generate_hash("no account has this password"));
 
-/// The argon2id PHC string for this password, at `RustCrypto`'s default cost. Hashing
-/// is deliberately slow, so it runs on the blocking pool.
+/// Hashes running at once. Each holds argon2id's default 19 MiB, and requests
+/// without a session start them, so they wait for a place rather than all run.
+static HASHING: LazyLock<Semaphore> =
+    LazyLock::new(|| Semaphore::new(std::thread::available_parallelism().map_or(2, NonZero::get)));
+
+/// Runs password work on the blocking pool once a place under [`HASHING`] is free.
+async fn bounded<T: Send + 'static>(
+    places: &Semaphore,
+    work: impl FnOnce() -> T + Send + 'static,
+) -> Option<T> {
+    let _place = places.acquire().await.ok()?;
+    tokio::task::spawn_blocking(work).await.ok()
+}
+
+/// The argon2id PHC string for this password, at `RustCrypto`'s default cost.
 async fn hash(password: String) -> Result<String, Error> {
-    tokio::task::spawn_blocking(move || password_auth::generate_hash(password))
+    bounded(&HASHING, move || password_auth::generate_hash(password))
         .await
-        .map_err(|_| Error::Hash)
+        .ok_or(Error::Hash)
 }
 
 /// Whether this password produced that hash. A stored hash that does not parse
 /// answers no.
 async fn verify(password: String, stored: String) -> bool {
-    tokio::task::spawn_blocking(move || password_auth::verify_password(password, &stored).is_ok())
-        .await
-        .unwrap_or(false)
+    bounded(&HASHING, move || {
+        password_auth::verify_password(password, &stored).is_ok()
+    })
+    .await
+    .unwrap_or(false)
 }
 
 /// Spends what a verify costs, for a username that has no account.
@@ -211,6 +233,32 @@ mod tests {
             hash("correct horse battery".to_owned()).await.unwrap(),
             again
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn password_work_runs_at_most_as_many_at_once_as_there_are_places() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let places = Arc::new(Semaphore::new(2));
+        let running = Arc::new(AtomicUsize::new(0));
+        let most = Arc::new(AtomicUsize::new(0));
+        let tasks: Vec<_> = (0..12)
+            .map(|_| {
+                let (places, running, most) = (places.clone(), running.clone(), most.clone());
+                tokio::spawn(async move {
+                    bounded(&places, move || {
+                        let now = running.fetch_add(1, Ordering::SeqCst) + 1;
+                        most.fetch_max(now, Ordering::SeqCst);
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                        running.fetch_sub(1, Ordering::SeqCst);
+                    })
+                    .await
+                })
+            })
+            .collect();
+        for task in tasks {
+            assert!(task.await.unwrap().is_some());
+        }
+        assert_eq!(most.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]

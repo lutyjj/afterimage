@@ -5,6 +5,8 @@
 //! in the same transaction that creates or updates the device. A claimed MAC that
 //! matches one of the account's devices is the same device set up again: it takes
 //! the new registration and keeps everything else, and its old registration ends.
+//! Other unclaimed registrations of the MAC are left to end on their own, since a
+//! claim cannot tell the device's leftovers from someone else's setups.
 //! Removing a device hands its registration back to the unclaimed state, so the
 //! device shows its code again, or marks it for a reset.
 
@@ -170,15 +172,6 @@ impl Devices {
         };
         sqlx::query!(
             "UPDATE registrations SET expires_at = NULL WHERE id = ?",
-            registration.id
-        )
-        .execute(&mut *tx)
-        .await?;
-        // Every other unclaimed registration of this MAC is a setup the device left
-        // behind, or someone else's.
-        sqlx::query!(
-            "DELETE FROM registrations WHERE mac = ? AND id != ? AND expires_at IS NOT NULL",
-            registration.mac,
             registration.id
         )
         .execute(&mut *tx)

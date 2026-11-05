@@ -147,7 +147,8 @@ structure PlaylistEntry {
     from: TimeOfDay
 
     /// When it stops being current, exclusive; absent means midnight at the end of
-    /// the day. An `until` before `from` runs past midnight.
+    /// the day. An `until` before `from` runs past midnight; an `until` equal to
+    /// `from` makes the entry current all day.
     until: TimeOfDay
 }
 

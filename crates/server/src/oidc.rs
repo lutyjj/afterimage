@@ -13,7 +13,7 @@ use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetada
 use openidconnect::{
     AccessTokenHash, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointMaybeSet,
     EndpointNotSet, EndpointSet, IssuerUrl, Nonce, OAuth2TokenResponse, PkceCodeChallenge,
-    PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, reqwest,
+    PkceCodeVerifier, RedirectUrl, RequestTokenError, Scope, TokenResponse, reqwest,
 };
 use sqlx::SqlitePool;
 
@@ -23,6 +23,10 @@ use crate::sessions::CookieName;
 
 /// How long a browser has to come back from the provider.
 pub const FLOW_SECONDS: i64 = 10 * 60;
+/// Sign-ins waiting for the provider's answer at once. Anyone can start one, so
+/// past this the server sends the browser back with `unavailable` instead of
+/// storing more.
+pub const FLOW_LIMIT: i64 = 64;
 /// Where the provider sends the browser back, under the public URL.
 pub const CALLBACK_PATH: &str = "/manage/auth/oidc/callback";
 
@@ -145,6 +149,17 @@ impl Oidc {
     ///
     /// When the provider is unavailable or storage fails.
     pub async fn start(&self, secure: bool) -> Result<Started, Error> {
+        let now = self.clock.now();
+        sqlx::query!("DELETE FROM oidc_flows WHERE expires_at <= ?", now)
+            .execute(&self.pool)
+            .await?;
+        let waiting = sqlx::query_scalar!("SELECT COUNT(*) FROM oidc_flows")
+            .fetch_one(&self.pool)
+            .await?;
+        if waiting >= FLOW_LIMIT {
+            tracing::warn!(waiting, "too many OIDC sign-ins are waiting");
+            return Err(Error::Unavailable);
+        }
         let client = self.client().await?;
         let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
         let (url, state, nonce) = client
@@ -158,12 +173,8 @@ impl Oidc {
             .url();
         let binding = keys::new_token(&*self.entropy);
         let binding_hash = keys::token_hash(&binding);
-        let now = self.clock.now();
         let expires_at = now + FLOW_SECONDS;
         let (state, nonce, verifier) = (state.secret(), nonce.secret(), verifier.secret());
-        sqlx::query!("DELETE FROM oidc_flows WHERE expires_at <= ?", now)
-            .execute(&self.pool)
-            .await?;
         sqlx::query!(
             "INSERT INTO oidc_flows (binding_hash, state, nonce, pkce_verifier, expires_at)
              VALUES (?, ?, ?, ?, ?)",
@@ -218,7 +229,16 @@ impl Oidc {
             .await
             .map_err(|error| {
                 tracing::warn!(%error, "OIDC code exchange failed");
-                Error::Refused
+                match error {
+                    // The provider was not reached, or did not answer as a token
+                    // endpoint does.
+                    RequestTokenError::Request(_) | RequestTokenError::Other(_) => {
+                        Error::Unavailable
+                    }
+                    RequestTokenError::ServerResponse(_) | RequestTokenError::Parse(..) => {
+                        Error::Refused
+                    }
+                }
             })?;
         let token = tokens.id_token().ok_or(Error::Refused)?;
         let verifier = client.id_token_verifier();

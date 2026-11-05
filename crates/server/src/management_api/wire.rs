@@ -11,7 +11,7 @@ use afterimage_trmnl::catalog::Catalog;
 
 use crate::accounts::Account;
 use crate::devices::{self, Device, Entry};
-use crate::screens::Screen;
+use crate::screens::{Screen, Summary};
 
 /// A stored value into its constrained model shape.
 fn fit<T, V>(value: V) -> Result<T, InternalFailure>
@@ -173,7 +173,7 @@ pub fn screen(screen: Screen) -> Result<model::Screen, InternalFailure> {
     })
 }
 
-pub fn summary(screen: Screen) -> Result<model::ScreenSummary, InternalFailure> {
+pub fn summary(screen: Summary) -> Result<model::ScreenSummary, InternalFailure> {
     Ok(model::ScreenSummary {
         id: fit(screen.id)?,
         name: fit(screen.name)?,
