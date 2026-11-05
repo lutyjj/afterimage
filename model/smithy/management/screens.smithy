@@ -535,17 +535,3 @@ structure Problem {
     /// Where in the document, as a JSON Pointer such as `/content/column/children/0`.
     path: String
 }
-
-
-/// The names of the secrets the deployment provides, which data source requests read
-/// as `secrets.NAME`. The values never appear in an answer, but every account's
-/// requests may send them anywhere: a deployment gives its secrets to every account
-/// it lets sign in.
-@readonly
-@http(method: "GET", uri: "/manage/secrets")
-operation ListSecretNames {
-    output := {
-        @required
-        names: Names
-    }
-}

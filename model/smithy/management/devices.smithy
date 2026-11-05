@@ -55,7 +55,19 @@ structure Palette {
 
     @required
     name: String
+
+    /// The colors the display shows, in TRMNL's order, with grays from black to
+    /// white; absent for a palette of thousands of colors.
+    colors: Colors
 }
+
+list Colors {
+    member: Color
+}
+
+/// `#rrggbb`.
+@pattern("^#[0-9a-f]{6}$")
+string Color
 
 list Palettes {
     member: Palette

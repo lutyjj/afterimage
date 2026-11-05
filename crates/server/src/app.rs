@@ -61,6 +61,13 @@ pub async fn build(
             .map_err(|error| Error::Settings(format!("the time zone {name}: {error}")))?,
         None => jiff::tz::TimeZone::system(),
     };
+    // Playlist times are in this zone, so the web UI needs its name to show them.
+    let time_zone_name = time_zone
+        .iana_name()
+        .ok_or_else(|| {
+            Error::Settings("the host's time zone has no name; set the time zone".to_owned())
+        })?
+        .to_owned();
     std::fs::create_dir_all(&config.data_dir).map_err(Error::DataDir)?;
     let pool = database::open(&config.data_dir.join("afterimage.db")).await?;
     let oidc = match (oidc_settings, config.public_url.as_deref()) {
@@ -100,6 +107,7 @@ pub async fn build(
         landing: config.landing(),
         cookies: CookiePolicy::new(config.public_url_is_https()),
         password_sign_in: config.password_sign_in,
+        time_zone: time_zone_name,
         secret_names,
         drawing,
         images,

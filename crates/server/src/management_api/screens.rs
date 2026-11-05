@@ -124,16 +124,6 @@ pub async fn delete_screen(
     Ok(output::DeleteScreenOutput {})
 }
 
-pub async fn list_secret_names(
-    _input: input::ListSecretNamesInput,
-    Extension(state): Shared,
-    _caller: Caller,
-) -> Result<output::ListSecretNamesOutput, error::ListSecretNamesError> {
-    Ok(output::ListSecretNamesOutput {
-        names: state.secret_names.clone(),
-    })
-}
-
 pub async fn preview_screen(
     input: input::PreviewScreenInput,
     Extension(state): Shared,

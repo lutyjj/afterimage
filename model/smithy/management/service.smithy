@@ -37,7 +37,7 @@ service Management {
         UpdateScreen
         DeleteScreen
         PreviewScreen
-        ListSecretNames
+        GetServer
     ]
     errors: [
         ValidationException
@@ -88,4 +88,24 @@ timestamp Instant
 
 list Names {
     member: String
+}
+
+/// What the deployment gives every account: the time zone of playlists and dates,
+/// and the secrets data source requests may read.
+@readonly
+@http(method: "GET", uri: "/manage/server")
+operation GetServer {
+    output := {
+        /// The IANA name of the time zone that playlist times and dates on screens
+        /// follow, such as `Europe/Berlin`.
+        @required
+        timeZone: String
+
+        /// The names of the secrets the deployment provides, which data source
+        /// requests read as `secrets.NAME`. The values never appear in an answer,
+        /// but every account's requests may send them anywhere: a deployment gives
+        /// its secrets to every account it lets sign in.
+        @required
+        secretNames: Names
+    }
 }

@@ -153,6 +153,15 @@ pub fn display_models() -> Result<Vec<model::DisplayModel>, InternalFailure> {
                         Ok(model::Palette {
                             id: fit(palette.id.clone())?,
                             name: palette.name.clone(),
+                            colors: palette
+                                .rgb()
+                                .map(|colors| {
+                                    colors
+                                        .iter()
+                                        .map(|[r, g, b]| fit(format!("#{r:02x}{g:02x}{b:02x}")))
+                                        .collect::<Result<_, InternalFailure>>()
+                                })
+                                .transpose()?,
                         })
                     })
                     .collect::<Result<_, InternalFailure>>()?,

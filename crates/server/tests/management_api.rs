@@ -528,6 +528,59 @@ async fn a_display_must_be_one_the_catalogue_lists() {
 }
 
 #[tokio::test]
+async fn display_models_carry_the_colors_their_palettes_show() {
+    let server = start().await;
+    server.sign_up().await;
+    let (status, body) = server.call("GET", "/manage/display-models", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let og_plus = body["models"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|model| model["name"] == "og_plus")
+        .unwrap();
+    let palette = |id: &str| {
+        og_plus["palettes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|palette| palette["id"] == id)
+            .unwrap()
+            .clone()
+    };
+    // TRMNL lists four grays for gray-4; the renderer spreads them evenly.
+    assert_eq!(
+        palette("gray-4")["colors"],
+        json!(["#000000", "#555555", "#aaaaaa", "#ffffff"])
+    );
+    assert_eq!(palette("bw")["colors"], json!(["#000000", "#ffffff"]));
+}
+
+#[tokio::test]
+async fn the_server_names_its_time_zone_and_secrets_but_no_secret_values() {
+    let server = common::start_with_secrets(afterimage_server::secrets::Secrets::from_vars([(
+        "AFTERIMAGE_SECRET_HA_TOKEN".into(),
+        "token-value".into(),
+    )]))
+    .await;
+    server.sign_up().await;
+    let response = server
+        .http
+        .get(format!("{}/manage/server", server.url))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let text = response.text().await.unwrap();
+    assert!(!text.contains("token-value"));
+    let body: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        body,
+        json!({ "timeZone": "UTC", "secretNames": ["HA_TOKEN"] })
+    );
+}
+
+#[tokio::test]
 async fn a_removed_device_shows_its_code_again_and_can_be_claimed_again() {
     let server = start().await;
     server.sign_up().await;

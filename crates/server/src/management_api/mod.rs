@@ -5,6 +5,7 @@
 //! [`Caller`], which only that plugin provides.
 
 mod accounts;
+mod deployment;
 mod devices;
 mod screens;
 mod wire;
@@ -46,6 +47,8 @@ pub struct State {
     pub landing: String,
     pub cookies: CookiePolicy,
     pub password_sign_in: bool,
+    /// The IANA name of the time zone of playlists and dates on screens.
+    pub time_zone: String,
     /// Names of the secrets data sources may read; the values stay with the renderer.
     pub secret_names: Vec<String>,
     pub drawing: Arc<Drawing>,
@@ -101,7 +104,7 @@ pub fn service(
         .update_screen(screens::update_screen)
         .delete_screen(screens::delete_screen)
         .preview_screen(screens::preview_screen)
-        .list_secret_names(screens::list_secret_names)
+        .get_server(deployment::get_server)
         .build()
         .expect("every management API operation has a handler")
 }
