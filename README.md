@@ -19,4 +19,5 @@ See [the design](docs/design.md).
 | `tools/prepare-queries` | Refreshes `.sqlx/` after a query or migration changes |
 | `tools/trmnl-excerpt` | Refreshes the excerpt of TRMNL's published device contract |
 | `tools/trmnl-catalog` | Refreshes the snapshot of TRMNL's display models and palettes |
+| `tools/tokens/refresh` | Refreshes the renderer's design tokens and fonts from the pinned release of TRMNL's design system |
 | `nix flake check` | Builds the server from the pinned contract, runs every test, and runs clippy and rustfmt |

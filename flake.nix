@@ -28,12 +28,20 @@
     {
       packages = forSystems (system: {
         default = scope.${system}.server;
-        inherit (scope.${system}) contract server;
+        inherit (scope.${system}) contract server tokens;
       });
 
       # The server's build runs every test; lint runs clippy and rustfmt.
       checks = forSystems (system: {
         inherit (scope.${system}) server lint;
+      });
+
+      # tools/tokens/refresh runs this.
+      apps = forSystems (system: {
+        tokens = {
+          type = "app";
+          program = lib.getExe scope.${system}.tokens;
+        };
       });
 
       devShells = forSystems (system: {
