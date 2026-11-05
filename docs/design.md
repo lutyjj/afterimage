@@ -18,7 +18,7 @@ The Smithy model in `model/` is the single source of truth. One build generates 
 |---|---|---|
 | Device API | TRMNL firmware | Devices |
 | Management API | Afterimage | Web UI |
-| Renderer API | Afterimage | Server |
+| Render operation | Afterimage | Server |
 
 The device API mirrors the four operations TRMNL firmware calls: `GET /api/setup`, `GET /api/display`, `GET /api/display/current` and `POST /api/log`. TRMNL publishes them in its OpenAPI document (`https://trmnl.com/api-docs/openapi.json`). A test compares the generated document with TRMNL's and fails on any difference in the paths, headers and response fields the model covers.
 
@@ -30,7 +30,7 @@ Each component builds on its own and depends on the others only through generate
 |---|---|
 | `model/` | Smithy contract |
 | `crates/server/` | Device and management APIs, schedule, SQLite persistence, MQTT publishing |
-| `renderer/` | Renderer API: screen template and data to device image |
+| `crates/render-typst/` | The render operation in Typst, with a component library generated from TRMNL's design tokens |
 | `web/` | Web UI on the generated TypeScript client |
 | `deploy/nix/` | Nix package, container image and NixOS module |
 
@@ -48,9 +48,15 @@ The server publishes each device's battery, signal, firmware version, last check
 
 ## Screens and schedule
 
-A screen is a template plus named data sources. A data source is an HTTP endpoint returning JSON, such as a Home Assistant REST call; the screen refers to its credentials by name and never stores them. A schedule lists, per device, the screens it shows and when.
+A screen is a tree of generic components (title bar, value, label, table, chart and others) whose properties bind to named data sources. The components and their properties are shapes in the model, so the web UI edits screens without a template language. A data source is an HTTP endpoint returning JSON, such as a Home Assistant REST call; the screen refers to its credentials by name and never stores them. A schedule lists, per device, the screens it shows and when.
 
-The renderer turns a template and its data into an image for one device model: the width, height, bit depth and palette that TRMNL's `GET /api/models` publishes, in the model's MIME type and under its image size limit. The server caches each image on disk by screen and model, and renders again when the data or the schedule changes.
+## Rendering
+
+The render contract is one operation in the model: a screen, its resolved data and a render profile in, an image out. The render profile is what TRMNL's `GET /api/models` publishes for the device's model: width, height, bit depth, palette, MIME type and image size limit. The server caches each image on disk by screen and profile, and renders again when the data or the schedule changes.
+
+Typst implements the operation in-process. Its component library is generated from the public tokens of TRMNL's design system (MIT): fonts, palette, gaps, type scale and dither patterns, so screens keep TRMNL's look. On one measured screen, Typst rendered in 13 ms with a 19 MiB memory peak; TRMNL's design system in headless Chromium took 1.3 s and about 1 GiB, most of it loading its 19 MB stylesheet.
+
+Another engine replaces Typst by implementing the same operation and every component, for example as a separate service that runs TRMNL's design system; screens stay unchanged. A screen may instead carry a raw Typst template for what the components cannot express. Such a screen works only with the Typst renderer.
 
 ## Storage and accounts
 
@@ -60,4 +66,5 @@ Users sign in through OIDC or with a local password. Both implement one sign-in 
 
 ## Open questions
 
-1. **Renderer.** Playwright with TRMNL's design system (MIT; its CSS and JavaScript runtime, pinned to a release from `GET /api/framework`), or Typst rendered to an image in Rust. The `spike/renderer` branch measures both on one screen: Typst renders in 13 ms with 19 MiB, the design system in 1.3 s with about 1 GiB, most of it spent loading its 19 MB stylesheet. Appearance on a device is not compared yet. TRMNL's design carries over either way: the design system's public tokens (palette, gaps, type scale, dither patterns) can generate Typst components, and the renderer API admits a second implementation that runs the design system itself. The answer also picks the template language and the renderer's implementation language.
+1. **Token source.** Whether the generator reads the design system's tokens from its Sass source or from a compiled stylesheet, and how it resolves their per-mode values (1-bit, 2-bit, density).
+2. **Component set.** Which of TRMNL's documented components the first release defines.
