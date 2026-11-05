@@ -298,8 +298,8 @@ impl Devices {
 
     /// # Errors
     ///
-    /// `UnsupportedDisplay` for a palette the model does not support or a model the
-    /// catalogue lacks; otherwise when storage fails.
+    /// `UnsupportedDisplay` for a display [`crate::drawing::drawable`] refuses;
+    /// otherwise when storage fails.
     pub async fn update(
         &self,
         account_id: i64,
@@ -307,7 +307,7 @@ impl Devices {
         changes: Changes,
     ) -> Result<Option<Device>, Error> {
         if let Some(display) = &changes.display
-            && !Catalog::get().supports(&display.model, &display.palette)
+            && crate::drawing::drawable(&display.model, &display.palette).is_none()
         {
             return Err(Error::UnsupportedDisplay {
                 model: display.model.clone(),
@@ -369,6 +369,13 @@ impl Devices {
         sqlx::query!("DELETE FROM playlist_entries WHERE device_id = ?", id)
             .execute(&mut *tx)
             .await?;
+        // A new playlist starts at its first entry.
+        sqlx::query!(
+            "UPDATE devices SET playlist_position = NULL WHERE id = ?",
+            id
+        )
+        .execute(&mut *tx)
+        .await?;
         for (position, entry) in (0_i64..).zip(playlist) {
             let screen = sqlx::query_scalar!(
                 "SELECT id FROM screens WHERE id = ? AND account_id = ?",

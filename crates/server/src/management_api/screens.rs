@@ -3,11 +3,9 @@
 use afterimage_management_api::server::Extension;
 use afterimage_management_api::{error, input, model, output};
 
-use afterimage_trmnl::catalog::Catalog;
-
 use super::{Caller, Shared, internal, wire};
 use crate::screens::TEMPLATE_NAMES;
-use crate::showing;
+use crate::{drawing, showing};
 
 /// Refuses a data source named like something templates already read.
 fn check(document: &model::ScreenDocument) -> Result<(), error::ValidationException> {
@@ -130,17 +128,10 @@ pub async fn preview_screen(
     caller: Caller,
 ) -> Result<output::PreviewScreenOutput, error::PreviewScreenError> {
     check(&input.document)?;
-    let catalog = Catalog::get();
     let display = wire::display(input.display);
-    let (Some(model), Some(palette)) = (
-        catalog.model(&display.model),
-        catalog.palette(&display.palette),
-    ) else {
+    let Some((model, palette)) = drawing::drawable(&display.model, &display.palette) else {
         return Err(invalid_display(&display).into());
     };
-    if !catalog.supports(&model.name, &palette.id) {
-        return Err(invalid_display(&display).into());
-    }
     let name = match input.device_id {
         Some(id) => {
             state
@@ -199,7 +190,7 @@ pub async fn preview_screen(
 fn invalid_display(display: &crate::devices::Display) -> error::ValidationException {
     error::ValidationException {
         message: format!(
-            "{} with {} is not a display TRMNL's catalogue lists.",
+            "{} with {} is not a display Afterimage can draw: TRMNL's catalogue does not list the pair, or its model takes an image format the renderer does not write.",
             display.model, display.palette
         ),
         field_list: None,

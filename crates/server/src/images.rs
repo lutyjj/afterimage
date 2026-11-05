@@ -5,8 +5,12 @@
 use std::fmt::Write;
 use std::io;
 use std::path::PathBuf;
+use std::time::{Duration, SystemTime};
 
 use sha2::{Digest, Sha256};
+
+/// How long an image outlives a newer one of its device.
+pub const RETAIN: Duration = Duration::from_mins(5);
 
 pub struct Images {
     root: PathBuf,
@@ -25,13 +29,15 @@ impl Images {
         Self { root }
     }
 
-    /// Stores a device's image and returns its name. Every other image of the
-    /// device goes, except `keep`, the one it may still be downloading.
+    /// Stores a device's image and returns its name. Other images of the device
+    /// go once they are older than [`RETAIN`], so an image a check-in just named
+    /// stays downloadable even when another check-in of the device, such as the
+    /// firmware's retry of a slow answer, draws a different one meanwhile.
     ///
     /// # Errors
     ///
     /// When the file cannot be written.
-    pub fn save(&self, device: i64, bytes: &[u8], keep: Option<&str>) -> io::Result<String> {
+    pub fn save(&self, device: i64, bytes: &[u8]) -> io::Result<String> {
         let hash = Sha256::digest(bytes);
         let mut name = String::with_capacity(20);
         for byte in &hash[..8] {
@@ -47,11 +53,18 @@ impl Images {
             std::fs::write(&partial, bytes)?;
             std::fs::rename(&partial, &path)?;
         }
+        let now = SystemTime::now();
         for entry in std::fs::read_dir(&directory)? {
             let entry = entry?;
-            let file = entry.file_name();
-            let file = file.to_string_lossy();
-            if file != name && Some(file.as_ref()) != keep {
+            if entry.file_name().to_string_lossy() == name {
+                continue;
+            }
+            let age = entry
+                .metadata()?
+                .modified()
+                .ok()
+                .and_then(|modified| now.duration_since(modified).ok());
+            if age.is_some_and(|age| age > RETAIN) {
                 std::fs::remove_file(entry.path())?;
             }
         }
@@ -74,6 +87,12 @@ impl Images {
         }
     }
 
+    /// Whether the device still has an image of this name.
+    #[must_use]
+    pub fn has(&self, device: i64, name: &str) -> bool {
+        valid(name) && self.root.join(device.to_string()).join(name).is_file()
+    }
+
     /// Removes a device's images.
     ///
     /// # Errors
@@ -92,18 +111,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn names_by_content_and_keeps_the_previous_image() {
+    fn names_by_content_and_drops_images_older_than_a_newer_one() {
         let directory = tempfile::TempDir::new().unwrap();
         let images = Images::new(directory.path().to_owned());
-        let first = images.save(7, b"first", None).unwrap();
+        let first = images.save(7, b"first").unwrap();
         assert!(valid(&first), "{first}");
-        assert_eq!(images.save(7, b"first", None).unwrap(), first);
-        let second = images.save(7, b"second", Some(&first)).unwrap();
+        assert_eq!(images.save(7, b"first").unwrap(), first);
+        // A second image drawn meanwhile leaves the first downloadable.
+        let second = images.save(7, b"second").unwrap();
         assert_eq!(
             images.read(7, &first).unwrap().as_deref(),
             Some(&b"first"[..])
         );
-        let third = images.save(7, b"third", Some(&second)).unwrap();
+        // Once the first is older than RETAIN, the next save removes it.
+        let old = SystemTime::now() - RETAIN - Duration::from_secs(1);
+        std::fs::File::options()
+            .write(true)
+            .open(directory.path().join("7").join(&first))
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        let third = images.save(7, b"third").unwrap();
         assert_eq!(images.read(7, &first).unwrap(), None, "older images go");
         assert!(images.read(7, &second).unwrap().is_some());
         assert!(images.read(7, &third).unwrap().is_some());

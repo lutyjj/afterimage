@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE devices SET playlist_position = NULL\n             WHERE account_id = ? AND id IN (SELECT device_id FROM playlist_entries WHERE screen_id = ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "40a3d7b112261a4b6d5a02e76bd96663afecbb77657123d2c34abeb48a372636"
+}

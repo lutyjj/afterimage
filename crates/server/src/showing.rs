@@ -15,6 +15,10 @@ use crate::images::Images;
 use crate::schedule;
 use crate::screens::Screens;
 
+/// Problems logged for a screen that could not be drawn; the editor's preview
+/// shows them all.
+const LOGGED_PROBLEMS: usize = 4;
+
 /// What the check-in answers.
 pub struct Shown {
     /// The image's name in [`Images`].
@@ -36,17 +40,11 @@ pub enum Error {
 }
 
 /// The model and palette a device's display names; the catalogue's default for
-/// its firmware when the catalogue no longer lists them.
+/// its firmware when they can no longer be drawn, as after a catalogue refresh.
 #[must_use]
 pub fn display(device: &Device) -> (&'static Model, &'static Palette) {
-    let catalog = Catalog::get();
-    match (
-        catalog.model(&device.display.model),
-        catalog.palette(&device.display.palette),
-    ) {
-        (Some(model), Some(palette)) => (model, palette),
-        _ => catalog.default_display(&device.firmware_model, None),
-    }
+    drawing::drawable(&device.display.model, &device.display.palette)
+        .unwrap_or_else(|| Catalog::get().default_display(&device.firmware_model, None))
 }
 
 /// The device as templates read it.
@@ -74,7 +72,7 @@ pub async fn next(
 ) -> Result<Shown, Error> {
     let at = jiff::Timestamp::from_second(now)
         .unwrap_or(jiff::Timestamp::UNIX_EPOCH)
-        .to_zoned(drawing.time_zone().clone());
+        .to_zoned(drawing.time_zone().zone().clone());
     let wait = schedule::wait(&device.playlist, device.refresh_minutes, &at);
     let (model, palette) = display(device);
     let position = schedule::next(&device.playlist, device.playlist_position, &at);
@@ -109,7 +107,7 @@ pub async fn next(
     let (bytes, screen_id) = match drawn {
         Ok(drawn) => drawn,
         Err((name, problems)) => {
-            for problem in &problems {
+            for problem in problems.iter().take(LOGGED_PROBLEMS) {
                 tracing::warn!(
                     device = device.id,
                     screen = name,
@@ -118,7 +116,14 @@ pub async fn next(
                     problem.message
                 );
             }
-            if let Some(showing) = &device.showing {
+            if let Some(showing) = device
+                .showing
+                .as_ref()
+                .filter(|showing| images.has(device.id, &showing.image))
+            {
+                // The device keeps its image, and the playlist moves past the entry
+                // that failed, so the next check-in shows the entry after it.
+                devices.show(device.id, position, showing).await?;
                 return Ok(Shown {
                     image: showing.image.clone(),
                     wait,
@@ -131,11 +136,7 @@ pub async fn next(
             (image.bytes, None)
         }
     };
-    let keep = device
-        .showing
-        .as_ref()
-        .map(|showing| showing.image.as_str());
-    let image = images.save(device.id, &bytes, keep)?;
+    let image = images.save(device.id, &bytes)?;
     let changed = device
         .showing
         .as_ref()

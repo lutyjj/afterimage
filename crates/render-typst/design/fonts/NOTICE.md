@@ -16,3 +16,5 @@ Copyright © 2026 Heavyweight Digital Type Foundry s.r.o. Designed by Heavyweigh
 ## Inter Variable
 
 Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter). Designed by Rasmus Andersson. Licensed under the SIL Open Font License v1.1 (https://scripts.sil.org/OFL). Files: `Inter.ttf`, `Inter-Italic.ttf`.
+
+The SIL Open Font License's text is in `OFL.txt`; the design system's own licence, which covers `tokens.json`, is in `../LICENSE`.

@@ -23,3 +23,4 @@ pub mod screens;
 pub mod secrets;
 pub mod sessions;
 pub mod showing;
+pub mod time_zone;

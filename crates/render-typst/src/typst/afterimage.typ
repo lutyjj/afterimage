@@ -38,9 +38,9 @@
   })
 }
 
-// Gray ink for text: the gray itself where the palette has grays, or black,
-// since neither a mid gray nor a dither survives as small text in black and white.
-#let gray-ink(t, levels) = if levels > 2 { rgb(tok(t, "--gray-50", default: "#999999")) } else { black }
+// Gray ink for text: the gray itself where the palette has a gray, or black,
+// since neither a mid gray nor a dither survives as small text without one.
+#let gray-ink(t, grays) = if grays { rgb(tok(t, "--gray-50", default: "#999999")) } else { black }
 
 // Text kept legible over a dithered fill: a white outline under the ink, as
 // TRMNL's title bar draws it (`--title-bar-text-stroke-width`).
@@ -58,10 +58,32 @@
   px(t, "--gap-" + name, default: 10)
 }
 
-// Cuts text to `lines` lines of its own size.
-#let clamp(body, lines, size, leading) = if lines == none { body } else {
-  block(height: lines * size * leading, clip: true, body)
+// Text in `face`, cut to `lines` lines with an ellipsis, as TRMNL's clamp: the
+// longest start of the text that fits, found by halving.
+#let clamped(face, leading, words, lines) = {
+  let set-text(body) = {
+    set par(leading: (leading - 1) * face.size)
+    text(..face, body)
+  }
+  if lines == none or words == "" { return set-text(words) }
+  layout(region => {
+    let height(body) = measure(block(width: region.width, set-text(body))).height
+    let limit = height(range(int(lines)).map(_ => [X]).join(linebreak())) + 0.5pt
+    if height(words) <= limit { return set-text(words) }
+    let clusters = words.clusters()
+    let (low, high) = (0, clusters.len())
+    while low < high {
+      let middle = calc.ceil((low + high) / 2)
+      if height(clusters.slice(0, middle).join() + "…") <= limit { low = middle } else { high = middle - 1 }
+    }
+    let kept = if low == 0 { "" } else { clusters.slice(0, low).join().trim() }
+    set-text(kept + "…")
+  })
 }
+
+// A value as a number: numbers, and text that reads as one (Home Assistant
+// states are text); `none` for anything else, which charts leave out.
+#let number(value) = if type(value) in (int, float) { float(value) } else if type(value) == str and value.trim().match(regex("^-?[0-9]+(\\.[0-9]+)?([eE][-+]?[0-9]+)?$")) != none { float(value.trim()) } else { none }
 
 // Whether a component takes a share of the space left along its parent.
 #let grows(node) = {
@@ -76,14 +98,15 @@
   let face = typeface(t, component, size)
   let leading = sized(t, component, size, "-line-height")
   let leading = if leading == none or leading < 0.8 { 1.2 } else { leading }
-  set par(leading: (leading - 1) * face.size)
-  clamp(text(..face, shown(value.text)), value.at("clamp", default: none), face.size, leading)
+  clamped(face, leading, shown(value.text), value.at("clamp", default: none))
 }
 
-#let label(t, value, levels) = {
+#let label(t, value, grays) = {
   let size = value.at("size", default: "base")
   let face = typeface(t, "--label", size)
-  let body = text(..face, shown(value.text))
+  let leading = sized(t, "--label", size, "-line-height")
+  let leading = if leading == none or leading < 0.8 { 1.2 } else { leading }
+  let body = clamped(face, leading, shown(value.text), value.at("clamp", default: none))
   let inset = (x: px(t, "--gap-xsmall", default: 5), y: 1pt)
   let radius = px(t, "--rounded-xsmall", default: 5)
   let style = value.at("style", default: "plain")
@@ -92,7 +115,7 @@
   } else if style == "underline" {
     underline(offset: 2pt, body)
   } else if style == "gray" {
-    text(fill: gray-ink(t, levels), body)
+    text(fill: gray-ink(t, grays), body)
   } else if style == "filled" {
     box(fill: black, inset: inset, radius: radius, text(fill: white, body))
   } else {
@@ -128,9 +151,12 @@
 }
 
 #let chart(t, value, kind) = layout(region => {
-  let series = value.series.filter(s => type(s.values) == array and s.values.len() > 0)
+  let series = value.series
+    .filter(s => type(s.values) == array)
+    .map(s => (..s, values: s.values.map(number)))
+    .filter(s => s.values.any(v => v != none))
   if series.len() == 0 { return text(..typeface(t, "--label", "small"), "No data") }
-  let all = series.map(s => s.values).flatten().map(float)
+  let all = series.map(s => s.values).flatten().filter(v => v != none)
   let low = value.at("min", default: none)
   let high = value.at("max", default: none)
   let low = if low == none { calc.min(..all) } else { low }
@@ -152,7 +178,7 @@
   } else {
     axis-width + width * i / calc.max(count - 1, 1)
   }
-  let y(v) = 2pt + height * (1 - (float(v) - low) / (high - low))
+  let y(v) = 2pt + height * (1 - (v - low) / (high - low))
   box(width: region.width, height: height + label-height + 4pt, {
     let tick = low
     while tick <= high + step / 2 {
@@ -176,10 +202,11 @@
     }
     let dashes = (none, "dashed", "dotted", "dash-dotted")
     for (n, s) in series.enumerate() {
-      let values = s.values.map(float)
+      let values = s.values
       if kind == "bar" {
         let slot = width / count / series.len()
         for (i, v) in values.enumerate() {
+          if v == none { continue }
           let top = y(calc.max(v, 0))
           let bottom = y(calc.min(v, 0))
           let shade = if n == 0 { black } else { fill(t, "--framework-slot-item-meta-emphasis-2-bg-color", image: "--framework-slot-item-meta-emphasis-2-bg-image") }
@@ -187,15 +214,26 @@
             rect(width: slot * 0.7, height: calc.max(bottom - top, 1pt), fill: shade, stroke: none))
         }
       } else {
-        let points = values.enumerate().map(((i, v)) => (x(i), y(v)))
-        let segments = (curve.move(points.at(0)),)
-        for i in range(points.len() - 1) {
-          let (p0, p1, p2, p3) = (points.at(calc.max(i - 1, 0)), points.at(i), points.at(i + 1), points.at(calc.min(i + 2, points.len() - 1)))
-          let c1 = (p1.at(0) + (p2.at(0) - p0.at(0)) / 6, p1.at(1) + (p2.at(1) - p0.at(1)) / 6)
-          let c2 = (p2.at(0) - (p3.at(0) - p1.at(0)) / 6, p2.at(1) - (p3.at(1) - p1.at(1)) / 6)
-          segments.push(curve.cubic(c1, c2, p2))
+        // A missing value breaks the line; each run of values is its own curve.
+        let runs = ((),)
+        for (i, v) in values.enumerate() {
+          if v == none { if runs.at(-1) != () { runs.push(()) } } else { runs.at(-1).push((x(i), y(v))) }
         }
-        place(curve(stroke: (thickness: if n == 0 { 4pt } else { 3pt }, cap: "round", join: "round", dash: dashes.at(calc.rem(n, 4))), ..segments))
+        let stroke = (thickness: if n == 0 { 4pt } else { 3pt }, cap: "round", join: "round", dash: dashes.at(calc.rem(n, 4)))
+        for points in runs.filter(run => run.len() > 0) {
+          if points.len() == 1 {
+            place(dx: points.at(0).at(0) - 2pt, dy: points.at(0).at(1) - 2pt, circle(radius: 2pt, fill: black, stroke: none))
+            continue
+          }
+          let segments = (curve.move(points.at(0)),)
+          for i in range(points.len() - 1) {
+            let (p0, p1, p2, p3) = (points.at(calc.max(i - 1, 0)), points.at(i), points.at(i + 1), points.at(calc.min(i + 2, points.len() - 1)))
+            let c1 = (p1.at(0) + (p2.at(0) - p0.at(0)) / 6, p1.at(1) + (p2.at(1) - p0.at(1)) / 6)
+            let c2 = (p2.at(0) - (p3.at(0) - p1.at(0)) / 6, p2.at(1) - (p3.at(1) - p1.at(1)) / 6)
+            segments.push(curve.cubic(c1, c2, p2))
+          }
+          place(curve(stroke: stroke, ..segments))
+        }
       }
     }
   })
@@ -246,30 +284,33 @@
   )
 }
 
-#let node(t, images, levels, n, direction: "column") = {
+// The bytes of the image a resolved `url` names, or `none`.
+#let image-of(images, key) = if type(key) == str { images.at(key, default: none) } else { none }
+
+#let node(t, images, grays, n, direction: "column") = {
   let kind = n.keys().first()
   let v = n.at(kind)
   if kind == "column" or kind == "row" {
-    stack-of(t, v, kind, child => node(t, images, levels, child, direction: kind))
+    stack-of(t, v, kind, child => node(t, images, grays, child, direction: kind))
   } else if kind == "grid" {
     let columns = int(v.columns)
     grid(
       columns: (1fr,) * columns,
       gutter: gap(t, v.at("gap", default: "medium")),
-      ..v.cells.map(cell => grid.cell(colspan: calc.min(int(cell.at("span", default: 1)), columns), node(t, images, levels, cell.content)))
+      ..v.cells.map(cell => grid.cell(colspan: calc.min(int(cell.at("span", default: 1)), columns), node(t, images, grays, cell.content)))
     )
   } else if kind == "item" {
-    item(t, v, child => node(t, images, levels, child))
+    item(t, v, child => node(t, images, grays, child))
   } else if kind == "title" {
     text-component(t, "--title", v)
   } else if kind == "description" {
     text-component(t, "--description", v)
   } else if kind == "label" {
-    label(t, v, levels)
+    label(t, v, grays)
   } else if kind == "value" {
     value(t, v)
   } else if kind == "image" {
-    let source = images.at(v.url, default: none)
+    let source = image-of(images, v.at("url", default: none))
     if source == none { text(..typeface(t, "--label", "small"), "Image unavailable") } else {
       std.image(source, width: 100%, height: 100%, fit: v.at("fit", default: "contain"))
     }
@@ -288,8 +329,8 @@
   let face = typeface(t, "--title-bar", "base")
   let ink = rgb(tok(t, "--framework-slot-title-bar-text-color", default: "#000000"))
   let icon = bar.at("icon", default: none)
-  let icon = if icon == none or images.at(icon, default: none) == none { none } else {
-    std.image(images.at(icon), height: px(t, "--title-bar-image-height", default: 24))
+  let icon = if image-of(images, icon) == none { none } else {
+    std.image(image-of(images, icon), height: px(t, "--title-bar-image-height", default: 24))
   }
   block(
     width: 100%,
@@ -310,13 +351,13 @@
   )
 }
 
-// The whole screen, `width` by `height` layout pixels, for a palette of
-// `levels` colors.
-#let screen(document, t, images, levels, width, height) = {
+// The whole screen, `width` by `height` layout pixels; `grays` tells whether the
+// palette has a gray for gray text.
+#let screen(document, t, images, grays, width, height) = {
   set page(width: width * 1pt, height: height * 1pt, margin: px(t, "--gap", default: 10), fill: white)
   set text(font: ("Inter",), size: 16pt, fill: black)
   let bar = document.at("titleBar", default: none)
-  let content = node(t, images, levels, document.content)
+  let content = node(t, images, grays, document.content)
   if bar == none {
     block(width: 100%, height: 100%, content)
   } else {

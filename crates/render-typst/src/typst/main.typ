@@ -2,4 +2,4 @@
 // `sys.inputs`.
 #import "afterimage.typ": screen
 #let inputs = sys.inputs
-#screen(json(bytes(inputs.screen)), json(bytes(inputs.tokens)), inputs.images, inputs.levels, inputs.width, inputs.height)
+#screen(json(bytes(inputs.screen)), json(bytes(inputs.tokens)), inputs.images, inputs.grays, inputs.width, inputs.height)

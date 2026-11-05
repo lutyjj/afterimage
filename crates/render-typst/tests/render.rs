@@ -86,3 +86,117 @@ fn draws_one_bit_and_scaled_profiles() {
         (1872, 1404, png::BitDepth::Four)
     );
 }
+
+/// Each pixel's palette color, row by row.
+fn pixels(bytes: &[u8]) -> Vec<Vec<[u8; 3]>> {
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes.to_vec()));
+    decoder.set_transformations(png::Transformations::EXPAND);
+    let mut reader = decoder.read_info().unwrap();
+    let mut buffer = vec![0; reader.output_buffer_size().unwrap()];
+    let frame = reader.next_frame(&mut buffer).unwrap();
+    let channels = frame.color_type.samples();
+    buffer[..frame.buffer_size()]
+        .chunks(frame.line_size)
+        .map(|line| {
+            line.chunks(channels)
+                .take(frame.width as usize)
+                .map(|pixel| match pixel {
+                    [luma] | [luma, _] => [*luma; 3],
+                    [r, g, b, ..] => [*r, *g, *b],
+                    [] => [255; 3],
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Rows holding anything but white.
+fn inked_rows(bytes: &[u8]) -> usize {
+    pixels(bytes)
+        .iter()
+        .filter(|row| row.iter().any(|pixel| *pixel != [255, 255, 255]))
+        .count()
+}
+
+fn screen_of(component: &Value) -> Value {
+    json!({ "content": { "column": { "gap": "medium", "align": "start", "justify": "start", "grow": false, "children": [component] } } })
+}
+
+#[test]
+fn gray_text_stays_visible_on_a_palette_without_grays() {
+    let label = screen_of(
+        &json!({ "label": { "text": "Updated 14:05", "size": "base", "style": "gray" } }),
+    );
+    for palette in ["color-6a", "bw", "gray-4"] {
+        let model = if palette == "color-6a" {
+            "inky_impression_7_3"
+        } else {
+            "og_plus"
+        };
+        let bytes = render(&label, model, palette);
+        assert!(
+            inked_rows(&bytes) > 5,
+            "{model} {palette}: the label vanished"
+        );
+    }
+}
+
+#[test]
+fn clamped_text_keeps_to_its_lines() {
+    let long = "A description long enough to run over many lines of the screen, so that \
+                cutting it to one line leaves most of it out and ends it with an ellipsis. "
+        .repeat(8);
+    let free = render(
+        &screen_of(&json!({ "description": { "text": long, "size": "base" } })),
+        "og_plus",
+        "gray-4",
+    );
+    let clamped = render(
+        &screen_of(&json!({ "description": { "text": long, "size": "base", "clamp": 1 } })),
+        "og_plus",
+        "gray-4",
+    );
+    let label = render(
+        &screen_of(
+            &json!({ "label": { "text": long, "size": "base", "style": "plain", "clamp": 1 } }),
+        ),
+        "og_plus",
+        "gray-4",
+    );
+    let (free, clamped, label) = (inked_rows(&free), inked_rows(&clamped), inked_rows(&label));
+    assert!(free > 4 * clamped, "free {free} rows, clamped {clamped}");
+    assert!(
+        label <= clamped + 4,
+        "label {label} rows, description {clamped}"
+    );
+}
+
+#[test]
+fn a_missing_image_or_value_leaves_the_rest_of_the_screen() {
+    let screen = json!({ "content": { "column": { "gap": "medium", "align": "start", "justify": "start", "grow": false, "children": [
+        { "image": { "url": null, "fit": "contain", "grow": false } },
+        { "lineChart": { "grow": true, "series": [ { "values": [1, null, "3.5", "unavailable", 2, 4] } ] } },
+        { "barChart": { "grow": true, "series": [ { "values": [null, "2", 3] } ] } }
+    ] } } });
+    assert!(inked_rows(&render(&screen, "og_plus", "gray-4")) > 50);
+}
+
+#[test]
+fn supports_what_it_can_write_and_has_tokens_for() {
+    let catalog = Catalog::get();
+    let drawable = |model: &str, palette: &str| {
+        Renderer::supports(
+            catalog.model(model).unwrap(),
+            catalog.palette(palette).unwrap(),
+        )
+    };
+    assert!(drawable("og_plus", "gray-4"));
+    // These take WebP images.
+    for model in ["openframe", "meta_portal", "tcl_nxtpaper_14"] {
+        let palettes = &catalog.model(model).unwrap().palette_ids;
+        assert!(
+            palettes.iter().all(|palette| !drawable(model, palette)),
+            "{model}"
+        );
+    }
+}

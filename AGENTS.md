@@ -33,7 +33,8 @@ Afterimage is a self-hosted server for TRMNL e-paper displays. [The design](docs
 For API changes, update `model/smithy/` first, then regenerate and implement.
 Generated output is never edited by hand. Each project builds on its own and
 depends on the others only through code generated from the model, except that
-any Rust project may use the shared library `crates/trmnl`. The Rust projects
+any Rust project may use the shared library `crates/trmnl`, and the server links
+the renderer library `crates/render-typst`, which draws in its process. The Rust projects
 share one Cargo workspace, so every Cargo command needs `gen/`: run
 `tools/generate` first in a fresh checkout.
 

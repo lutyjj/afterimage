@@ -26,6 +26,7 @@ use crate::registrations::Registrations;
 use crate::screens::Screens;
 use crate::secrets::Secrets;
 use crate::sessions::{CookiePolicy, Sessions};
+use crate::time_zone::TimeZone;
 use crate::{database, device_api, management_api};
 
 #[derive(Debug, thiserror::Error)]
@@ -56,18 +57,15 @@ pub async fn build(
             "turning password sign-in off needs an OIDC provider".to_owned(),
         ));
     }
+    // Playlist times and dates on screens are in this zone, and the web UI shows
+    // times in it, so it needs a name.
     let time_zone = match config.time_zone.as_deref() {
-        Some(name) => jiff::tz::TimeZone::get(name)
+        Some(name) => TimeZone::named(name)
             .map_err(|error| Error::Settings(format!("the time zone {name}: {error}")))?,
-        None => jiff::tz::TimeZone::system(),
-    };
-    // Playlist times are in this zone, so the web UI needs its name to show them.
-    let time_zone_name = time_zone
-        .iana_name()
-        .ok_or_else(|| {
+        None => TimeZone::system().ok_or_else(|| {
             Error::Settings("the host's time zone has no name; set the time zone".to_owned())
-        })?
-        .to_owned();
+        })?,
+    };
     std::fs::create_dir_all(&config.data_dir).map_err(Error::DataDir)?;
     let pool = database::open(&config.data_dir.join("afterimage.db")).await?;
     let oidc = match (oidc_settings, config.public_url.as_deref()) {
@@ -84,7 +82,7 @@ pub async fn build(
         _ => None,
     };
     let secret_names = secrets.names();
-    let drawing = Arc::new(Drawing::new(secrets, time_zone));
+    let drawing = Arc::new(Drawing::new(secrets, time_zone.clone()));
     let images = Arc::new(Images::new(config.data_dir.join("images")));
     let device_state = Arc::new(device_api::State {
         registrations: Registrations::new(pool.clone(), Arc::clone(&clock), Arc::clone(&entropy)),
@@ -107,7 +105,7 @@ pub async fn build(
         landing: config.landing(),
         cookies: CookiePolicy::new(config.public_url_is_https()),
         password_sign_in: config.password_sign_in,
-        time_zone: time_zone_name,
+        time_zone: time_zone.name().to_owned(),
         secret_names,
         drawing,
         images,

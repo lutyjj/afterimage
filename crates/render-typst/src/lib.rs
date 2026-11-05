@@ -77,6 +77,13 @@ impl Renderer {
         Self { engine }
     }
 
+    /// Whether this renderer can draw for `model` showing `palette`: it writes the
+    /// model's image format, and the profile has design tokens.
+    #[must_use]
+    pub fn supports(model: &Model, palette: &Palette) -> bool {
+        model.mime_type == "image/png" && Tokens::get().of(&model.name, &palette.id).is_some()
+    }
+
     /// Draws `screen` for a display of `model` showing `palette`.
     ///
     /// # Errors
@@ -114,11 +121,14 @@ impl Renderer {
         inputs.insert("screen".into(), Str::from(screen.to_string()).into_value());
         inputs.insert("tokens".into(), Str::from(tokens).into_value());
         inputs.insert("images".into(), files.into_value());
-        let levels = palette.rgb().map_or(256, |colors| colors.len());
-        inputs.insert(
-            "levels".into(),
-            i64::try_from(levels).unwrap_or(256).into_value(),
-        );
+        // Gray text needs a gray to land on: a full-color palette, or one that lists
+        // a gray between black and white. Elsewhere it is black.
+        let grays = palette.rgb().is_none_or(|colors| {
+            colors
+                .iter()
+                .any(|&[r, g, b]| r == g && g == b && r != 0 && r != u8::MAX)
+        });
+        inputs.insert("grays".into(), grays.into_value());
         inputs.insert(
             "width".into(),
             (f64::from(model.width) / model.scale_factor).into_value(),

@@ -126,13 +126,24 @@ impl Screens {
     ///
     /// When storage fails.
     pub async fn delete(&self, account_id: i64, id: i64) -> Result<bool, sqlx::Error> {
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        // A playlist that loses an entry starts again at its first.
+        sqlx::query!(
+            "UPDATE devices SET playlist_position = NULL
+             WHERE account_id = ? AND id IN (SELECT device_id FROM playlist_entries WHERE screen_id = ?)",
+            account_id,
+            id
+        )
+        .execute(&mut *tx)
+        .await?;
         let deleted = sqlx::query!(
             "DELETE FROM screens WHERE id = ? AND account_id = ?",
             id,
             account_id
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+        tx.commit().await?;
         Ok(deleted.rows_affected() == 1)
     }
 }

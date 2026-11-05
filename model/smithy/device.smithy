@@ -306,7 +306,8 @@ operation GetScreenImage {
     ]
 }
 
-/// The device's current screen has another name, or there is none yet.
+/// The device has no image of that name: never drawn, or replaced by a newer one
+/// a while ago.
 @error("client")
 @httpError(404)
 structure ImageNotFound {

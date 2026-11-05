@@ -11,6 +11,7 @@ use afterimage_trmnl::catalog::Catalog;
 
 use crate::accounts::Account;
 use crate::devices::{self, Device, Entry};
+use crate::drawing;
 use crate::screens::{Screen, Summary};
 
 /// A stored value into its constrained model shape.
@@ -134,40 +135,43 @@ pub fn stored_entry(entry: &model::PlaylistEntry) -> Entry {
     }
 }
 
+/// The displays Afterimage can draw for: each catalogue model with the palettes the
+/// renderer can draw it in, and none of the models it cannot draw at all.
 pub fn display_models() -> Result<Vec<model::DisplayModel>, InternalFailure> {
-    let catalog = Catalog::get();
-    catalog
-        .models
-        .iter()
-        .map(|display| {
-            Ok(model::DisplayModel {
-                name: fit(display.name.clone())?,
-                label: display.label.clone(),
-                width: i32::try_from(display.width).unwrap_or(i32::MAX),
-                height: i32::try_from(display.height).unwrap_or(i32::MAX),
-                palettes: display
-                    .palette_ids
-                    .iter()
-                    .filter_map(|id| catalog.palette(id))
-                    .map(|palette| {
-                        Ok(model::Palette {
-                            id: fit(palette.id.clone())?,
-                            name: palette.name.clone(),
-                            colors: palette
-                                .rgb()
-                                .map(|colors| {
-                                    colors
-                                        .iter()
-                                        .map(|[r, g, b]| fit(format!("#{r:02x}{g:02x}{b:02x}")))
-                                        .collect::<Result<_, InternalFailure>>()
-                                })
-                                .transpose()?,
+    let mut models = Vec::new();
+    for display in &Catalog::get().models {
+        let palettes = display
+            .palette_ids
+            .iter()
+            .filter_map(|id| drawing::drawable(&display.name, id).map(|(_, palette)| palette))
+            .map(|palette| {
+                Ok(model::Palette {
+                    id: fit(palette.id.clone())?,
+                    name: palette.name.clone(),
+                    colors: palette
+                        .rgb()
+                        .map(|colors| {
+                            colors
+                                .iter()
+                                .map(|[r, g, b]| fit(format!("#{r:02x}{g:02x}{b:02x}")))
+                                .collect::<Result<_, InternalFailure>>()
                         })
-                    })
-                    .collect::<Result<_, InternalFailure>>()?,
+                        .transpose()?,
+                })
             })
-        })
-        .collect()
+            .collect::<Result<Vec<_>, InternalFailure>>()?;
+        if palettes.is_empty() {
+            continue;
+        }
+        models.push(model::DisplayModel {
+            name: fit(display.name.clone())?,
+            label: display.label.clone(),
+            width: i32::try_from(display.width).unwrap_or(i32::MAX),
+            height: i32::try_from(display.height).unwrap_or(i32::MAX),
+            palettes,
+        });
+    }
+    Ok(models)
 }
 
 /// A document as the screens table stores it: the model's serde form, as JSON.

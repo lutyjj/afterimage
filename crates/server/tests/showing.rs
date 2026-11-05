@@ -413,3 +413,153 @@ async fn a_preview_reports_each_source_and_each_problem_by_path() {
         StatusCode::BAD_REQUEST
     );
 }
+
+#[tokio::test]
+async fn a_secret_stays_out_of_failures_and_echoed_answers() {
+    let echo = Source::default();
+    // An answer that repeats what it was sent, as some APIs do.
+    echo.set(Some(json!({ "sent": "Bearer s3cret-value" })));
+    let url = echo.serve().await;
+    let server = start_with_secrets(Secrets::from_vars([(
+        "AFTERIMAGE_SECRET_HA_TOKEN".into(),
+        "s3cret-value".into(),
+    )]))
+    .await;
+    server.sign_up().await;
+    let document = json!({
+        "sources": {
+            // Nothing listens on port 9, so the request fails with the secret in its URL.
+            "down": { "url": "http://127.0.0.1:9/state?token={{ secrets.HA_TOKEN }}" },
+            "echo": { "url": url, "headers": { "Authorization": "Bearer {{ secrets.HA_TOKEN }}" } },
+            "misnamed": { "url": "{{ secrets.HA_TOKEN }}" }
+        },
+        "content": { "label": { "text": "{{ echo.sent }}" } }
+    });
+    let response = server
+        .http
+        .post(format!("{}/manage/preview", server.url))
+        .json(&json!({ "document": document, "display": { "model": "og_plus", "palette": "gray-4" } }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let text = response.text().await.unwrap();
+    assert!(!text.contains("s3cret-value"), "{text}");
+    let body: Value = serde_json::from_str(&text).unwrap();
+    assert!(body["sources"]["down"]["error"].is_string(), "{body}");
+    assert_eq!(
+        body["sources"]["echo"]["data"]["sent"],
+        "Bearer [secret HA_TOKEN]"
+    );
+    assert_eq!(
+        echo.authorization.lock().unwrap().as_deref(),
+        Some("Bearer s3cret-value"),
+        "the request itself carries the secret"
+    );
+}
+
+#[tokio::test]
+async fn a_screen_that_fails_does_not_hold_up_the_rest_of_the_playlist() {
+    let down = Source::default();
+    let url = down.serve().await;
+    let server = start().await;
+    server.sign_up().await;
+    let (device, key) = server.claim(&mac(1)).await;
+    let id = device["id"].as_i64().unwrap();
+    let text = |label: &str| json!({ "content": { "title": { "text": label } } });
+    let first = screen(&server, "First", text("First")).await;
+    let broken = screen(
+        &server,
+        "Broken",
+        json!({ "sources": { "down": { "url": url } }, "content": { "title": { "text": "{{ down.value }}" } } }),
+    )
+    .await;
+    let third = screen(&server, "Third", text("Third")).await;
+    play(
+        &server,
+        id,
+        json!([{ "screenId": first }, { "screenId": broken }, { "screenId": third }]),
+    )
+    .await;
+    let showing = |body: Value| body["device"]["showing"]["screenId"].clone();
+    let device_path = format!("/manage/devices/{id}");
+
+    let one = server.display(&key, &READINGS).await;
+    assert_eq!(
+        showing(server.call("GET", &device_path, None).await.1),
+        first
+    );
+    let two = server.display(&key, &READINGS).await;
+    assert_eq!(
+        two["filename"], one["filename"],
+        "the device keeps its image"
+    );
+    server.display(&key, &READINGS).await;
+    assert_eq!(
+        showing(server.call("GET", &device_path, None).await.1),
+        third,
+        "the entry after the broken one shows next"
+    );
+}
+
+#[tokio::test]
+async fn a_new_playlist_starts_at_its_first_entry() {
+    let server = start().await;
+    server.sign_up().await;
+    let (device, key) = server.claim(&mac(1)).await;
+    let id = device["id"].as_i64().unwrap();
+    let text = |label: &str| json!({ "content": { "title": { "text": label } } });
+    let first = screen(&server, "First", text("First")).await;
+    let second = screen(&server, "Second", text("Second")).await;
+    let other = screen(&server, "Other", text("Other")).await;
+    play(
+        &server,
+        id,
+        json!([{ "screenId": first }, { "screenId": second }]),
+    )
+    .await;
+    let shown = server.display(&key, &READINGS).await;
+    let device_path = format!("/manage/devices/{id}");
+    let showing = |body: Value| body["device"]["showing"]["screenId"].clone();
+    assert_eq!(
+        showing(server.call("GET", &device_path, None).await.1),
+        first
+    );
+
+    play(
+        &server,
+        id,
+        json!([{ "screenId": other }, { "screenId": first }]),
+    )
+    .await;
+    server.display(&key, &READINGS).await;
+    assert_eq!(
+        showing(server.call("GET", &device_path, None).await.1),
+        other
+    );
+
+    // Deleting a screen of the playlist starts it over too.
+    server.display(&key, &READINGS).await;
+    assert_eq!(
+        showing(server.call("GET", &device_path, None).await.1),
+        first
+    );
+    assert_eq!(
+        server
+            .call("DELETE", &format!("/manage/screens/{second}"), None)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+    server.display(&key, &READINGS).await;
+    assert_eq!(
+        showing(server.call("GET", &device_path, None).await.1),
+        other
+    );
+
+    // The image a check-in named stays downloadable after the next one changes it.
+    assert_eq!(
+        download(&server, &shown, &key).await.status(),
+        StatusCode::OK
+    );
+}

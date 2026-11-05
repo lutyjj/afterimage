@@ -525,6 +525,21 @@ async fn a_display_must_be_one_the_catalogue_lists() {
         json!({ "model": "og_png", "palette": "bw" })
     );
     assert_eq!(body["device"]["refreshMinutes"], 30);
+    // TRMNL lists openframe, but it takes WebP images, which Afterimage does not draw.
+    let webp = json!({ "display": { "model": "openframe", "palette": "color-24bit" } });
+    assert_eq!(
+        server.call("PATCH", &path, Some(webp)).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    let (_, body) = server.call("GET", "/manage/display-models", None).await;
+    assert!(
+        body["models"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|model| model["name"] != "openframe"),
+        "only displays Afterimage can draw are offered"
+    );
 }
 
 #[tokio::test]

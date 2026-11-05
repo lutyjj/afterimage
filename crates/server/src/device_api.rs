@@ -267,16 +267,11 @@ async fn get_screen_image(
         }
         .into());
     };
+    // Any image the device still has, not only its current one: a check-in may
+    // have named one that a retried check-in has since replaced.
     let not_found = || error::ImageNotFound {
-        message: Some("This device shows no image of that name.".to_owned()),
+        message: Some("This device has no image of that name.".to_owned()),
     };
-    let current = device
-        .showing
-        .as_ref()
-        .map(|showing| showing.image.as_str());
-    if current != Some(input.name.as_str()) {
-        return Err(not_found().into());
-    }
     let image = state
         .images
         .read(device.id, &input.name)

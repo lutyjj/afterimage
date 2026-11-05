@@ -289,7 +289,7 @@ structure Each {
 
     gap: Gap = "medium"
 
-    /// Elements drawn at most.
+    /// Elements drawn at most; absent draws at most 100.
     limit: EachLimit
 
     /// Shown after the last element drawn when some are left out; reads `hidden`,

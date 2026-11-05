@@ -4,9 +4,14 @@
 //! Templates are `MiniJinja` (Jinja syntax). Text without template syntax is itself;
 //! a template that is exactly one `{{ expression }}` keeps the expression's value,
 //! so a chart's series can be a list; any other template renders to text. Data
-//! source requests read `secrets`; nothing else does, so a secret never reaches
-//! the screen. Each problem names where in the document it arose, as a JSON
-//! Pointer, so the editor can point at it.
+//! source requests read `secrets`; nothing else does, and every answer and message
+//! has their values redacted, so a secret never reaches the screen or the editor.
+//! Each problem names where in the document it arose, as a JSON Pointer, so the
+//! editor can point at it.
+//!
+//! A drawing is bounded: it ends within [`DRAW_TIME`], which a device's check-in
+//! waits on, and a document expands to at most [`MAX_COMPONENTS`] components and
+//! [`MAX_IMAGES`] images.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -15,20 +20,36 @@ use std::time::Duration;
 use minijinja::value::{Serde, Value as Template};
 use minijinja::{Environment, State, UndefinedBehavior, context};
 use afterimage_render_typst::{Image, Renderer};
-use afterimage_trmnl::catalog::{Model, Palette};
+use afterimage_trmnl::catalog::{Catalog, Model, Palette};
 use serde_json::{Map, Value, json};
 use tokio::sync::Semaphore;
+use tokio::time::Instant;
 
 use crate::secrets::Secrets;
+use crate::time_zone::TimeZone;
 
 /// How long a data source or image may take.
 const FETCH_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long a whole drawing may take. Firmware 1.8.18 waits 15 seconds for the
+/// check-in's answer (`HTTP_DEFAULT_TIMEOUT_MS`, `http_retry_request.h`), and the
+/// render and the answer come after the fetches.
+const DRAW_TIME: Duration = Duration::from_secs(12);
+/// How long templates may run over one document.
+const RESOLVE_TIME: Duration = Duration::from_secs(2);
 /// Largest data source answer read.
 const SOURCE_BYTES: usize = 2 * 1024 * 1024;
 /// Largest image read.
 const IMAGE_BYTES: usize = 4 * 1024 * 1024;
-/// Template steps one render may take, which bounds loops over large data.
+/// Template steps one template may take, which bounds loops over large data.
 const FUEL: u64 = 200_000;
+/// Components one document may expand to, `each` included.
+pub const MAX_COMPONENTS: usize = 2_000;
+/// Distinct images one document may show.
+pub const MAX_IMAGES: usize = 16;
+/// Elements an `each` without a `limit` draws, the model's largest `limit`.
+const EACH_LIMIT: usize = 100;
+/// Problems reported for one drawing; the rest are counted.
+const MAX_PROBLEMS: usize = 32;
 
 /// The device a screen is drawn for, as templates read it.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -60,14 +81,15 @@ pub struct Drawn {
 }
 
 /// Owns what every drawing shares: the template environment, the HTTP client,
-/// the renderer and a bound on renders at once.
+/// the renderer and a bound on CPU-bound work at once.
 pub struct Drawing {
-    templates: Environment<'static>,
+    templates: Arc<Environment<'static>>,
     http: reqwest::Client,
     renderer: Arc<Renderer>,
-    renders: Semaphore,
+    /// One place per CPU, held while templates resolve and while Typst renders.
+    places: Arc<Semaphore>,
     secrets: Secrets,
-    time_zone: jiff::tz::TimeZone,
+    time_zone: TimeZone,
 }
 
 impl Drawing {
@@ -75,7 +97,7 @@ impl Drawing {
     ///
     /// When even an HTTP client that trusts no certificate cannot be built.
     #[must_use]
-    pub fn new(secrets: Secrets, time_zone: jiff::tz::TimeZone) -> Self {
+    pub fn new(secrets: Secrets, time_zone: TimeZone) -> Self {
         let mut templates = Environment::new();
         minijinja_contrib::add_to_environment(&mut templates);
         templates.set_unknown_method_callback(minijinja_contrib::pycompat::unknown_method_callback);
@@ -92,30 +114,34 @@ impl Drawing {
                 .user_agent(concat!("afterimage/", env!("CARGO_PKG_VERSION")))
         };
         // HTTPS trusts the host's certificate store, so a source behind a private CA
-        // works where the host trusts it. A host with no store, such as a bare
-        // container, still serves devices; its HTTPS sources fail with a
-        // certificate error until it has one.
+        // works where the host trusts it. Loading that store is the only part of
+        // this builder that can fail, as on a bare container without one; such a
+        // host still serves devices, and its HTTPS sources fail with a certificate
+        // error until it has a store and the server restarts.
         let http = builder().build().unwrap_or_else(|error| {
-            tracing::warn!(%error, "HTTPS data sources will fail until this host has CA certificates");
+            tracing::warn!(
+                %error,
+                "HTTPS data sources and images will fail: the host's CA certificates could not be loaded; install them and restart"
+            );
             builder()
                 .tls_certs_only([])
                 .build()
                 .expect("a client that trusts no certificate needs no store")
         });
         Self {
-            templates,
+            templates: Arc::new(templates),
             http,
             renderer: Arc::new(Renderer::new()),
-            renders: Semaphore::new(
+            places: Arc::new(Semaphore::new(
                 std::thread::available_parallelism().map_or(2, std::num::NonZero::get),
-            ),
+            )),
             secrets,
             time_zone,
         }
     }
 
     #[must_use]
-    pub fn time_zone(&self) -> &jiff::tz::TimeZone {
+    pub fn time_zone(&self) -> &TimeZone {
         &self.time_zone
     }
 
@@ -128,19 +154,17 @@ impl Drawing {
         palette: &Palette,
         now: i64,
     ) -> Drawn {
-        let time_zone = self.time_zone.iana_name().unwrap_or("UTC").to_owned();
+        let deadline = Instant::now() + DRAW_TIME;
         #[allow(clippy::cast_precision_loss)]
         let base = context! {
             device => Template::from(Serde(device)),
             __render_time => now as f64,
-            TIMEZONE => time_zone,
+            TIMEZONE => self.time_zone.name(),
         };
-        let mut resolver = Resolver {
-            templates: &self.templates,
-            problems: Vec::new(),
-            images: Vec::new(),
-        };
-        let sources = self.fetch_sources(document, &base, &mut resolver).await;
+        let mut resolver = Resolver::new(Arc::clone(&self.templates));
+        let sources = self
+            .fetch_sources(document, &base, &mut resolver, deadline)
+            .await;
         let data: BTreeMap<&str, Template> = sources
             .iter()
             .map(|(name, answer)| {
@@ -151,24 +175,34 @@ impl Drawing {
             })
             .collect();
         let scope = context! { ..Template::from(Serde(&data)), ..base };
-        let screen = resolver.document(document, &scope);
-        let images = self.fetch_images(&mut resolver).await;
-        let Resolver { problems, .. } = resolver;
+        let (screen, mut resolver) = match self.resolve(resolver, document.clone(), scope).await {
+            Ok(done) => done,
+            Err(message) => {
+                return Drawn {
+                    image: None,
+                    sources,
+                    problems: vec![Problem {
+                        message,
+                        path: None,
+                    }],
+                };
+            }
+        };
+        let images = self.fetch_images(&mut resolver, deadline).await;
+        let mut problems = resolver.finish();
         let image = match self.render(screen, images, model, palette).await {
             Ok(image) => Some(image),
             Err(message) => {
-                let mut problems = problems;
                 problems.push(Problem {
                     message,
                     path: None,
                 });
-                return Drawn {
-                    image: None,
-                    sources,
-                    problems,
-                };
+                None
             }
         };
+        for problem in &mut problems {
+            problem.message = self.secrets.redact(&problem.message);
+        }
         Drawn {
             image,
             sources,
@@ -190,6 +224,27 @@ impl Drawing {
         self.render(resolved, BTreeMap::new(), model, palette).await
     }
 
+    /// Resolves the document's templates. They run over data of any size, so they
+    /// run off the async workers, holding one of the places.
+    async fn resolve(
+        &self,
+        mut resolver: Resolver,
+        document: Value,
+        scope: Template,
+    ) -> Result<(Value, Resolver), String> {
+        let place = Arc::clone(&self.places)
+            .acquire_owned()
+            .await
+            .map_err(|error| error.to_string())?;
+        tokio::task::spawn_blocking(move || {
+            let _place = place;
+            let screen = resolver.document(&document, &scope);
+            (screen, resolver)
+        })
+        .await
+        .map_err(|error| error.to_string())
+    }
+
     async fn render(
         &self,
         resolved: Value,
@@ -197,24 +252,29 @@ impl Drawing {
         model: &Model,
         palette: &Palette,
     ) -> Result<Image, String> {
-        let _place = self
-            .renders
-            .acquire()
+        // The place moves into the blocking task, so it stays held until the render
+        // ends even when the caller stops waiting.
+        let place = Arc::clone(&self.places)
+            .acquire_owned()
             .await
             .map_err(|error| error.to_string())?;
         let renderer = Arc::clone(&self.renderer);
         let (model, palette) = (model.clone(), palette.clone());
-        tokio::task::spawn_blocking(move || renderer.render(&resolved, &images, &model, &palette))
-            .await
-            .map_err(|error| error.to_string())?
-            .map_err(|error| error.to_string())
+        tokio::task::spawn_blocking(move || {
+            let _place = place;
+            renderer.render(&resolved, &images, &model, &palette)
+        })
+        .await
+        .map_err(|error| error.to_string())?
+        .map_err(|error| error.to_string())
     }
 
     async fn fetch_sources(
         &self,
         document: &Value,
         base: &Template,
-        resolver: &mut Resolver<'_>,
+        resolver: &mut Resolver,
+        deadline: Instant,
     ) -> SourceResults {
         let Some(sources) = document.get("sources").and_then(Value::as_object) else {
             return SourceResults::new();
@@ -253,7 +313,12 @@ impl Drawing {
                             ),
                             None => builder,
                         };
-                    requests.spawn(async move { (name, fetch_json(builder).await) });
+                    requests.spawn(async move {
+                        let answer = tokio::time::timeout_at(deadline, fetch_json(builder))
+                            .await
+                            .unwrap_or_else(|_| Err(too_late()));
+                        (name, answer)
+                    });
                 }
                 Err(message) => {
                     requests.spawn(async move { (name, Err(message)) });
@@ -262,12 +327,16 @@ impl Drawing {
         }
         let mut results = SourceResults::new();
         while let Some(joined) = requests.join_next().await {
-            if let Ok((name, answer)) = joined {
-                if let Err(message) = &answer {
-                    resolver.problems.push(Problem {
-                        message: format!("Data source `{name}`: {message}"),
-                        path: Some(format!("/sources/{}", pointer_escape(&name))),
-                    });
+            if let Ok((name, mut answer)) = joined {
+                match &mut answer {
+                    Ok(data) => self.secrets.redact_json(data),
+                    Err(message) => {
+                        *message = self.secrets.redact(message);
+                        resolver.push(Problem {
+                            message: format!("Data source `{name}`: {message}"),
+                            path: Some(format!("/sources/{}", pointer_escape(&name))),
+                        });
+                    }
                 }
                 results.insert(name, answer);
             }
@@ -275,14 +344,32 @@ impl Drawing {
         results
     }
 
-    async fn fetch_images(&self, resolver: &mut Resolver<'_>) -> BTreeMap<String, Vec<u8>> {
-        let mut images = BTreeMap::new();
+    /// Fetches the document's images at once, each by its URL once.
+    async fn fetch_images(
+        &self,
+        resolver: &mut Resolver,
+        deadline: Instant,
+    ) -> BTreeMap<String, Vec<u8>> {
+        let mut fetches = tokio::task::JoinSet::new();
         for (key, url, path) in std::mem::take(&mut resolver.images) {
-            match self.fetch_image(&url).await {
+            let http = self.http.clone();
+            fetches.spawn(async move {
+                let bytes = tokio::time::timeout_at(deadline, fetch_image(&http, &url))
+                    .await
+                    .unwrap_or_else(|_| Err(too_late()));
+                (key, url, path, bytes)
+            });
+        }
+        let mut images = BTreeMap::new();
+        while let Some(joined) = fetches.join_next().await {
+            let Ok((key, url, path, bytes)) = joined else {
+                continue;
+            };
+            match bytes {
                 Ok(bytes) => {
                     images.insert(key, bytes);
                 }
-                Err(message) => resolver.problems.push(Problem {
+                Err(message) => resolver.push(Problem {
                     message: format!("Image {url}: {message}"),
                     path: Some(path),
                 }),
@@ -290,29 +377,70 @@ impl Drawing {
         }
         images
     }
+}
 
-    async fn fetch_image(&self, url: &str) -> Result<Vec<u8>, String> {
-        if url.starts_with("data:") {
-            let data = data_url::DataUrl::process(url).map_err(|error| format!("{error:?}"))?;
-            let (bytes, _) = data.decode_to_vec().map_err(|error| format!("{error:?}"))?;
-            return Ok(bytes);
-        }
-        if !(url.starts_with("https://") || url.starts_with("http://")) {
-            return Err("an image URL starts with http://, https:// or data:".to_owned());
-        }
-        read_limited(self.http.get(url), IMAGE_BYTES).await
+/// The catalogue's model and palette of a display that can be drawn: the model
+/// lists the palette, and the renderer writes the model's format with tokens for
+/// the pair.
+#[must_use]
+pub fn drawable(model: &str, palette: &str) -> Option<(&'static Model, &'static Palette)> {
+    let catalog = Catalog::get();
+    let (model, palette) = (catalog.model(model)?, catalog.palette(palette)?);
+    (catalog.supports(&model.name, &palette.id) && Renderer::supports(model, palette))
+        .then_some((model, palette))
+}
+
+fn too_late() -> String {
+    format!(
+        "gave no answer in time: a screen is drawn within {} seconds",
+        DRAW_TIME.as_secs()
+    )
+}
+
+async fn fetch_image(http: &reqwest::Client, url: &str) -> Result<Vec<u8>, String> {
+    if url.starts_with("data:") {
+        let data = data_url::DataUrl::process(url).map_err(|error| format!("{error:?}"))?;
+        let (bytes, _) = data.decode_to_vec().map_err(|error| format!("{error:?}"))?;
+        return Ok(bytes);
     }
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("an image URL starts with http://, https:// or data:".to_owned());
+    }
+    read_limited(http.get(url), IMAGE_BYTES).await
+}
+
+/// A failed request in words, without its URL: reqwest's own message names the
+/// URL, whose query or path may carry a secret. The causes beneath it (the
+/// connection, the name lookup, TLS) do not.
+fn describe(error: &reqwest::Error) -> String {
+    if error.is_timeout() {
+        return format!("gave no answer within {} seconds", FETCH_TIMEOUT.as_secs());
+    }
+    let mut message = if error.is_connect() {
+        "could not connect".to_owned()
+    } else if error.is_body() || error.is_decode() {
+        "its answer broke off".to_owned()
+    } else {
+        "the request failed".to_owned()
+    };
+    let mut cause = std::error::Error::source(error);
+    while let Some(inner) = cause {
+        message.push_str(": ");
+        message.push_str(&inner.to_string());
+        cause = inner.source();
+    }
+    message
 }
 
 /// Sends the request and reads at most `limit` bytes of a successful answer.
 async fn read_limited(request: reqwest::RequestBuilder, limit: usize) -> Result<Vec<u8>, String> {
-    let mut response = request.send().await.map_err(|error| error.to_string())?;
+    let mut response = request.send().await.map_err(|error| describe(&error))?;
     let status = response.status();
     if !status.is_success() {
         return Err(format!("answered HTTP {status}"));
     }
     let mut bytes = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|error| error.to_string())? {
+    while let Some(chunk) = response.chunk().await.map_err(|error| describe(&error))? {
         if bytes.len() + chunk.len() > limit {
             return Err(format!("answered more than {limit} bytes"));
         }
@@ -343,20 +471,58 @@ fn has_template(text: &str) -> bool {
     text.contains("{{") || text.contains("{%") || text.contains("{#")
 }
 
-/// Resolves a document's templates, collecting problems and the images to fetch.
-struct Resolver<'a> {
-    templates: &'a Environment<'static>,
+/// Resolves a document's templates, collecting problems and the images to fetch,
+/// within the drawing's bounds.
+struct Resolver {
+    templates: Arc<Environment<'static>>,
     problems: Vec<Problem>,
-    /// Key, URL and document path of each image.
+    /// Problems beyond [`MAX_PROBLEMS`], counted.
+    dropped: usize,
+    /// Key, URL and document path of each distinct image.
     images: Vec<(String, String, String)>,
+    components: usize,
+    started: std::time::Instant,
+    /// The document went past a bound and the rest of it was left out.
+    exhausted: bool,
 }
 
-impl Resolver<'_> {
+impl Resolver {
+    fn new(templates: Arc<Environment<'static>>) -> Self {
+        Self {
+            templates,
+            problems: Vec::new(),
+            dropped: 0,
+            images: Vec::new(),
+            components: 0,
+            started: std::time::Instant::now(),
+            exhausted: false,
+        }
+    }
+
+    fn push(&mut self, problem: Problem) {
+        if self.problems.len() < MAX_PROBLEMS {
+            self.problems.push(problem);
+        } else {
+            self.dropped += 1;
+        }
+    }
+
     fn problem(&mut self, path: &str, message: impl Into<String>) {
-        self.problems.push(Problem {
+        self.push(Problem {
             message: message.into(),
             path: Some(path.to_owned()),
         });
+    }
+
+    /// The problems, with a last one counting those left out.
+    fn finish(mut self) -> Vec<Problem> {
+        if self.dropped > 0 {
+            self.problems.push(Problem {
+                message: format!("and {} more problems", self.dropped),
+                path: None,
+            });
+        }
+        self.problems
     }
 
     /// A template's value: its expression's value, or its text.
@@ -396,9 +562,8 @@ impl Resolver<'_> {
     ) -> Result<(reqwest::Method, String), String> {
         let url = self.text(&source["url"], scope, &format!("{path}/url"));
         if !(url.starts_with("https://") || url.starts_with("http://")) {
-            return Err(format!(
-                "the URL `{url}` does not start with http:// or https://"
-            ));
+            // The URL itself stays out of the message: it may hold a secret.
+            return Err("its URL does not start with http:// or https://".to_owned());
         }
         let method = if source.get("method").and_then(Value::as_str) == Some("POST") {
             reqwest::Method::POST
@@ -420,16 +585,31 @@ impl Resolver<'_> {
         Value::Object(resolved)
     }
 
-    /// Replaces the URL at `member` with the key of the image it names.
+    /// Replaces the URL at `member` with the key of the image it names, or with
+    /// nothing when it names none.
     fn take_image(&mut self, object: &mut Value, member: &str, path: &str) {
-        let Some(url) = object
-            .get(member)
-            .and_then(Value::as_str)
-            .map(str::to_owned)
-        else {
-            return;
+        let url = match object.get(member) {
+            None | Some(Value::Null) => return,
+            Some(Value::String(url)) if !url.is_empty() => url.clone(),
+            Some(Value::String(_)) => {
+                object[member] = Value::Null;
+                return;
+            }
+            Some(other) => {
+                self.problem(path, format!("an image URL is text, not {other}"));
+                object[member] = Value::Null;
+                return;
+            }
         };
-        if url.is_empty() {
+        if let Some((key, _, _)) = self.images.iter().find(|(_, known, _)| *known == url) {
+            object[member] = Value::String(key.clone());
+            return;
+        }
+        if self.images.len() == MAX_IMAGES {
+            self.problem(
+                path,
+                format!("a screen shows at most {MAX_IMAGES} different images"),
+            );
             object[member] = Value::Null;
             return;
         }
@@ -472,10 +652,40 @@ impl Resolver<'_> {
         Value::Object(resolved)
     }
 
+    /// Counts a component against the bounds; `false` once the document is past
+    /// them, reported once.
+    fn admit(&mut self, path: &str) -> bool {
+        if self.exhausted {
+            return false;
+        }
+        self.components += 1;
+        if self.components > MAX_COMPONENTS {
+            self.exhausted = true;
+            self.problem(
+                path,
+                format!("the screen expands to more than {MAX_COMPONENTS} components; the rest is left out"),
+            );
+        } else if self.started.elapsed() > RESOLVE_TIME {
+            self.exhausted = true;
+            self.problem(
+                path,
+                format!(
+                    "the screen's templates ran longer than {} seconds; the rest is left out",
+                    RESOLVE_TIME.as_secs()
+                ),
+            );
+        }
+        !self.exhausted
+    }
+
     fn component(&mut self, node: &Value, scope: &Template, path: &str) -> Value {
+        let empty = || json!({ "column": { "children": [] } });
+        if !self.admit(path) {
+            return empty();
+        }
         let Some((kind, value)) = node.as_object().and_then(|object| object.iter().next()) else {
             self.problem(path, "a component is an object with one member");
-            return json!({ "column": { "children": [] } });
+            return empty();
         };
         let here = format!("{path}/{kind}");
         match kind.as_str() {
@@ -514,8 +724,8 @@ impl Resolver<'_> {
         let limit = each
             .get("limit")
             .and_then(Value::as_u64)
-            .map_or(items.len(), |limit| {
-                usize::try_from(limit).unwrap_or(usize::MAX)
+            .map_or(EACH_LIMIT, |limit| {
+                usize::try_from(limit).unwrap_or(EACH_LIMIT)
             });
         let mut children: Vec<Value> = items
             .iter()
@@ -555,17 +765,18 @@ impl Resolver<'_> {
 mod tests {
     use super::*;
 
-    fn resolve(document: &Value, scope: &Template) -> (Value, Vec<Problem>) {
+    fn resolver() -> Resolver {
         let mut templates = Environment::new();
         minijinja_contrib::add_to_environment(&mut templates);
         templates.set_undefined_behavior(UndefinedBehavior::Chainable);
-        let mut resolver = Resolver {
-            templates: &templates,
-            problems: Vec::new(),
-            images: Vec::new(),
-        };
+        templates.set_fuel(Some(FUEL));
+        Resolver::new(Arc::new(templates))
+    }
+
+    fn resolve(document: &Value, scope: &Template) -> (Value, Vec<Problem>) {
+        let mut resolver = resolver();
         let screen = resolver.document(document, scope);
-        (screen, resolver.problems)
+        (screen, resolver.finish())
     }
 
     #[test]
@@ -625,16 +836,87 @@ mod tests {
             "titleBar": { "title": "T", "icon": "https://icons.example.test/a.svg" },
             "content": { "image": { "url": "data:image/png;base64,AA==" } }
         });
-        let mut templates = Environment::new();
-        let mut resolver = Resolver {
-            templates: &mut templates,
-            problems: Vec::new(),
-            images: Vec::new(),
-        };
+        let mut resolver = resolver();
         let screen = resolver.document(&document, &context! {});
         assert_eq!(screen["titleBar"]["icon"], "image-0");
         assert_eq!(screen["content"]["image"]["url"], "image-1");
         assert_eq!(resolver.images[1].1, "data:image/png;base64,AA==");
+    }
+
+    #[test]
+    fn an_image_named_twice_is_fetched_once_and_a_missing_one_is_none() {
+        let scope = context! { photos => Template::from(Serde(json!([
+            { "url": "https://photos.example.test/a.png" },
+            { "url": "https://photos.example.test/a.png" },
+            { "url": null },
+            { "url": 7 }
+        ]))) };
+        let document = json!({ "content": { "each": {
+            "items": "{{ photos }}",
+            "content": { "image": { "url": "{{ item.url }}" } }
+        } } });
+        let mut resolver = resolver();
+        let screen = resolver.document(&document, &scope);
+        let children = &screen["content"]["column"]["children"];
+        assert_eq!(children[0]["image"]["url"], "image-0");
+        assert_eq!(children[1]["image"]["url"], "image-0");
+        assert_eq!(children[2]["image"]["url"], Value::Null);
+        assert_eq!(children[3]["image"]["url"], Value::Null);
+        assert_eq!(resolver.images.len(), 1);
+        let problems = resolver.finish();
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert_eq!(
+            problems[0].path.as_deref(),
+            Some("/content/each/content/image/url")
+        );
+    }
+
+    #[test]
+    fn an_each_without_a_limit_draws_at_most_a_hundred() {
+        let document = json!({ "content": { "each": {
+            "items": "{{ range(150) | list }}",
+            "more": "and {{ hidden }} more",
+            "content": { "label": { "text": "{{ item }}" } }
+        } } });
+        let (resolved, problems) = resolve(&document, &context! {});
+        assert_eq!(problems, []);
+        let children = resolved["content"]["column"]["children"]
+            .as_array()
+            .unwrap();
+        assert_eq!(children.len(), EACH_LIMIT + 1);
+        assert_eq!(children[EACH_LIMIT]["label"]["text"], "and 50 more");
+    }
+
+    #[test]
+    fn a_document_stops_expanding_past_its_bound() {
+        // A hundred times a hundred labels: five times the bound.
+        let document = json!({ "content": { "each": {
+            "items": "{{ range(100) | list }}",
+            "content": { "each": {
+                "items": "{{ range(100) | list }}",
+                "content": { "label": { "text": "{{ item }}" } }
+            } }
+        } } });
+        let (_, problems) = resolve(&document, &context! {});
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].message.contains("more than 2000 components"),
+            "{problems:?}"
+        );
+    }
+
+    #[test]
+    fn problems_past_the_bound_are_counted() {
+        let document = json!({ "content": { "each": {
+            "items": "{{ range(50) | list }}",
+            "content": { "value": { "text": "{{ 1 + }}" } }
+        } } });
+        let (_, problems) = resolve(&document, &context! {});
+        assert_eq!(problems.len(), MAX_PROBLEMS + 1);
+        assert_eq!(
+            problems[MAX_PROBLEMS].message,
+            format!("and {} more problems", 50 - MAX_PROBLEMS)
+        );
     }
 
     #[test]
