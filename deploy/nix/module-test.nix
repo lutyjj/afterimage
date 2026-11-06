@@ -18,7 +18,8 @@ testers.runNixOSTest {
       package = afterimage;
       settings = {
         AFTERIMAGE_URL = "http://machine";
-        # The VM has no internet; TRMNL's firmware list fails at once here.
+        # The VM has no internet: TRMNL's firmware list is read from a closed
+        # port, so that no request tries to leave it.
         AFTERIMAGE_TRMNL_URL = "http://127.0.0.1:9";
       };
     };

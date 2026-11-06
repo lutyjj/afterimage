@@ -45,8 +45,8 @@ structure DeviceFirmware {
     @required
     boardChosen: Boolean
 
-    /// The board's newest release; absent without a board, or while TRMNL's list
-    /// cannot be read.
+    /// The board's newest release; absent without a board, or until the server
+    /// has read TRMNL's list, which a device read never waits for.
     latestVersion: FirmwareVersion
 
     /// Whether `latestVersion` is newer than the release the device reports, or
@@ -82,8 +82,9 @@ enum FirmwareUpdateState {
     /// Waiting for the device's next check-in.
     REQUESTED = "requested"
 
-    /// The device has the request and has not checked in since. Both firmware
-    /// lines restart and check in as soon as they have tried to install it.
+    /// The device has the request and has not checked in since. Firmware 1.8
+    /// restarts and checks in once the release is installed, and otherwise at its
+    /// next wake; firmware 1.6 restarts and checks in after any attempt.
     SENT = "sent"
 
     /// The device checked in reporting `version`.

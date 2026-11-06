@@ -29,7 +29,7 @@ pub use updates::{State, Update};
 
 use cache::Cache;
 use releases::Releases;
-use updates::{Delivery, Updates};
+use updates::{Delivery, Recorded, Updates};
 
 /// How long a flash image download may take.
 const IMAGE_TIMEOUT: Duration = Duration::from_secs(120);
@@ -51,6 +51,8 @@ pub enum InstallError {
     NoRelease(String),
     #[error("This device's board changed while its firmware was fetched. Install again.")]
     BoardChanged,
+    #[error("This device was removed while its firmware was fetched.")]
+    DeviceGone,
     #[error("TRMNL's firmware list could not be read: it {0}.")]
     List(String),
     #[error("TRMNL's image of {version} for {board}: {reason}.")]
@@ -103,6 +105,13 @@ impl Firmware {
     /// Why TRMNL's list could not be read, when it never was.
     pub async fn boards(&self) -> Result<Arc<[Board]>, String> {
         self.releases.boards().await
+    }
+
+    /// TRMNL's boards as far as the server has read them, without waiting for
+    /// TRMNL; see [`Releases::on_hand`].
+    #[must_use]
+    pub fn boards_on_hand(&self) -> Option<Arc<[Board]>> {
+        self.releases.on_hand()
     }
 
     /// The board the device installs firmware for: the one a user chose, or else
@@ -158,9 +167,14 @@ impl Firmware {
             .updates
             .request(device.id, &board.name, &release.version, &image)
             .await?;
-        if !recorded {
+        let refused = match recorded {
+            Recorded::Yes => None,
+            Recorded::BoardChanged => Some(InstallError::BoardChanged),
+            Recorded::DeviceGone => Some(InstallError::DeviceGone),
+        };
+        if let Some(refused) = refused {
             self.prune().await;
-            return Err(InstallError::BoardChanged);
+            return Err(refused);
         }
         tracing::info!(
             device = device.id,

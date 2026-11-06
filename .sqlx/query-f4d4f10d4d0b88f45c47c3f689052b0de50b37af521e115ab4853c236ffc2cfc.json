@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT devices.id, devices.account_id FROM devices\n             JOIN registrations ON registrations.id = devices.registration_id\n             WHERE registrations.mac = ? ORDER BY devices.id LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "devices",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "account_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "devices",
+            "name": "account_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "f4d4f10d4d0b88f45c47c3f689052b0de50b37af521e115ab4853c236ffc2cfc"
+}

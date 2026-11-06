@@ -77,8 +77,8 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
           </ol>
           {update.state === "sent" && (
             <p className="hint">
-              The display has the request. It installs {update.version}, restarts and checks in again, which
-              shows whether the new release runs.
+              The display has the request and installs {update.version}. Its next check-in shows whether it runs
+              the new release.
             </p>
           )}
           {update.state === "not_installed" && (

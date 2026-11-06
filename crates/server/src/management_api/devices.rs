@@ -9,13 +9,12 @@ use super::{Caller, Shared, State, internal, wire};
 use crate::devices::{self, Changes, Claim, Device};
 
 /// The device as the API shows it, with what TRMNL's firmware list says of its
-/// board. A list that cannot be read leaves that out.
-pub(super) async fn shown(
+/// board as far as the server has read it: a device page never waits for TRMNL.
+pub(super) fn shown(
     state: &State,
     device: Device,
 ) -> Result<model::Device, error::InternalFailure> {
-    let boards = state.firmware.boards().await.ok();
-    wire::device(device, boards.as_deref())
+    wire::device(device, state.firmware.boards_on_hand().as_deref())
 }
 
 pub(super) fn not_found() -> error::NotFound {
@@ -51,7 +50,7 @@ pub async fn list_devices(
         .list(caller.account.id)
         .await
         .map_err(|error| internal(&error))?;
-    let boards = state.firmware.boards().await.ok();
+    let boards = state.firmware.boards_on_hand();
     Ok(output::ListDevicesOutput {
         devices: devices
             .into_iter()
@@ -86,7 +85,7 @@ pub async fn claim_device(
     };
     tracing::info!(device = device.id, replaced, "device claimed");
     Ok(output::ClaimDeviceOutput {
-        device: shown(&state, device).await?,
+        device: shown(&state, device)?,
         replaced,
     })
 }
@@ -103,7 +102,7 @@ pub async fn get_device(
         .map_err(|error| internal(&error))?
         .ok_or_else(not_found)?;
     Ok(output::GetDeviceOutput {
-        device: shown(&state, device).await?,
+        device: shown(&state, device)?,
     })
 }
 
@@ -148,7 +147,7 @@ pub async fn update_device(
         state.firmware.forget_unused().await;
     }
     Ok(output::UpdateDeviceOutput {
-        device: shown(&state, device).await?,
+        device: shown(&state, device)?,
     })
 }
 
@@ -175,7 +174,7 @@ pub async fn set_playlist(
         Err(error) => return Err(internal(&error).into()),
     };
     Ok(output::SetPlaylistOutput {
-        device: shown(&state, device).await?,
+        device: shown(&state, device)?,
     })
 }
 

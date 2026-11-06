@@ -2,12 +2,12 @@
 //!
 //! A request waits for the device's next check-in, whose answer carries it once;
 //! the check-in after that decides it by the version the device reports. Both
-//! firmware lines act on such an answer and restart at once: 1.8 after it
-//! installed the image, or after a failure it records so as to try again only a
-//! day later (`otaAttemptDue` in `lib/trmnl/src/ota_schedule.cpp`); 1.6 after
-//! any attempt, installed or not (`bl_init` in `src/bl.cpp`). 1.6 has no such
-//! pause, so a request sent at every check-in would restart a failing device
-//! over and over.
+//! firmware lines act on such an answer. 1.8 restarts into the image once it is
+//! installed (`bl_init` in `src/bl.cpp`); after a failure it checks in at its next
+//! wake and tries again only a day later (`otaAttemptDue` in
+//! `lib/trmnl/src/ota_schedule.cpp`). 1.6 restarts after any attempt, installed
+//! or not (`bl_init` in `src/bl.cpp`), and has no such pause, so a request sent
+//! at every check-in would restart a failing device over and over.
 
 use std::sync::Arc;
 
@@ -49,6 +49,15 @@ impl Update {
     }
 }
 
+/// Whether a request was recorded.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Recorded {
+    Yes,
+    /// The device's board is no longer the one the request is for.
+    BoardChanged,
+    DeviceGone,
+}
+
 /// What a check-in's answer says about firmware.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Delivery {
@@ -77,9 +86,9 @@ impl Updates {
 
     /// Records a request, replacing the device's last one, when `board` is
     /// still the device's: the one a user chose, or with none chosen the one
-    /// named like its firmware's model. `false` when the board changed since the
-    /// caller read it, so that no request for another board's image survives a
-    /// board change.
+    /// named like its firmware's model. Nothing is recorded when the board
+    /// changed since the caller read it, so that no request for another board's
+    /// image survives a board change, or when the device is gone.
     ///
     /// # Errors
     ///
@@ -90,23 +99,26 @@ impl Updates {
         board: &str,
         version: &str,
         image: &str,
-    ) -> Result<bool, sqlx::Error> {
+    ) -> Result<Recorded, sqlx::Error> {
         let now = self.clock.now();
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
-        let still = sqlx::query_scalar!(
-            "SELECT devices.id FROM devices
+        let Some(current) = sqlx::query!(
+            "SELECT devices.firmware_board, registrations.model FROM devices
              JOIN registrations ON registrations.id = devices.registration_id
-             WHERE devices.id = ?
-               AND (devices.firmware_board = ?
-                    OR (devices.firmware_board IS NULL AND registrations.model = ?))",
-            device_id,
-            board,
-            board
+             WHERE devices.id = ?",
+            device_id
         )
         .fetch_optional(&mut *tx)
-        .await?;
-        if still.is_none() {
-            return Ok(false);
+        .await?
+        else {
+            return Ok(Recorded::DeviceGone);
+        };
+        let still = match &current.firmware_board {
+            Some(chosen) => chosen == board,
+            None => current.model == board,
+        };
+        if !still {
+            return Ok(Recorded::BoardChanged);
         }
         sqlx::query!(
             "INSERT OR REPLACE INTO firmware_updates (device_id, board, version, image, requested_at)
@@ -120,7 +132,7 @@ impl Updates {
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;
-        Ok(true)
+        Ok(Recorded::Yes)
     }
 
     /// Forgets the device's request, whatever its state.

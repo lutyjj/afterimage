@@ -234,12 +234,7 @@ impl Releases {
         };
         if let Some(boards) = boards {
             if due {
-                let releases = Arc::clone(self);
-                tokio::spawn(async move {
-                    if let Ok(_fetching) = releases.fetching.try_lock() {
-                        releases.refresh().await;
-                    }
-                });
+                self.refresh_behind();
             }
             return Ok(boards);
         }
@@ -253,6 +248,34 @@ impl Releases {
             (None, Some((_, failure))) => Err(failure.clone()),
             (None, None) => Err("has not answered yet".to_owned()),
         }
+    }
+
+    /// The list on hand, without waiting: one that is missing or old is fetched
+    /// behind the answer. For readers that can do without it, such as a device
+    /// page, whose firmware facts wait for the list.
+    #[must_use]
+    pub fn on_hand(self: &Arc<Self>) -> Option<Arc<[Board]>> {
+        let (boards, due) = {
+            let cached = self.lock();
+            (
+                cached.boards.as_ref().map(|(boards, _)| Arc::clone(boards)),
+                cached.due(self.clock.now()),
+            )
+        };
+        if due {
+            self.refresh_behind();
+        }
+        boards
+    }
+
+    /// Starts a fetch unless one is running.
+    fn refresh_behind(self: &Arc<Self>) {
+        let releases = Arc::clone(self);
+        tokio::spawn(async move {
+            if let Ok(_fetching) = releases.fetching.try_lock() {
+                releases.refresh().await;
+            }
+        });
     }
 
     /// Fetches the list when a fetch is still due. The caller holds `fetching`.

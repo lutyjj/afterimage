@@ -111,10 +111,18 @@ fn publish(server: &Server) -> Vec<u8> {
     app
 }
 
+/// Waits for the server to read TRMNL's list, as the web UI's firmware section
+/// does; a device read only starts that.
+async fn read_boards(server: &Server) {
+    let (status, body) = server.call("GET", "/manage/firmware-boards", None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+}
+
 /// A claimed kit on firmware 1.6.10 with its board chosen; returns its id and
 /// key.
 async fn kit(server: &Server) -> (i64, String) {
     server.sign_up().await;
+    read_boards(server).await;
     let (device, key) = server.claim(&mac(1)).await;
     let id = device["id"].as_i64().unwrap();
     server
@@ -173,6 +181,7 @@ async fn a_board_comes_from_a_choice_or_from_the_model_the_firmware_reports() {
     let server = start().await;
     publish(&server);
     server.sign_up().await;
+    read_boards(&server).await;
     let (device, key) = server.claim(&mac(1)).await;
     let id = device["id"].as_i64().unwrap();
     assert_eq!(
@@ -549,6 +558,7 @@ async fn a_variant_is_installed_when_the_device_reports_the_version_it_varies() 
     let server = start().await;
     publish(&server);
     server.sign_up().await;
+    read_boards(&server).await;
     let (device, key) = server.claim(&mac(1)).await;
     let id = device["id"].as_i64().unwrap();
     server
@@ -602,6 +612,61 @@ async fn without_trmnls_list_there_is_no_board_to_choose() {
         device["firmware"],
         json!({ "boardChosen": false, "updateAvailable": false })
     );
+}
+
+/// A server that never read TRMNL's list shows its devices at once.
+#[tokio::test]
+async fn device_reads_answer_before_trmnl_ever_has() {
+    let server = start().await;
+    server.trmnl.set_list(None);
+    server.trmnl.delay_list(Duration::from_secs(60));
+    server.sign_up().await;
+    let (device, _) = tokio::time::timeout(Duration::from_secs(5), server.claim(&mac(1)))
+        .await
+        .expect("the claim answered while TRMNL was slow");
+    assert_eq!(device["firmware"]["boardChosen"], false);
+    for _ in 0..2 {
+        let read = tokio::time::timeout(
+            Duration::from_secs(5),
+            server.call("GET", "/manage/devices", None),
+        )
+        .await
+        .expect("the devices answered while TRMNL was slow");
+        assert_eq!(read.0, StatusCode::OK);
+        server.clock.advance(10 * 60);
+    }
+}
+
+/// A device removed while its firmware downloads is missing, not a conflict.
+#[tokio::test]
+async fn an_install_for_a_device_removed_meanwhile_finds_no_device() {
+    let server = start().await;
+    publish(&server);
+    let (id, _) = kit(&server).await;
+    let hold = server.trmnl.hold_flash().await;
+    let http = server.http.clone();
+    let url = format!("{}/manage/devices/{id}/firmware-update", server.url);
+    let installing = tokio::spawn(async move {
+        http.post(url)
+            .header("Content-Type", "application/json")
+            .body("{}")
+            .send()
+            .await
+            .unwrap()
+            .status()
+    });
+    until(
+        || server.trmnl.flash_requests.load(Ordering::SeqCst) == 1,
+        "the install never asked TRMNL for its image",
+    )
+    .await;
+    let (status, _) = server
+        .call("DELETE", &format!("/manage/devices/{id}"), None)
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    drop(hold);
+    assert_eq!(installing.await.unwrap(), StatusCode::NOT_FOUND);
+    assert!(cached(&server).is_empty(), "its image does not stay");
 }
 
 #[tokio::test]

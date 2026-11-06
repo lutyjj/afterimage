@@ -70,6 +70,7 @@ pub async fn install_firmware(
             }
             .into());
         }
+        Err(InstallError::DeviceGone) => return Err(not_found().into()),
         Err(error @ (InstallError::List(_) | InstallError::Image { .. })) => {
             tracing::warn!(%error, device = id, "firmware not installed");
             return Err(error::UpstreamFailure {
@@ -88,7 +89,7 @@ pub async fn install_firmware(
         .map_err(|error| internal(&error))?
         .ok_or_else(not_found)?;
     Ok(output::InstallFirmwareOutput {
-        device: shown(&state, device).await?,
+        device: shown(&state, device)?,
     })
 }
 
@@ -118,6 +119,6 @@ pub async fn cancel_firmware_update(
         .map_err(|error| internal(&error))?
         .ok_or_else(not_found)?;
     Ok(output::CancelFirmwareUpdateOutput {
-        device: shown(&state, device).await?,
+        device: shown(&state, device)?,
     })
 }
