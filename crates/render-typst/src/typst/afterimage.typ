@@ -340,6 +340,31 @@
   }
 }
 
+// A container's surface: inverse turns it to light content on the canvas's
+// inverse with every paint inside inverted, as TRMNL's `.inverse` does; padding
+// and rounded corners are TRMNL's spacing and rounding. `body` draws the content
+// with the tokens of the surface.
+#let surface(t, v, bounds, body) = {
+  let inverse = v.at("inverse", default: false)
+  let padding = gap(t, v.at("padding", default: "none"))
+  let rounded = v.at("rounded", default: "none")
+  let radius = if rounded == "none" { 0pt } else if rounded == "base" { px(t, "--rounded", default: 10) } else { px(t, "--rounded-" + rounded, default: 10) }
+  if not inverse and padding == 0pt and radius == 0pt { return body(t) }
+  let t = if inverse { (..t, "@inverse": true) } else { t }
+  let canvas = paint(t, "canvas")
+  block(
+    width: if bounds.w { 100% } else { auto },
+    height: if bounds.h { 100% } else { auto },
+    fill: if inverse and "color" in canvas { rgb(canvas.color) } else { none },
+    inset: padding,
+    radius: radius,
+    {
+      set text(fill: ink(t))
+      body(t)
+    },
+  )
+}
+
 #let item(t, v, bounds, draw) = {
   let emphasis = int(v.at("emphasis", default: 1))
   let meta = fill-of(t, paint(t, if emphasis == 1 { "item-meta" } else { "item-meta-emphasis-" + str(emphasis) }))
@@ -357,6 +382,164 @@
   )
 }
 
+// The alignment of a `TextAlign`.
+#let across(align) = if align == "center" { center } else if align == "end" { right } else { left }
+
+// A line height that is a ratio of its font size; a value the tokens lack falls
+// back to 1.2.
+#let leading-of(t, component, size) = {
+  let ratio = sized(t, component, size, "-line-height")
+  if ratio == none or ratio <= 0 { 1.2 } else { ratio }
+}
+
+// TRMNL's table: rows as tall as the size's row height or their tallest cell,
+// cells centred down the row, a rule under the heading row and between body
+// rows, and columns sharing a fixed width in proportion to their widest text,
+// as the browser's table layout shares it. Small tables set their headings as
+// small titles and their cells as small labels.
+#let table-of(t, v, bounds) = {
+  let size = v.at("size", default: "base")
+  let small = size in ("xsmall", "small")
+  let infix = if size == "base" { "" } else { "-" + size }
+  let head-face = typeface(t, "--title", if small { "small" } else { "base" })
+  let head-leading = leading-of(t, "--title", if small { "small" } else { "base" })
+  let cell-face = typeface(t, "--label", if small { "small" } else { "base" })
+  let cell-leading = leading-of(t, "--label", if small { "small" } else { "base" })
+  let head-height = px(t, "--table" + infix + "-thead-height", default: 36)
+  let row-height = px(t, "--table" + infix + "-tbody-height", default: 46)
+  let columns = v.at("columns", default: ())
+  let rows = v.at("rows", default: ())
+  let more = v.at("more", default: none)
+  let indexed = v.at("indexed", default: false)
+  let meta-width = px(t, "--item-meta-width", default: 10)
+  // The index bar and the space after it, before the first column.
+  let lead = if indexed { meta-width + px(t, "--gap-small", default: 7) } else { 0pt }
+  layout(region => {
+    let widest(index) = {
+      let heading = measure(text(..head-face, shown(columns.at(index).heading))).width
+      calc.max(heading, ..rows.map(row => measure(text(..cell-face, shown(row.at(index, default: none)))).width), 1pt)
+    }
+    let widths = range(columns.len()).map(widest)
+    let tracks = if bounds.w { widths.map(width => width / 1pt * 1fr) } else { widths }
+    let row-of(height, cells, rule-name, start) = block(width: if bounds.w { 100% } else { auto }, breakable: false, {
+      grid(
+        columns: (lead,) + tracks,
+        align: horizon,
+        box(height: height, width: lead, start),
+        ..cells,
+      )
+      if rule-name != none { place(bottom + left, rule(t, rule-name)) }
+    })
+    let cell(face, leading, value, column) = align(across(column.at("align", default: "start")),
+      clamped(face, leading, shown(value), column.at("clamp", default: 1)))
+    let headings = columns.map(column => cell(head-face, head-leading, column.heading, column))
+    stack(
+      row-of(head-height, headings, "table-head-rule", []),
+      ..rows.enumerate().map(((at, row)) => {
+        let last = at == rows.len() - 1 and more == none
+        let meta = paint(t, "table-meta")
+        let index-ink = rgb(paint(t, "table-index").at("ink", default: "#000000"))
+        let start = if not indexed { [] } else {
+          place(left + top, dy: 4pt, rect(width: meta-width, height: row-height - 8pt, radius: 3pt, fill: fill-of(t, meta), stroke: none))
+          place(left + horizon, dx: meta-width / 2, box(width: 0pt, align(center, haloed(t, text(..typeface(t, "--item-index", "base"), fill: index-ink, str(at + 1))))))
+        }
+        row-of(row-height, columns.enumerate().map(((index, column)) => cell(cell-face, cell-leading, row.at(index, default: none), column)), if last { none } else { "table-body-rule" }, start)
+      }),
+      ..if more == none { () } else {
+        (block(height: if small { px(t, "--table-xsmall-tbody-height", default: 22) } else { px(t, "--table-small-tbody-height", default: 31) },
+          align(horizon, pad(left: lead, text(..typeface(t, "--label", "small"), shown(more))))),)
+      },
+    )
+  })
+}
+
+// TRMNL's progress bar: the label and figure on one line, then a track with a
+// one-pixel border whose fill reaches `value` of `max`. It fills what its parent
+// fixes, or is 320 pixels wide.
+#let progress-bar(t, v, bounds) = {
+  let size = v.at("size", default: "base")
+  let small = size in ("xsmall", "small")
+  let infix = if size == "base" { "" } else { "-" + size }
+  let height = px(t, "--progress-bar-height" + infix, default: 24)
+  let radius = px(t, "--progress-bar-radius", default: 10)
+  let value = number(v.at("value", default: none))
+  let maximum = number(v.at("max", default: 100))
+  let share = if value == none or maximum == none or maximum <= 0 { 0 } else { calc.clamp(value / maximum, 0, 1) }
+  let emphasis = int(v.at("emphasis", default: 1))
+  let track = paint(t, "progress-track")
+  let fill = paint(t, if emphasis == 1 { "progress-fill" } else { "progress-fill-emphasis-" + str(emphasis) })
+  let label = v.at("label", default: none)
+  let figure = v.at("figure", default: none)
+  block(width: if bounds.w { 100% } else { 320pt }, breakable: false, {
+    if label != none or figure != none {
+      grid(
+        columns: (1fr, auto),
+        align: (left + bottom, right + bottom),
+        text(..typeface(t, "--label", if small { "small" } else { "base" }), shown(label)),
+        text(..typeface(t, "--value", "xxsmall"), shown(figure)),
+      )
+      std.v(px(t, "--gap-xsmall", default: 5), weak: false)
+    }
+    block(width: 100%, height: height, radius: radius, inset: 1pt, fill: rgb(track.at("border", default: "#000000")),
+      block(width: 100%, height: 100%, radius: calc.max(radius - 1pt, 0pt), clip: true, fill: fill-of(t, track),
+        block(width: share * 100%, height: 100%, fill: fill-of(t, fill))))
+  })
+}
+
+// TRMNL's progress dots: `count` round dots with a one-pixel border, the first
+// `value` filled and, where `current`, the next marked as the step under way.
+#let progress-dots(t, v) = {
+  let size = v.at("size", default: "base")
+  let infix = if size == "base" { "" } else { "-" + size }
+  let diameter = px(t, "--progress-dot-size" + infix, default: 16)
+  let whole(value) = { let n = number(value); if n == none { 0 } else { int(calc.max(n, 0)) } }
+  let count = calc.min(whole(v.at("count", default: 0)), 64)
+  let filled = calc.min(whole(v.at("value", default: 0)), count)
+  let current = v.at("current", default: false)
+  stack(dir: ltr, spacing: px(t, "--gap-small", default: 7), ..range(count).map(at => {
+    let name = if at < filled { "progress-dot-filled" } else if current and at == filled { "progress-dot-current" } else { "progress-dot" }
+    let dot = paint(t, name)
+    box(width: diameter, height: diameter, radius: 50%, inset: 1pt, fill: rgb(dot.at("border", default: "#000000")),
+      box(width: 100%, height: 100%, radius: 50%, fill: fill-of(t, dot)))
+  }))
+}
+
+// TRMNL's rich text: the blocks the renderer read from the Markdown, in the
+// size's typeface, at most `--richtext-content-max-width` wide and as wide as its
+// longest line, placed and aligned by `align`.
+#let rich-text(t, v, bounds) = {
+  let size = v.at("size", default: "base")
+  let face = typeface(t, "--richtext", size)
+  let leading = leading-of(t, "--richtext", size)
+  let spacing = gap(t, v.at("gap", default: "medium"))
+  let horizontal = across(v.at("align", default: "start"))
+  let runs(items) = items.map(run => if run.at("break", default: false) { linebreak() } else {
+    text(
+      weight: if run.at("strong", default: false) { "bold" } else { face.weight },
+      style: if run.at("emphasis", default: false) { "italic" } else { "normal" },
+      run.text,
+    )
+  }).join()
+  let blocks(items) = items.map(item => if "paragraph" in item { par(runs(item.paragraph)) } else {
+    let list-of = item.list
+    let entries = list-of.items.map(entry => blocks(entry))
+    if "start" in list-of { enum(start: list-of.start, tight: true, ..entries) } else { list(tight: true, ..entries) }
+  }).join()
+  let body = {
+    set text(..face)
+    set par(leading: (leading - 1) * face.size, spacing: spacing, justify: false)
+    set list(spacing: spacing)
+    set enum(spacing: spacing)
+    set align(horizontal)
+    blocks(v.at("blocks", default: ()))
+  }
+  layout(region => {
+    let limit = calc.min(region.width, px(t, "--richtext-content-max-width", default: 640))
+    let width = measure(body, width: limit).width
+    block(width: if bounds.w { 100% } else { auto }, align(horizontal, block(width: width, body)))
+  })
+}
+
 // The bytes of the image a resolved `url` names, or `none`.
 #let image-of(images, key) = if type(key) == str { images.at(key, default: none) } else { none }
 
@@ -364,7 +547,7 @@
   let kind = n.keys().first()
   let v = n.at(kind)
   if kind == "column" or kind == "row" {
-    stack-of(t, v, kind, bounds, (child, bounds) => node(t, images, grays, child, direction: kind, bounds: bounds))
+    surface(t, v, bounds, t => stack-of(t, v, kind, bounds, (child, bounds) => node(t, images, grays, child, direction: kind, bounds: bounds)))
   } else if kind == "grid" {
     // Equal columns across a fixed width; rows as tall as their cells.
     let columns = int(v.columns)
@@ -375,7 +558,7 @@
       ..v.cells.map(cell => grid.cell(colspan: calc.min(int(cell.at("span", default: 1)), columns), node(t, images, grays, cell.content, bounds: cells)))
     )
   } else if kind == "item" {
-    item(t, v, bounds, (child, bounds) => node(t, images, grays, child, bounds: bounds))
+    surface(t, v, bounds, t => item(t, v, bounds, (child, bounds) => node(t, images, grays, child, bounds: bounds)))
   } else if kind == "title" {
     text-component(t, "--title", v)
   } else if kind == "description" {
@@ -400,6 +583,14 @@
     chart(t, v, "line", bounds)
   } else if kind == "barChart" {
     chart(t, v, "bar", bounds)
+  } else if kind == "table" {
+    table-of(t, v, bounds)
+  } else if kind == "progressBar" {
+    progress-bar(t, v, bounds)
+  } else if kind == "progressDots" {
+    progress-dots(t, v)
+  } else if kind == "richText" {
+    rich-text(t, v, bounds)
   } else {
     text(..typeface(t, "--label", "small"), "Unknown component " + kind)
   }

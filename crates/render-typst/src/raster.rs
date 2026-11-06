@@ -64,19 +64,65 @@ fn opaque(pixmap: &Pixmap) -> Vec<[u8; 3]> {
 /// and are unaffected.
 const INK_LUMA: u32 = 192;
 
-/// The index of the palette color for `pixel`: on a two-color palette, the darker
-/// color for ink and the lighter one otherwise; on any other, the nearest color.
-fn nearest(palette: &[[u8; 3]], pixel: [u8; 3]) -> u8 {
-    let luma =
-        |[r, g, b]: [u8; 3]| (299 * u32::from(r) + 587 * u32::from(g) + 114 * u32::from(b)) / 1000;
-    if let [first, second] = palette {
-        let dark = u8::from(luma(*first) > luma(*second));
-        return if luma(pixel) < INK_LUMA {
-            dark
-        } else {
-            1 - dark
-        };
+/// Luminance below which a pixel is ink where it lies on a dark surface, such as
+/// an inverse element: there the thin strokes are light, so a half-covered
+/// pixel stays paper. It is the mirror of `INK_LUMA`.
+const SURFACE_INK_LUMA: u32 = 255 - INK_LUMA;
+
+/// How far around a pixel its surface is judged: a square of this radius, wider
+/// than the strokes of text.
+const SURFACE_RADIUS: usize = 3;
+
+fn luma([r, g, b]: [u8; 3]) -> u32 {
+    (299 * u32::from(r) + 587 * u32::from(g) + 114 * u32::from(b)) / 1000
+}
+
+/// For a two-color palette, whether each pixel is ink: darker than `INK_LUMA`,
+/// or than `SURFACE_INK_LUMA` where more of its surroundings are dark than light
+/// (light content on a dark surface). Grays between count as neither, so a gray
+/// area stays ink as before.
+fn ink(pixels: &[[u8; 3]], width: usize, height: usize) -> Vec<bool> {
+    let lumas: Vec<u32> = pixels.iter().copied().map(luma).collect();
+    // Counts of dark and light pixels above and left of each corner, so a
+    // square's counts take four lookups.
+    let stride = width + 1;
+    let mut dark = vec![0u32; stride * (height + 1)];
+    let mut light = vec![0u32; stride * (height + 1)];
+    for y in 0..height {
+        for x in 0..width {
+            let value = lumas[y * width + x];
+            let (at, up, left, corner) = (
+                (y + 1) * stride + x + 1,
+                y * stride + x + 1,
+                (y + 1) * stride + x,
+                y * stride + x,
+            );
+            dark[at] = u32::from(value < SURFACE_INK_LUMA) + dark[up] + dark[left] - dark[corner];
+            light[at] = u32::from(value >= INK_LUMA) + light[up] + light[left] - light[corner];
+        }
     }
+    let count = |table: &[u32], (x0, y0, x1, y1): (usize, usize, usize, usize)| {
+        table[y1 * stride + x1] + table[y0 * stride + x0]
+            - table[y0 * stride + x1]
+            - table[y1 * stride + x0]
+    };
+    (0..width * height)
+        .map(|at| {
+            let (x, y) = (at % width, at / width);
+            let square = (
+                x.saturating_sub(SURFACE_RADIUS),
+                y.saturating_sub(SURFACE_RADIUS),
+                (x + SURFACE_RADIUS + 1).min(width),
+                (y + SURFACE_RADIUS + 1).min(height),
+            );
+            let on_dark = count(&dark, square) > count(&light, square);
+            lumas[at] < if on_dark { SURFACE_INK_LUMA } else { INK_LUMA }
+        })
+        .collect()
+}
+
+/// The index of the nearest palette color for `pixel`.
+fn nearest(palette: &[[u8; 3]], pixel: [u8; 3]) -> u8 {
     let distance = |color: &[u8; 3]| {
         color
             .iter()
@@ -122,9 +168,28 @@ pub fn encode(
     let per_byte = 8 / usize::from(bits);
     let row_bytes = (width as usize).div_ceil(per_byte);
     let mut data = vec![0u8; row_bytes * height as usize];
+    // On a two-color palette, the darker color for ink and the lighter one
+    // otherwise; on any other, the nearest color.
+    let two_color = if let [first, second] = palette {
+        Some((
+            u8::from(luma(*first) > luma(*second)),
+            ink(&pixels, width as usize, height as usize),
+        ))
+    } else {
+        None
+    };
     for (y, row) in pixels.chunks(width as usize).enumerate() {
         for (x, pixel) in row.iter().enumerate() {
-            let index = nearest(palette, *pixel);
+            let index = match &two_color {
+                Some((dark, ink)) => {
+                    if ink[y * width as usize + x] {
+                        *dark
+                    } else {
+                        1 - dark
+                    }
+                }
+                None => nearest(palette, *pixel),
+            };
             let shift = 8 - usize::from(bits) * (x % per_byte + 1);
             data[y * row_bytes + x / per_byte] |= index << shift;
         }
@@ -176,6 +241,38 @@ mod tests {
         let bytes = encode(&pixmap(3, 1, &[128, 180, 200]), 0, Some(&palette)).unwrap();
         let (_, data, _) = decode(&bytes);
         assert_eq!(data, [0b0010_0000]);
+    }
+
+    #[test]
+    fn half_covered_light_strokes_on_a_dark_surface_stay_paper() {
+        let palette = [[0; 3], [255; 3]];
+        // A 9 by 9 black square with a half-covered light stroke down its middle,
+        // beside the same stroke in dark on white: each keeps its stroke.
+        let mut dark = vec![0u8; 81];
+        let mut light = vec![255u8; 81];
+        for y in 0..9 {
+            dark[y * 9 + 4] = 128;
+            light[y * 9 + 4] = 128;
+        }
+        let ink_of = |gray: &[u8]| {
+            let bytes = encode(&pixmap(9, 9, gray), 0, Some(&palette)).unwrap();
+            let (_, data, _) = decode(&bytes);
+            // Two bytes a row; the middle pixel is bit 4 of the first, counting
+            // from its high bit.
+            (0..9)
+                .map(|y| data[y * 2] & 0b0000_1000 == 0)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ink_of(&dark), [false; 9], "light stroke on dark");
+        assert_eq!(ink_of(&light), [true; 9], "dark stroke on light");
+    }
+
+    #[test]
+    fn a_uniform_gray_stays_ink_in_black_and_white() {
+        let palette = [[0; 3], [255; 3]];
+        let bytes = encode(&pixmap(9, 9, &[100; 81]), 0, Some(&palette)).unwrap();
+        let (_, data, _) = decode(&bytes);
+        assert!(data.iter().step_by(2).all(|byte| *byte == 0), "{data:?}");
     }
 
     #[test]

@@ -704,6 +704,7 @@ impl Resolver {
         match kind.as_str() {
             "each" => self.each(value, scope, &here),
             "choose" => self.choose(value, scope, &here),
+            "table" => self.table(value, scope, &here),
             "image" => {
                 let mut image = self.fields(value, scope, &here);
                 self.take_image(&mut image, "url", &format!("{here}/url"));
@@ -715,6 +716,54 @@ impl Resolver {
                 Value::Object(resolved)
             }
         }
+    }
+
+    /// A `table` keeps its settings and its columns' headings, and gets a row of
+    /// cell values for each element, each row counted as a component, and the
+    /// line saying how many were left out.
+    fn table(&mut self, table: &Value, scope: &Template, path: &str) -> Value {
+        let (scopes, more) = self.elements(table, scope, path);
+        let columns = table["columns"].as_array().cloned().unwrap_or_default();
+        let mut resolved = table.as_object().cloned().unwrap_or_default();
+        resolved.remove("items");
+        resolved.remove("limit");
+        let headings: Vec<Value> = columns
+            .iter()
+            .enumerate()
+            .map(|(index, column)| {
+                let heading = self.text(
+                    &column["heading"],
+                    scope,
+                    &format!("{path}/columns/{index}/heading"),
+                );
+                let mut column = column.as_object().cloned().unwrap_or_default();
+                column.remove("text");
+                column.insert("heading".to_owned(), Value::String(heading));
+                Value::Object(column)
+            })
+            .collect();
+        let mut rows = Vec::new();
+        for scope in &scopes {
+            if !self.admit(path) {
+                break;
+            }
+            let cells = columns
+                .iter()
+                .enumerate()
+                .map(|(index, column)| {
+                    self.value(
+                        column["text"].as_str().unwrap_or_default(),
+                        scope,
+                        &format!("{path}/columns/{index}/text"),
+                    )
+                })
+                .collect();
+            rows.push(Value::Array(cells));
+        }
+        resolved.insert("columns".to_owned(), Value::Array(headings));
+        resolved.insert("rows".to_owned(), Value::Array(rows));
+        resolved.insert("more".to_owned(), more.map_or(Value::Null, Value::String));
+        json!({ "table": resolved })
     }
 
     /// A `choose` becomes its `then` where `when` is true as Jinja's `if` tests
@@ -735,11 +784,16 @@ impl Resolver {
         })
     }
 
-    /// An `each` becomes a column or row of its content once per element, and a
-    /// line saying how many were left out.
-    fn each(&mut self, each: &Value, scope: &Template, path: &str) -> Value {
+    /// The elements an `each` or a `table` draws, each in the scope its templates
+    /// read it in as `item`, and the line saying how many its `limit` left out.
+    fn elements(
+        &mut self,
+        node: &Value,
+        scope: &Template,
+        path: &str,
+    ) -> (Vec<Template>, Option<String>) {
         let items = match self.value(
-            each["items"].as_str().unwrap_or_default(),
+            node["items"].as_str().unwrap_or_default(),
             scope,
             &format!("{path}/items"),
         ) {
@@ -753,25 +807,35 @@ impl Resolver {
                 Vec::new()
             }
         };
-        let limit = each
+        let limit = node
             .get("limit")
             .and_then(Value::as_u64)
             .map_or(EACH_LIMIT, |limit| {
                 usize::try_from(limit).unwrap_or(EACH_LIMIT)
             });
-        let mut children: Vec<Value> = items
+        let scopes = items
             .iter()
             .take(limit)
-            .map(|item| {
-                let scope = context! { item => Template::from(Serde(item)), ..scope.clone() };
-                self.component(&each["content"], &scope, &format!("{path}/content"))
-            })
-            .filter(|child| !child.is_null())
+            .map(|item| context! { item => Template::from(Serde(item)), ..scope.clone() })
             .collect();
         let hidden = items.len().saturating_sub(limit);
-        if hidden > 0 {
+        let more = (hidden > 0).then(|| {
             let scope = context! { hidden => hidden, ..scope.clone() };
-            let more = self.text(&each["more"], &scope, &format!("{path}/more"));
+            self.text(&node["more"], &scope, &format!("{path}/more"))
+        });
+        (scopes, more)
+    }
+
+    /// An `each` becomes a column or row of its content once per element, and a
+    /// line saying how many were left out.
+    fn each(&mut self, each: &Value, scope: &Template, path: &str) -> Value {
+        let (scopes, more) = self.elements(each, scope, path);
+        let mut children: Vec<Value> = scopes
+            .iter()
+            .map(|scope| self.component(&each["content"], scope, &format!("{path}/content")))
+            .filter(|child| !child.is_null())
+            .collect();
+        if let Some(more) = more {
             children.push(json!({ "label": { "text": more, "size": "small", "style": "plain" } }));
         }
         let direction = each
@@ -876,6 +940,39 @@ mod tests {
             assert_eq!(problems, [], "{value}");
             assert_eq!(resolved["content"]["label"]["text"], expected, "{value}");
         }
+    }
+
+    #[test]
+    fn a_table_gets_its_headings_and_a_row_of_cells_for_each_element() {
+        let scope = context! { stocks => Template::from(Serde(json!([
+            { "symbol": "AMZN", "price": 184.2 },
+            { "symbol": "MSFT", "price": 412.5 },
+            { "symbol": "NVDA", "price": 121.9 }
+        ]))) };
+        let document = json!({ "content": { "table": {
+            "items": "{{ stocks }}",
+            "limit": 2,
+            "more": "and {{ hidden }} more",
+            "size": "small",
+            "columns": [
+                { "heading": "{{ 'Symbol' | upper }}", "text": "{{ item.symbol }}", "align": "start", "clamp": 1 },
+                { "heading": "Price", "text": "{{ item.price }}", "align": "end", "clamp": 1 }
+            ]
+        } } });
+        let (resolved, problems) = resolve(&document, &scope);
+        assert_eq!(problems, []);
+        assert_eq!(
+            resolved["content"],
+            json!({ "table": {
+                "size": "small",
+                "more": "and 1 more",
+                "columns": [
+                    { "heading": "SYMBOL", "align": "start", "clamp": 1 },
+                    { "heading": "Price", "align": "end", "clamp": 1 }
+                ],
+                "rows": [["AMZN", 184.2], ["MSFT", 412.5]]
+            } })
+        );
     }
 
     #[test]

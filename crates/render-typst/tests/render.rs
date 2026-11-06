@@ -438,3 +438,147 @@ fn every_default_display_is_one_it_can_draw() {
         );
     }
 }
+
+#[test]
+fn a_progress_bar_fills_its_share_of_the_track() {
+    // Emphasis 3 fills solid black on four grays; the track is 32 pixels tall at
+    // the large size and spans the 780 pixels inside the screen's margins, a
+    // one-pixel border around its inside.
+    let bar =
+        json!({ "progressBar": { "value": 25, "max": "100", "size": "large", "emphasis": 3 } });
+    let bytes = render(&screen_of(&bar), "og_plus", "gray-4");
+    let row = &pixels(&bytes)[10 + 16];
+    let black = row.iter().filter(|pixel| **pixel == [0, 0, 0]).count();
+    // A quarter of the inside, to two pixels: four times the black pixels is
+    // within eight of the inside's width.
+    let inside: usize = 780 - 2;
+    assert!(
+        (black * 4).abs_diff(inside) <= 8,
+        "{black} black pixels across a track {inside} wide"
+    );
+}
+
+#[test]
+fn progress_dots_fill_their_first_value() {
+    // Large dots are 20 pixels across, 7 apart, from the margin at 10: white in
+    // the gaps between them and after the last.
+    let dots =
+        json!({ "progressDots": { "count": "5", "value": 2, "current": true, "size": "large" } });
+    let bytes = render(&screen_of(&dots), "og_plus", "gray-4");
+    let row = &pixels(&bytes)[10 + 10];
+    let at = |dot: usize, offset: usize| row[10 + dot * 27 + offset];
+    for dot in 0..5 {
+        assert_eq!(at(dot, 23), [255, 255, 255], "the gap after dot {dot}");
+    }
+    assert!(
+        row[10 + 5 * 27..]
+            .iter()
+            .all(|pixel| *pixel == [255, 255, 255])
+    );
+    assert_eq!((at(0, 10), at(1, 10)), ([0, 0, 0], [0, 0, 0]), "filled");
+    for dot in 2..5 {
+        assert_ne!(at(dot, 10), [0, 0, 0], "dot {dot} is not filled");
+    }
+}
+
+#[test]
+fn a_table_draws_a_rule_under_the_headings_and_between_rows() {
+    // A small table: a 24-pixel heading row and 31-pixel body rows from the
+    // margin at 10, each rule on its row's bottom pixel row, none under the last
+    // row unless a row saying what was left out follows. Short text leaves the
+    // right of the screen to the rules.
+    let table = |more: Value| {
+        json!({ "table": {
+        "size": "small", "indexed": false, "grow": false, "more": more,
+        "columns": [
+            { "heading": "A", "align": "start", "clamp": 1 },
+            { "heading": "B", "align": "start", "clamp": 1 }
+        ],
+        "rows": [["a", "1"], ["b", "2"], ["c", "3"]]
+    } })
+    };
+    let rules = |bytes: &[u8]| {
+        pixels(bytes)
+            .iter()
+            .enumerate()
+            .filter(|(_, row)| row[700..780].iter().any(|pixel| *pixel != [255, 255, 255]))
+            .map(|(y, _)| y)
+            .collect::<Vec<_>>()
+    };
+    let bytes = render(&screen_of(&table(Value::Null)), "og_png", "bw");
+    assert_eq!(rules(&bytes), [33, 64, 95]);
+    let bytes = render(&screen_of(&table(json!("and 1 more"))), "og_png", "bw");
+    assert_eq!(rules(&bytes), [33, 64, 95, 126]);
+}
+
+#[test]
+fn an_inverse_surface_draws_light_content_on_a_dark_one() {
+    let cell = json!({ "column": { "inverse": true, "padding": "small", "rounded": "none",
+        "gap": "medium", "align": "start", "justify": "start", "grow": false,
+        "children": [{ "title": { "text": "Hi", "size": "base" } }] } });
+    let bytes = render(&screen_of(&cell), "og_plus", "gray-4");
+    let pixels = pixels(&bytes);
+    assert_eq!(pixels[11][11], [0, 0, 0], "the surface is dark");
+    let inside: Vec<[u8; 3]> = pixels[10..40]
+        .iter()
+        .flat_map(|row| row[10..60].iter().copied())
+        .collect();
+    assert!(inside.contains(&[255, 255, 255]), "its text is light");
+}
+
+#[test]
+fn small_light_text_on_an_inverse_surface_keeps_its_strokes_in_black_and_white() {
+    // The same label, in a face whose strokes land between pixels, dark on white
+    // and light on an inverse surface: the light one keeps as many pixels as the
+    // dark one, since a stroke is a stroke whichever its color.
+    let label = json!({ "label": { "text": "Today IIIIII", "size": "large", "style": "plain" } });
+    let plain = pixels(&render(&screen_of(&label), "og_png", "bw"));
+    let dark = plain
+        .iter()
+        .flatten()
+        .filter(|pixel| **pixel == [0, 0, 0])
+        .count();
+    let cell = json!({ "column": { "inverse": true, "padding": "small", "rounded": "none",
+        "gap": "medium", "align": "start", "justify": "start", "grow": false, "children": [label] } });
+    let inverse = pixels(&render(&screen_of(&cell), "og_png", "bw"));
+    // The surface spans the screen's width; its right end holds no text.
+    let surface = (10..inverse.len())
+        .take_while(|&y| inverse[y][785] == [0, 0, 0])
+        .count();
+    assert!(surface > 20, "a surface {surface} rows tall");
+    let light = inverse[10..10 + surface]
+        .iter()
+        .flat_map(|row| row[10..790].iter())
+        .filter(|pixel| **pixel == [255, 255, 255])
+        .count();
+    assert!(
+        light * 100 >= dark * 95,
+        "{light} light pixels for {dark} dark ones"
+    );
+}
+
+#[test]
+fn rich_text_sets_strong_runs_heavier_and_wraps_at_its_width() {
+    let rich = |text: &str| json!({ "richText": { "size": "base", "align": "start", "gap": "medium", "text": text } });
+    let ink = |bytes: &[u8]| {
+        pixels(bytes)
+            .iter()
+            .flatten()
+            .filter(|pixel| **pixel == [0, 0, 0])
+            .count()
+    };
+    let regular = ink(&render(&screen_of(&rich("WWWWWW")), "og_png", "bw"));
+    let strong = ink(&render(&screen_of(&rich("**WWWWWW**")), "og_png", "bw"));
+    assert!(
+        regular > 0 && strong > regular,
+        "{strong} strong against {regular} regular"
+    );
+
+    let bytes = render(&screen_of(&rich(&"word ".repeat(80))), "og_png", "bw");
+    let (rows, columns) = inked(&bytes);
+    assert!(rows.len() > 16, "it wraps onto several lines");
+    assert!(
+        columns.last().unwrap() - columns.first().unwrap() < 640,
+        "at most 640 pixels wide"
+    );
+}

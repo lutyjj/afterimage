@@ -118,6 +118,18 @@ union Component {
 
     barChart: Chart
 
+    /// Rows of text under a row of headings, one row for each element of a list.
+    table: Table
+
+    /// How far something has come, as a bar that fills.
+    progressBar: ProgressBar
+
+    /// Steps done of a number of steps, as a row of dots.
+    progressDots: ProgressDots
+
+    /// Paragraphs of text, written in Markdown.
+    richText: RichText
+
     /// Its content once for each element of a list.
     each: Each
 
@@ -130,9 +142,35 @@ list Components {
     member: Component
 }
 
+/// How a container's surface is drawn.
+@mixin
+structure Surface {
+    /// Light content on a dark surface, to set one element apart from its
+    /// neighbours, such as the cell of today or the active row: TRMNL's inverse.
+    inverse: Boolean = false
+
+    /// Space between the edge and the content.
+    padding: Gap = "none"
+
+    /// How round the corners are.
+    rounded: Rounding = "none"
+}
+
+enum Rounding {
+    NONE = "none"
+    XSMALL = "xsmall"
+    SMALL = "small"
+    BASE = "base"
+    MEDIUM = "medium"
+    LARGE = "large"
+    XLARGE = "xlarge"
+    XXLARGE = "xxlarge"
+    FULL = "full"
+}
+
 /// Children size to their content; those with `grow` share the space left along
 /// the stack's direction.
-structure Stack {
+structure Stack with [Surface] {
     @required
     children: Components
 
@@ -175,7 +213,7 @@ structure Cell {
     span: GridColumns = 1
 }
 
-structure Item {
+structure Item with [Surface] {
     @required
     children: Components
 
@@ -273,6 +311,140 @@ structure Chart {
     max: Double
 
     grow: Boolean = true
+}
+
+/// One row for each element of `items` up to `limit`, and a last row saying how
+/// many were left out. Rows are as tall as TRMNL's table rows of the size, or
+/// taller when a cell takes more lines; columns share the width as their text
+/// does.
+structure Table {
+    /// The list, as a template.
+    @required
+    items: Template
+
+    @required
+    columns: TableColumns
+
+    size: TableSize = "base"
+
+    /// Numbers the rows in a bar along their left edge.
+    indexed: Boolean = false
+
+    /// Rows drawn at most; absent draws at most 100.
+    limit: EachLimit
+
+    /// The last row when some are left out; reads `hidden`, the number left out.
+    more: Template = "and {{ hidden }} more"
+
+    grow: Boolean = false
+}
+
+@length(min: 1, max: 12)
+list TableColumns {
+    member: TableColumn
+}
+
+structure TableColumn {
+    /// Text in the heading row.
+    @required
+    heading: Template
+
+    /// Text in each row, which templates read the row's element as `item`.
+    @required
+    text: Template
+
+    /// Where the text sits across the column.
+    align: TextAlign = "start"
+
+    /// Lines a cell shows before its text is cut with an ellipsis.
+    clamp: Lines = 1
+}
+
+enum TableSize {
+    XSMALL = "xsmall"
+    SMALL = "small"
+    BASE = "base"
+    LARGE = "large"
+    XLARGE = "xlarge"
+}
+
+enum TextAlign {
+    START = "start"
+    CENTER = "center"
+    END = "end"
+}
+
+/// A track that fills as far as `value` is of `max`, under a line with `label`
+/// at its start and `figure` at its end. It fills what its parent fixes; where
+/// its parent sizes it to content, it is 320 pixels wide.
+structure ProgressBar {
+    /// How far, as a number.
+    @required
+    value: Template
+
+    /// The value of a full track, as a number.
+    max: Template = "100"
+
+    label: Template
+
+    /// Text at the end, such as the value with its unit.
+    figure: Template
+
+    size: ProgressSize = "base"
+
+    /// How dark the fill is: 1, 2 or 3.
+    emphasis: Emphasis = 1
+
+    grow: Boolean = false
+}
+
+/// `count` dots, the first `value` of them filled.
+structure ProgressDots {
+    /// How many dots, as a number from 1 to 64.
+    @required
+    count: Template
+
+    /// How many are filled, as a number.
+    @required
+    value: Template
+
+    /// Marks the dot after the filled ones as the step under way.
+    current: Boolean = false
+
+    size: ProgressSize = "base"
+}
+
+enum ProgressSize {
+    XSMALL = "xsmall"
+    SMALL = "small"
+    BASE = "base"
+    LARGE = "large"
+}
+
+/// Markdown in TRMNL's rich text: paragraphs apart by a blank line, `**strong**`,
+/// `*emphasis*`, and lists. Headings are strong paragraphs; links, code and
+/// images show their text. It is at most 640 pixels wide on an 800-pixel screen,
+/// as TRMNL's rich text is.
+structure RichText {
+    @required
+    text: Template
+
+    size: RichTextSize = "base"
+
+    /// Where the text sits, and how its lines align.
+    align: TextAlign = "start"
+
+    /// Space between paragraphs.
+    gap: Gap = "medium"
+}
+
+enum RichTextSize {
+    SMALL = "small"
+    BASE = "base"
+    LARGE = "large"
+    XLARGE = "xlarge"
+    XXLARGE = "xxlarge"
+    XXXLARGE = "xxxlarge"
 }
 
 @length(min: 1, max: 4)

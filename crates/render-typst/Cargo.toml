@@ -12,6 +12,8 @@ afterimage-trmnl = { path = "../trmnl" }
 # The fonts tools/tokens copies, embedded at build time.
 include_dir = "0.7.4"
 png = "0.18.1"
+# Rich text's Markdown, read into the blocks the Typst library draws.
+pulldown-cmark = { version = "0.13.6", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
 thiserror = "2.0.21"

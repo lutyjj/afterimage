@@ -8,6 +8,7 @@
 //! (`design/tokens.json`), with the fonts of that release (`design/fonts/`).
 //! Images arrive as bytes under the keys the screen's `url` members name.
 
+mod markdown;
 mod raster;
 mod tokens;
 
@@ -118,6 +119,8 @@ impl Renderer {
             );
         }
         let mut inputs = Dict::new();
+        let mut screen = screen.clone();
+        markdown::prepare(&mut screen);
         inputs.insert("screen".into(), Str::from(screen.to_string()).into_value());
         inputs.insert("tokens".into(), Str::from(tokens).into_value());
         inputs.insert("images".into(), files.into_value());
