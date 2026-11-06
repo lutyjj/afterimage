@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT devices.id, devices.account_id FROM devices\n             JOIN registrations ON registrations.id = devices.registration_id\n             WHERE registrations.mac = ? ORDER BY devices.id LIMIT 1",
+  "query": "SELECT devices.id, devices.account_id FROM devices\n             JOIN registrations ON registrations.id = devices.registration_id\n             WHERE registrations.mac = ?\n             ORDER BY registrations.seen_at IS NULL, registrations.seen_at DESC, devices.id DESC\n             LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -34,5 +34,5 @@
       false
     ]
   },
-  "hash": "f4d4f10d4d0b88f45c47c3f689052b0de50b37af521e115ab4853c236ffc2cfc"
+  "hash": "277c2fd69786591879b1c2d80e67f7ef6c3265eb14f5fb94d610b6291485e9b5"
 }

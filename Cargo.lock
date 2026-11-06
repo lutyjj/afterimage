@@ -3648,6 +3648,7 @@ dependencies = [
  "afterimage-trmnl",
  "reqwest 0.13.5",
  "rumqttc",
+ "rustls-native-certs",
  "semver",
  "serde",
  "serde_json",

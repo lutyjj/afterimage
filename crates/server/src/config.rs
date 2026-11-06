@@ -92,8 +92,9 @@ pub struct Config {
     pub mqtt_password: Option<String>,
 
     /// The topic every device's state is published under, which is also the
-    /// server's client ID at the broker.
-    #[arg(long, env = "AFTERIMAGE_MQTT_TOPIC", default_value = "afterimage", value_parser = parse_topic)]
+    /// server's client ID at the broker and the start of each device's discovery
+    /// ID: letters, digits, `_` and `-`, as Home Assistant's discovery topics take.
+    #[arg(long, env = "AFTERIMAGE_MQTT_TOPIC", default_value = "afterimage", value_parser = parse_base_topic)]
     pub mqtt_topic: String,
 
     /// Home Assistant's MQTT discovery prefix.
@@ -169,6 +170,20 @@ fn parse_mqtt_url(text: &str) -> Result<url::Url, String> {
         return Err("takes no credentials; set the MQTT username and password".to_owned());
     }
     Ok(url)
+}
+
+/// One topic level of letters, digits, `_` and `-`: Home Assistant's discovery
+/// takes no other characters in a discovery ID.
+fn parse_base_topic(text: &str) -> Result<String, String> {
+    if !text.is_empty()
+        && text
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    {
+        Ok(text.to_owned())
+    } else {
+        Err("must be letters, digits, _ and - only".to_owned())
+    }
 }
 
 /// A topic of one or more levels, without wildcards or empty levels.
@@ -266,10 +281,20 @@ mod tests {
             parse(&["--mqtt-username", "afterimage"]).is_err(),
             "a username needs a broker"
         );
-        for topic in ["", "a/#", "a/+/b", "a//b", "a b"] {
+        for topic in [
+            "",
+            "a/#",
+            "a/+/b",
+            "a//b",
+            "a b",
+            "home/afterimage",
+            "home.afterimage",
+        ] {
             assert!(parse(&["--mqtt-topic", topic]).is_err(), "{topic:?}");
         }
-        assert!(parse(&["--mqtt-topic", "home/afterimage"]).is_ok());
+        assert!(parse(&["--mqtt-topic", "afterimage-2"]).is_ok());
+        assert!(parse(&["--mqtt-discovery-prefix", "a/#"]).is_err());
+        assert!(parse(&["--mqtt-discovery-prefix", "ha/discovery"]).is_ok());
     }
 
     #[test]

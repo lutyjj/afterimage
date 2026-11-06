@@ -323,8 +323,9 @@ impl Devices {
         Ok(devices)
     }
 
-    /// The device whose registration has this MAC, as `Mac` writes it; the
-    /// earliest claimed when accounts share one.
+    /// The device whose registration has this MAC, as `Mac` writes it; when
+    /// accounts hold devices of one MAC, the one that checked in last, which is
+    /// the device itself while the others hold registrations it left.
     ///
     /// # Errors
     ///
@@ -334,7 +335,9 @@ impl Devices {
         let Some(row) = sqlx::query!(
             "SELECT devices.id, devices.account_id FROM devices
              JOIN registrations ON registrations.id = devices.registration_id
-             WHERE registrations.mac = ? ORDER BY devices.id LIMIT 1",
+             WHERE registrations.mac = ?
+             ORDER BY registrations.seen_at IS NULL, registrations.seen_at DESC, devices.id DESC
+             LIMIT 1",
             mac
         )
         .fetch_optional(&mut *tx)

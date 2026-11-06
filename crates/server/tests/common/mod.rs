@@ -506,6 +506,11 @@ impl Broker {
             .local_addr()
             .unwrap()
             .port();
+        Self::start_on(port).await
+    }
+
+    /// A broker on `port`, as after a restart; it keeps no retained messages.
+    pub async fn start_on(port: u16) -> Self {
         let directory = TempDir::new().unwrap();
         let config = directory.path().join("mosquitto.conf");
         std::fs::write(
@@ -556,22 +561,30 @@ impl Drop for Broker {
 pub struct Observer {
     pub client: rumqttc::AsyncClient,
     messages: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    /// Connections to the broker so far.
+    pub connections: Arc<AtomicUsize>,
 }
 
 impl Observer {
-    pub async fn start(broker: &Broker) -> Self {
+    pub fn start(broker: &Broker) -> Self {
         let mut options = rumqttc::MqttOptions::new("observer", "127.0.0.1", broker.port);
         options.set_max_packet_size(1024 * 1024, 1024 * 1024);
         let (client, mut eventloop) = rumqttc::AsyncClient::new(options, 64);
-        client
-            .subscribe("#", rumqttc::QoS::AtLeastOnce)
-            .await
-            .unwrap();
         let messages = Arc::new(Mutex::new(HashMap::new()));
         let kept = Arc::clone(&messages);
+        let connections = Arc::new(AtomicUsize::new(0));
+        let connected = Arc::clone(&connections);
+        let subscriber = client.clone();
         tokio::spawn(async move {
             loop {
                 match eventloop.poll().await {
+                    // Every connection starts afresh and subscribes again, as Home
+                    // Assistant reads a restarted broker anew.
+                    Ok(rumqttc::Event::Incoming(rumqttc::Packet::ConnAck(_))) => {
+                        kept.lock().unwrap().clear();
+                        connected.fetch_add(1, Ordering::SeqCst);
+                        let _ = subscriber.try_subscribe("#", rumqttc::QoS::AtLeastOnce);
+                    }
                     Ok(rumqttc::Event::Incoming(rumqttc::Packet::Publish(message))) => {
                         let mut kept = kept.lock().unwrap();
                         if message.payload.is_empty() {
@@ -585,7 +598,11 @@ impl Observer {
                 }
             }
         });
-        Self { client, messages }
+        Self {
+            client,
+            messages,
+            connections,
+        }
     }
 
     /// The last message on `topic` once `accept` takes it, as JSON when it is.

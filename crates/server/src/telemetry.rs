@@ -18,18 +18,27 @@
 //! Everything but the install command is retained, so a subscriber that joins
 //! later reads the last state. The server publishes every device again when it
 //! connects and when Home Assistant announces itself on `<prefix>/status`, and
-//! one device whenever it checks in or changes. History belongs to whoever
-//! subscribes.
+//! one device whenever it checks in or changes. On connecting it also reads the
+//! retained state topics back and clears those of devices that are gone, so a
+//! device removed while the broker was out of reach does not linger. History
+//! belongs to whoever subscribes.
+//!
+//! Accounts may hold devices of one MAC, as when a device set up again is claimed
+//! by another account; its topics belong to the one that checked in last.
 //!
 //! Whoever may publish to the broker may ask any device to install firmware: the
-//! broker's access control is the boundary.
+//! broker's access control is the boundary. A retained install command is
+//! ignored, since the broker would replay it at every connection.
 
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use afterimage_trmnl::Mac;
-use rumqttc::{AsyncClient, Event, LastWill, MqttOptions, Packet, QoS};
+use rumqttc::tokio_rustls::rustls;
+use rumqttc::{
+    AsyncClient, Event, LastWill, MqttOptions, Packet, QoS, TlsConfiguration, Transport,
+};
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
@@ -103,11 +112,26 @@ impl Telemetry {
         firmware: Arc<Firmware>,
     ) -> Result<Self, String> {
         let mut url = settings.url.clone();
+        // rumqttc's own TLS for `mqtts://` panics without a process-wide crypto
+        // provider or a host certificate store, so the URL is read as plain
+        // `mqtt://` and the TLS transport set here.
+        let tls = url.scheme() == "mqtts";
+        if tls {
+            if url.port().is_none() {
+                url.set_port(Some(8883))
+                    .map_err(|()| "an mqtts:// URL without a host".to_owned())?;
+            }
+            url.set_scheme("mqtt")
+                .map_err(|()| "an mqtts:// URL that cannot be read as mqtt://".to_owned())?;
+        }
         if !url.query_pairs().any(|(name, _)| name == "client_id") {
             url.query_pairs_mut()
                 .append_pair("client_id", &settings.topic);
         }
         let mut options = MqttOptions::try_from(url).map_err(|error| error.to_string())?;
+        if tls {
+            options.set_transport(tls_transport());
+        }
         if let Some(username) = &settings.username {
             options.set_credentials(username, settings.password.as_deref().unwrap_or_default());
         }
@@ -133,6 +157,7 @@ impl Telemetry {
                         let message = Incoming::Message {
                             topic: message.topic,
                             payload: message.payload.to_vec(),
+                            retained: message.retain,
                         };
                         if incoming_sender.send(message).is_err() {
                             return;
@@ -180,11 +205,40 @@ impl Telemetry {
     }
 }
 
+/// TLS for an `mqtts://` broker: rustls with its aws-lc-rs provider and the
+/// host's certificate store, or an empty store when the host has none, as
+/// [`crate::outbound::Outbound`] does, so that such a host still serves devices.
+fn tls_transport() -> Transport {
+    let mut roots = rustls::RootCertStore::empty();
+    let native = rustls_native_certs::load_native_certs();
+    for error in &native.errors {
+        tracing::warn!(%error, "a host CA certificate could not be read for MQTT over TLS");
+    }
+    let (added, _) = roots.add_parsable_certificates(native.certs);
+    if added == 0 {
+        tracing::warn!(
+            "MQTT over TLS will fail: the host has no CA certificates; install them and restart"
+        );
+    }
+    let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
+    let config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .expect("aws-lc-rs supports rustls's default protocol versions")
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    Transport::tls_with_config(TlsConfiguration::Rustls(Arc::new(config)))
+}
+
 /// What the broker sent.
 enum Incoming {
     Connected,
     Disconnected,
-    Message { topic: String, payload: Vec<u8> },
+    Message {
+        topic: String,
+        payload: Vec<u8>,
+        /// Delivered from the broker's retained store rather than published now.
+        retained: bool,
+    },
 }
 
 struct Publisher {
@@ -207,6 +261,8 @@ impl Publisher {
                 let subscriptions = [
                     format!("{}/status", self.settings.discovery_prefix),
                     format!("{}/+/firmware/install", self.settings.topic),
+                    // Read back once, to clear what devices since removed left.
+                    format!("{}/+/state", self.settings.topic),
                 ];
                 for topic in subscriptions {
                     if let Err(error) = self.client.subscribe(topic, QoS::AtLeastOnce).await {
@@ -217,15 +273,25 @@ impl Publisher {
                 self.publish_all().await;
             }
             Incoming::Disconnected => self.connected = false,
-            Incoming::Message { topic, payload } => {
+            Incoming::Message {
+                topic,
+                payload,
+                retained,
+            } => {
+                let base = &self.settings.topic;
                 if topic == format!("{}/status", self.settings.discovery_prefix) {
                     if payload == b"online" {
                         self.publish_all().await;
                     }
-                } else if let Some(key) = install_key(&self.settings.topic, &topic)
-                    && payload == b"install"
+                } else if let Some(key) = device_key(base, &topic, "firmware/install") {
+                    if payload == b"install" && !retained {
+                        self.install(key);
+                    }
+                } else if let Some(key) = device_key(base, &topic, "state")
+                    && retained
+                    && !payload.is_empty()
                 {
-                    self.install(key);
+                    self.clear_if_gone(key).await;
                 }
             }
         }
@@ -239,25 +305,31 @@ impl Publisher {
         match change {
             Change::Device(id) => match self.devices.any(id).await {
                 Ok(Some(device)) => {
-                    let boards = self.firmware.boards_on_hand();
-                    self.publish_device(&device, boards.as_deref()).await;
+                    // A device whose MAC another device holds more recently
+                    // leaves the topics to that one.
+                    if let Some(live) = self.live(&device.mac).await
+                        && live.id == device.id
+                    {
+                        let boards = self.firmware.boards_on_hand();
+                        self.publish_device(&device, boards.as_deref()).await;
+                    }
                 }
                 Ok(None) => {}
                 Err(error) => {
                     tracing::error!(%error, device = id, "a device to publish could not be read");
                 }
             },
-            Change::Removed(mac) => {
-                if let Some(key) = key(&mac) {
-                    for topic in [
-                        self.discovery_topic(&key),
-                        self.device_topic(&key, "state"),
-                        self.device_topic(&key, "firmware"),
-                    ] {
-                        self.publish(&topic, "").await;
+            Change::Removed(mac) => match self.live(&mac).await {
+                Some(other) => {
+                    let boards = self.firmware.boards_on_hand();
+                    self.publish_device(&other, boards.as_deref()).await;
+                }
+                None => {
+                    if let Some(key) = key(&mac) {
+                        self.clear(&key).await;
                     }
                 }
-            }
+            },
         }
     }
 
@@ -271,7 +343,43 @@ impl Publisher {
         };
         let boards = self.firmware.boards_on_hand();
         for device in &devices {
-            self.publish_device(device, boards.as_deref()).await;
+            if let Some(live) = self.live(&device.mac).await
+                && live.id == device.id
+            {
+                self.publish_device(device, boards.as_deref()).await;
+            }
+        }
+    }
+
+    /// The device whose MAC this is and which checked in last, when any holds it.
+    async fn live(&self, mac: &str) -> Option<Device> {
+        match self.devices.with_mac(mac).await {
+            Ok(device) => device,
+            Err(error) => {
+                tracing::error!(%error, "a device to publish could not be read");
+                None
+            }
+        }
+    }
+
+    /// Clears a key's topics when no device holds its MAC any more.
+    async fn clear_if_gone(&self, key: &str) {
+        let Some(mac) = mac_of(key) else {
+            return;
+        };
+        if self.live(&mac).await.is_none() {
+            self.clear(key).await;
+        }
+    }
+
+    /// Empties a device's retained topics, which takes it out of Home Assistant.
+    async fn clear(&self, key: &str) {
+        for topic in [
+            self.discovery_topic(key),
+            self.device_topic(key, "state"),
+            self.device_topic(key, "firmware"),
+        ] {
+            self.publish(&topic, "").await;
         }
     }
 
@@ -380,13 +488,14 @@ fn mac_of(key: &str) -> Option<String> {
         .map(|mac| mac.to_string())
 }
 
-/// The device key of an install command's topic.
-fn install_key<'a>(base: &str, topic: &'a str) -> Option<&'a str> {
+/// The device key of a topic `<base>/<key>/<leaf>`.
+fn device_key<'a>(base: &str, topic: &'a str, leaf: &str) -> Option<&'a str> {
     topic
         .strip_prefix(base)?
         .strip_prefix('/')?
-        .strip_suffix("/firmware/install")
-        .filter(|key| !key.contains('/'))
+        .strip_suffix(leaf)?
+        .strip_suffix('/')
+        .filter(|key| !key.is_empty() && !key.contains('/'))
 }
 
 /// The device's readings and screen, as its sensors read them.
@@ -450,18 +559,26 @@ fn discovery(settings: &Settings, key: &str, device: &Device) -> Value {
         }
         component
     };
+    // Home Assistant drops a device whose optional fields are null, so an
+    // unknown one is left out.
     let mut device_info = json!({
         "identifiers": [format!("{base}_{key}")],
         "connections": [["mac", device.mac.to_lowercase()]],
         "name": device.name,
-        "model": device.firmware_model,
-        "sw_version": device.readings.firmware_version,
     });
-    if let (Some(info), Some(url)) = (device_info.as_object_mut(), &settings.public_url) {
-        info.insert(
-            "configuration_url".to_owned(),
-            Value::String(format!("{url}/devices/{}", device.id)),
-        );
+    if let Some(info) = device_info.as_object_mut() {
+        if !device.firmware_model.is_empty() {
+            info.insert("model".to_owned(), json!(device.firmware_model));
+        }
+        if let Some(version) = &device.readings.firmware_version {
+            info.insert("sw_version".to_owned(), json!(version));
+        }
+        if let Some(url) = &settings.public_url {
+            info.insert(
+                "configuration_url".to_owned(),
+                json!(format!("{url}/devices/{}", device.id)),
+            );
+        }
     }
     json!({
         "device": device_info,
@@ -518,18 +635,29 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_device_of_an_install_command() {
+    fn reads_the_device_of_a_topic() {
+        let install = "firmware/install";
         assert_eq!(
-            install_key("afterimage", "afterimage/41b41039a10f/firmware/install"),
+            device_key(
+                "afterimage",
+                "afterimage/41b41039a10f/firmware/install",
+                install
+            ),
             Some("41b41039a10f")
         );
         assert_eq!(
-            install_key("afterimage", "afterimage/a/b/firmware/install"),
+            device_key("afterimage", "afterimage/a/b/firmware/install", install),
             None
         );
         assert_eq!(
-            install_key("afterimage", "other/41b41039a10f/firmware/install"),
+            device_key("afterimage", "other/41b41039a10f/firmware/install", install),
             None
         );
+        assert_eq!(
+            device_key("afterimage", "afterimage/41b41039a10f/state", "state"),
+            Some("41b41039a10f")
+        );
+        assert_eq!(device_key("afterimage", "afterimage//state", "state"), None);
+        assert_eq!(device_key("afterimage", "afterimage/a/firmware", "state"), None);
     }
 }
