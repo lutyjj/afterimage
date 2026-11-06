@@ -555,6 +555,9 @@ impl Drop for Broker {
     }
 }
 
+/// A topic and the payload it carried.
+type Message = (String, Vec<u8>);
+
 /// A client that subscribes to every topic and keeps the last message of each,
 /// as Home Assistant reads retained topics; an empty retained message removes a
 /// topic, as it does there.
@@ -562,7 +565,7 @@ pub struct Observer {
     pub client: rumqttc::AsyncClient,
     messages: Arc<Mutex<HashMap<String, Vec<u8>>>>,
     /// Every message in the order it arrived, an emptied topic included.
-    history: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
+    history: Arc<Mutex<Vec<Message>>>,
     /// Connections to the broker so far.
     pub connections: Arc<AtomicUsize>,
 }
