@@ -169,3 +169,56 @@ fn image_type(bytes: &[u8]) -> Option<&'static str> {
         .find(|(signature, _)| bytes.starts_with(signature))
         .map(|(_, mime)| *mime)
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    /// A catalog of one tool per method, each answering whatever a test hands
+    /// `answer`.
+    fn tools() -> Catalog {
+        let operation =
+            |id: &str| json!({ "operationId": id, "description": "A tool.", "tags": ["mcp"] });
+        let document = json!({
+            "paths": {
+                "/thing": { "get": operation("ReadThing"), "post": operation("MakeThing") },
+                "/me": { "get": { "operationId": "WhoAmI", "description": "Who." } }
+            }
+        });
+        Catalog::from_openapi(&document.to_string(), "WhoAmI").unwrap()
+    }
+
+    fn over_the_cap() -> Response<Bytes> {
+        let body = json!({ "text": "x".repeat(MAX_TEXT_BYTES) });
+        Response::new(Bytes::from(body.to_string()))
+    }
+
+    fn outcome(answer: CallToolResponse) -> (bool, String) {
+        let CallToolResponse::Complete(result) = answer else {
+            panic!("a tool answers at once");
+        };
+        let text = result.content[0]
+            .as_text()
+            .map(|text| text.text.clone())
+            .unwrap_or_default();
+        (result.is_error == Some(true), text)
+    }
+
+    #[test]
+    fn a_write_too_long_to_show_is_done_and_a_read_asks_for_less() {
+        let catalog = tools();
+
+        let (failed, text) = outcome(answer(catalog.get("MakeThing").unwrap(), over_the_cap()));
+        assert!(
+            !failed,
+            "the write happened, so retrying it would repeat it"
+        );
+        assert!(text.starts_with("Done."), "{text}");
+
+        let (failed, text) = outcome(answer(catalog.get("ReadThing").unwrap(), over_the_cap()));
+        assert!(failed);
+        assert!(text.ends_with("ask for less"), "{text}");
+    }
+}
