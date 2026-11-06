@@ -279,7 +279,7 @@ Quiet and exact: a hairline frame that names its action.
 
 ### Navigation
 
-The top bar is paper with a hairline rule beneath it: the wordmark, then Devices and Screens as text tabs in Pencil Blue, and at the right the account (a person icon and the account's name, in Pencil Blue, leading to the account page with its API tokens) and "Sign out". The current tab is heavier (640) and underlined by a 2px Non-repro Blue bar on the rule; on the account page the account's name is heavier. On a phone the account's name hides behind its icon; the tabs and "Sign out" stay. Back links on inner pages lead with a lucide arrow.
+The top bar is paper with a hairline rule beneath it: the wordmark, then Devices and Screens as text tabs in Pencil Blue, with Server after them for the administrator, and at the right the account (a person icon and the account's name, in Pencil Blue, leading to the account page with its API tokens) and "Sign out". The current tab is heavier (640) and underlined by a 2px Non-repro Blue bar on the rule; on the account page the account's name is heavier. On a phone the account's name hides behind its icon, the wordmark sets at 1.0625rem and the gaps narrow; the tabs and "Sign out" stay, and where the tabs still do not fit they scroll sideways rather than widen the page. Back links on inner pages lead with a lucide arrow.
 
 ### Proof plate (signature)
 

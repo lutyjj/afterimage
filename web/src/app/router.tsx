@@ -5,6 +5,7 @@ import { AccountPage } from "../account/AccountPage";
 import { DeviceDetail } from "../devices/DeviceDetail";
 import { DeviceList } from "../devices/DeviceList";
 import { ScreenList } from "../screens/ScreenList";
+import { ServerPage } from "../server/ServerPage";
 import { SignIn } from "../sign-in/SignIn";
 import { accountQuery, client, queryClient, whenSignedOut } from "./client";
 import { NotFoundPage, RouteError } from "./RouteError";
@@ -61,6 +62,7 @@ export const router = createBrowserRouter([
       { path: "screens/new", lazy: screenEditor },
       { path: "screens/:screenId", lazy: screenEditor },
       { path: "account", Component: AccountPage },
+      { path: "server", Component: ServerPage },
       { path: "*", Component: NotFoundPage },
     ],
   },

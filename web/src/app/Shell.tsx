@@ -5,8 +5,9 @@ import { Form, Link, NavLink, Outlet, useLocation, useNavigation } from "react-r
 import { accountQuery } from "./client";
 import styles from "./Shell.module.css";
 
-/** The signed-in frame: the wordmark, the two places, and who is signed in, which
- * leads to the account's page. */
+/** The signed-in frame: the wordmark, the places (the server's settings among
+ * them for its administrator), and who is signed in, which leads to the
+ * account's page. */
 export function Shell() {
   const account = useQuery(accountQuery).data;
   const { pathname } = useLocation();
@@ -26,6 +27,11 @@ export function Shell() {
           <NavLink to="/screens" className={styles.place}>
             Screens
           </NavLink>
+          {account?.administrator && (
+            <NavLink to="/server" className={styles.place}>
+              Server
+            </NavLink>
+          )}
         </nav>
         <div className={styles.account}>
           <NavLink to="/account" className={styles.accountLink} aria-label={`Account, ${account?.name ?? ""}`}>
