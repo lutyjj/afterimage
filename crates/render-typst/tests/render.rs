@@ -172,6 +172,22 @@ fn clamped_text_keeps_to_its_lines() {
 }
 
 #[test]
+fn clamped_text_in_a_fallback_font_keeps_what_fits() {
+    // Cyrillic comes from the fallback font, whose lines are taller than the
+    // description font's; a line of it must still count as one line.
+    let long = "Сменить насадку на зубной щетке и поставить стирку до вечера. ".repeat(4);
+    let bytes = render(
+        &screen_of(&json!({ "description": { "text": long, "size": "base", "clamp": 1 } })),
+        "og_plus",
+        "gray-4",
+    );
+    let (rows, columns) = inked(&bytes);
+    let width = columns.last().unwrap() - columns.first().unwrap();
+    assert!(width > 300, "the clamped line is {width} pixels wide");
+    assert!(rows.len() < 40, "{} inked rows for one line", rows.len());
+}
+
+#[test]
 fn a_fitted_value_shrinks_into_its_box() {
     // Far wider than the first of four columns, a quarter of the 800-pixel screen.
     let screen = json!({ "content": { "grid": { "columns": 4, "gap": "medium", "grow": false, "cells": [

@@ -68,7 +68,12 @@
   if lines == none or words == "" { return set-text(words) }
   layout(region => {
     let height(body) = measure(block(width: region.width, set-text(body))).height
-    let limit = height(range(int(lines)).map(_ => [X]).join(linebreak())) + 0.5pt
+    // A line as tall as any line of this text: a Latin letter beside the text's
+    // own non-ASCII characters, which may come from a fallback font whose lines
+    // are taller than the face's.
+    let others = words.clusters().filter(cluster => cluster.len() > 1).dedup()
+    let line = "X" + others.slice(0, calc.min(others.len(), 6)).join()
+    let limit = height(range(int(lines)).map(_ => [#line]).join(linebreak())) + 0.5pt
     if height(words) <= limit { return set-text(words) }
     let clusters = words.clusters()
     let (low, high) = (0, clusters.len())
