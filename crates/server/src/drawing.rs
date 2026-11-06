@@ -778,7 +778,7 @@ impl Resolver {
                 "gap": each.get("gap").cloned().unwrap_or(json!("medium")),
                 "align": "start",
                 "justify": "start",
-                "grow": false,
+                "grow": each.get("grow").cloned().unwrap_or(json!(false)),
             }),
         );
         Value::Object(stack)
@@ -839,6 +839,26 @@ mod tests {
         assert_eq!(children[1]["title"]["text"], "B");
         assert_eq!(children[2]["label"]["text"], "and 1 more");
         assert_eq!(children.as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn an_each_that_grows_is_a_stack_that_grows() {
+        let document = json!({ "content": { "each": {
+            "items": "{{ [1, 2] }}",
+            "direction": "row",
+            "grow": true,
+            "content": { "title": { "text": "{{ item }}" } }
+        } } });
+        let (resolved, problems) = resolve(&document, &context! {});
+        assert_eq!(problems, []);
+        assert_eq!(resolved["content"]["row"]["grow"], true);
+        assert_eq!(
+            resolved["content"]["row"]["children"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
     }
 
     #[test]

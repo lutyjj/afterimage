@@ -295,6 +295,10 @@ structure Each {
     /// Shown after the last element drawn when some are left out; reads `hidden`,
     /// the number left out.
     more: Template = "and {{ hidden }} more"
+
+    /// Takes a share of the space left along its parent, as a stack does, so that
+    /// elements that grow can fill it.
+    grow: Boolean = false
 }
 
 @range(min: 1, max: 100)
