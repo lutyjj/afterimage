@@ -8,6 +8,7 @@
   curl,
   nodejs_24,
   pnpm,
+  mosquitto,
 }:
 
 mkShell {
@@ -29,6 +30,8 @@ mkShell {
     curl
     nodejs_24
     pnpm
+    # The broker the MQTT tests publish to.
+    mosquitto
   ];
 
   shellHook = ''

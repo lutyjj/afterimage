@@ -8,72 +8,10 @@ use std::fmt::Write;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use common::{READINGS, Server, mac, start};
-use esp_idf_part::{AppType, DataType, Flags, Partition, PartitionTable, SubType, Type};
+use common::{READINGS, Server, app_image, flash_image, mac, start};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-
-/// An app image of one segment holding `payload`, in ESP-IDF's format: the
-/// header with `hash_appended` set, the segment, the checksum on the last byte
-/// of its 16-byte block, and the SHA-256 of everything before.
-fn app_image(payload: &[u8]) -> Vec<u8> {
-    let mut image = vec![0; 24];
-    image[0] = 0xE9;
-    image[1] = 1;
-    image[23] = 1;
-    image.extend_from_slice(&0x3c00_0020_u32.to_le_bytes());
-    image.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
-    image.extend_from_slice(payload);
-    let checksum = payload.iter().fold(0xEF, |checksum, byte| checksum ^ byte);
-    image.resize((image.len() + 1).next_multiple_of(16) - 1, 0);
-    image.push(checksum);
-    let digest = Sha256::digest(&image);
-    image.extend_from_slice(&digest);
-    image
-}
-
-/// A flash image with `app` in `ota_0` at 0x10000.
-fn flash_image(app: &[u8]) -> Vec<u8> {
-    let partition = |name: &str, ty, subtype, offset, size| {
-        Partition::new(name, ty, subtype, offset, size, Flags::empty())
-    };
-    let table = PartitionTable::new(vec![
-        partition(
-            "nvs",
-            Type::Data,
-            SubType::Data(DataType::Nvs),
-            0x9000,
-            0x5000,
-        ),
-        partition(
-            "otadata",
-            Type::Data,
-            SubType::Data(DataType::Ota),
-            0xe000,
-            0x2000,
-        ),
-        partition(
-            "app0",
-            Type::App,
-            SubType::App(AppType::Ota_0),
-            0x10000,
-            0x10000,
-        ),
-        partition(
-            "app1",
-            Type::App,
-            SubType::App(AppType::Ota_1),
-            0x20000,
-            0x10000,
-        ),
-    ]);
-    let mut flash = vec![0xFF; 0x8000];
-    flash.extend_from_slice(&table.to_bin().unwrap());
-    flash.resize(0x10000, 0xFF);
-    flash.extend_from_slice(app);
-    flash
-}
 
 fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)

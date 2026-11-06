@@ -48,7 +48,7 @@ Each component builds on its own and depends on the others only through generate
 
 ## MQTT
 
-The server publishes each device's battery, signal, firmware version, last check-in and current screen with Home Assistant MQTT discovery, plus a firmware update entity whose install command starts step 4. History belongs to whoever consumes the topics.
+With a broker configured, the server publishes each claimed device with Home Assistant's device-based MQTT discovery: its battery (estimated as in step 3 where the firmware reports none), voltage, signal, last check-in and current screen as sensors, and its firmware as an update entity whose install command starts step 4 for the board's newest release. A device is keyed by its MAC, so it stays the same Home Assistant device across setups, and its link back leads to its page in the web UI. Discovery, state and firmware topics are retained; the server publishes every device when it connects and when Home Assistant announces itself on its status topic, and one device at each check-in and change; removing a device clears its topics. Every entity's availability follows the server's own status topic, which its last will sets offline. Whoever may publish to the broker may start an install, so the broker's access control is the boundary. History belongs to whoever consumes the topics.
 
 ## Screens and playlists
 

@@ -28,6 +28,7 @@ use crate::registrations::Registrations;
 use crate::screens::Screens;
 use crate::secrets::Secrets;
 use crate::sessions::{CookiePolicy, Sessions};
+use crate::telemetry::Telemetry;
 use crate::time_zone::TimeZone;
 use crate::{database, device_api, management_api};
 
@@ -92,6 +93,17 @@ pub async fn build(
         pool.clone(),
         Arc::clone(&clock),
     ));
+    // Device state over MQTT, when a broker is configured.
+    let telemetry = match config.mqtt() {
+        Some(settings) => Telemetry::start(
+            settings,
+            Devices::new(pool.clone(), Arc::clone(&clock)),
+            Screens::new(pool.clone(), Arc::clone(&clock)),
+            Arc::clone(&firmware),
+        )
+        .map_err(|error| Error::Settings(format!("the MQTT broker: {error}")))?,
+        None => Telemetry::default(),
+    };
     let device_state = Arc::new(device_api::State {
         registrations: Registrations::new(pool.clone(), Arc::clone(&clock), Arc::clone(&entropy)),
         devices: Devices::new(pool.clone(), Arc::clone(&clock)),
@@ -99,6 +111,7 @@ pub async fn build(
         drawing: Arc::clone(&drawing),
         images: Arc::clone(&images),
         firmware: Arc::clone(&firmware),
+        telemetry: telemetry.clone(),
         clock: Arc::clone(&clock),
     });
     let state = Arc::new(management_api::State {
@@ -119,6 +132,7 @@ pub async fn build(
         drawing,
         images,
         firmware,
+        telemetry,
         clock,
     });
     Ok(router(

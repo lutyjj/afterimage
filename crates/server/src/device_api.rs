@@ -20,6 +20,7 @@ use crate::images::Images;
 use crate::registrations::{CheckIn, Refusal, Registrations, Setup};
 use crate::screens::Screens;
 use crate::showing;
+use crate::telemetry::Telemetry;
 
 /// What the handlers act on.
 pub struct State {
@@ -29,6 +30,7 @@ pub struct State {
     pub drawing: Arc<Drawing>,
     pub images: Arc<Images>,
     pub firmware: Arc<Firmware>,
+    pub telemetry: Telemetry,
     pub clock: Arc<dyn Clock>,
 }
 
@@ -218,6 +220,7 @@ async fn get_display(
                 .check_in(&device, special_function)
                 .await
                 .map_err(|error| internal_failure(&error))?;
+            state.telemetry.device(device.id);
             output::GetDisplayOutput {
                 status: DisplayStatus::Show.code(),
                 image_url: Some(format!("{origin}/api/images/{}", shown.image)),

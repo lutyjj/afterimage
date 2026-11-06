@@ -37,6 +37,7 @@ use crate::images::Images;
 use crate::oidc::Oidc;
 use crate::screens::Screens;
 use crate::sessions::{CookieName, CookiePolicy, Sessions};
+use crate::telemetry::Telemetry;
 
 /// What the handlers act on.
 pub struct State {
@@ -56,6 +57,8 @@ pub struct State {
     pub drawing: Arc<Drawing>,
     pub images: Arc<Images>,
     pub firmware: Arc<Firmware>,
+    /// Told of every change to a device, for MQTT.
+    pub telemetry: Telemetry,
     pub clock: Arc<dyn Clock>,
 }
 

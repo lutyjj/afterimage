@@ -36,7 +36,7 @@ One small server and one contract: the Smithy model defines every API, and scree
 - Removing a device either returns it to its claim code or, with a reset, erases its Wi-Fi settings at its next check-in.
 - Secrets for data sources live in the server's environment; the UI shows only their names.
 - Firmware comes from TRMNL's published releases. A device's board is matched by the model its firmware reports or chosen once; an install happens at the device's next check-in, and the check-in after it shows whether it worked.
-- Not built yet: MQTT telemetry.
+- With an MQTT broker, every claimed device appears in Home Assistant with its battery, signal, last check-in, current screen and a firmware update it can install.
 
 ## Brand Commitments
 

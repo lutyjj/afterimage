@@ -88,6 +88,7 @@ pub async fn install_firmware(
         .await
         .map_err(|error| internal(&error))?
         .ok_or_else(not_found)?;
+    state.telemetry.device(device.id);
     Ok(output::InstallFirmwareOutput {
         device: shown(&state, device)?,
     })
@@ -118,6 +119,7 @@ pub async fn cancel_firmware_update(
         .await
         .map_err(|error| internal(&error))?
         .ok_or_else(not_found)?;
+    state.telemetry.device(device.id);
     Ok(output::CancelFirmwareUpdateOutput {
         device: shown(&state, device)?,
     })

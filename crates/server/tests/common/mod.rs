@@ -14,6 +14,7 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 
 use clap::Parser;
+use esp_idf_part::{AppType, DataType, Flags, Partition, PartitionTable, SubType, Type};
 use afterimage_server::app;
 use afterimage_server::clock::Clock;
 use afterimage_server::config::Config;
@@ -21,6 +22,7 @@ use afterimage_server::keys::{Entropy, OsEntropy};
 use afterimage_server::secrets::Secrets;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 use tokio::net::TcpListener;
 
@@ -375,6 +377,67 @@ pub fn log_entry(message: &str) -> Value {
     })
 }
 
+/// An app image of one segment holding `payload`, in ESP-IDF's format: the
+/// header with `hash_appended` set, the segment, the checksum on the last byte
+/// of its 16-byte block, and the SHA-256 of everything before.
+pub fn app_image(payload: &[u8]) -> Vec<u8> {
+    let mut image = vec![0; 24];
+    image[0] = 0xE9;
+    image[1] = 1;
+    image[23] = 1;
+    image.extend_from_slice(&0x3c00_0020_u32.to_le_bytes());
+    image.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_le_bytes());
+    image.extend_from_slice(payload);
+    let checksum = payload.iter().fold(0xEF, |checksum, byte| checksum ^ byte);
+    image.resize((image.len() + 1).next_multiple_of(16) - 1, 0);
+    image.push(checksum);
+    let digest = Sha256::digest(&image);
+    image.extend_from_slice(&digest);
+    image
+}
+
+/// A flash image with `app` in `ota_0` at 0x10000.
+pub fn flash_image(app: &[u8]) -> Vec<u8> {
+    let partition = |name: &str, ty, subtype, offset, size| {
+        Partition::new(name, ty, subtype, offset, size, Flags::empty())
+    };
+    let table = PartitionTable::new(vec![
+        partition(
+            "nvs",
+            Type::Data,
+            SubType::Data(DataType::Nvs),
+            0x9000,
+            0x5000,
+        ),
+        partition(
+            "otadata",
+            Type::Data,
+            SubType::Data(DataType::Ota),
+            0xe000,
+            0x2000,
+        ),
+        partition(
+            "app0",
+            Type::App,
+            SubType::App(AppType::Ota_0),
+            0x10000,
+            0x10000,
+        ),
+        partition(
+            "app1",
+            Type::App,
+            SubType::App(AppType::Ota_1),
+            0x20000,
+            0x10000,
+        ),
+    ]);
+    let mut flash = vec![0xFF; 0x8000];
+    flash.extend_from_slice(&table.to_bin().unwrap());
+    flash.resize(0x10000, 0xFF);
+    flash.extend_from_slice(app);
+    flash
+}
+
 pub fn mac(index: u8) -> String {
     format!("41:B4:10:39:A1:{index:02X}")
 }
@@ -424,5 +487,151 @@ impl Server {
             .await;
         assert_eq!(status, StatusCode::CREATED, "{body}");
         (body["device"].clone(), key)
+    }
+}
+
+/// A Mosquitto broker of the test's own on a free local port, stopped when the
+/// test drops it. `mosquitto` comes from the development shell, as in the Nix
+/// build's checks.
+pub struct Broker {
+    pub port: u16,
+    child: std::process::Child,
+    _directory: TempDir,
+}
+
+impl Broker {
+    pub async fn start() -> Self {
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        let directory = TempDir::new().unwrap();
+        let config = directory.path().join("mosquitto.conf");
+        std::fs::write(
+            &config,
+            format!("listener {port} 127.0.0.1\nallow_anonymous true\npersistence false\n"),
+        )
+        .unwrap();
+        let child = std::process::Command::new("mosquitto")
+            .arg("-c")
+            .arg(&config)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("mosquitto is on PATH, as in `nix develop`");
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        while tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .is_err()
+        {
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "mosquitto never listened"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        Self {
+            port,
+            child,
+            _directory: directory,
+        }
+    }
+
+    pub fn url(&self) -> String {
+        format!("mqtt://127.0.0.1:{}", self.port)
+    }
+}
+
+impl Drop for Broker {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+/// A client that subscribes to every topic and keeps the last message of each,
+/// as Home Assistant reads retained topics; an empty retained message removes a
+/// topic, as it does there.
+pub struct Observer {
+    pub client: rumqttc::AsyncClient,
+    messages: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+}
+
+impl Observer {
+    pub async fn start(broker: &Broker) -> Self {
+        let mut options = rumqttc::MqttOptions::new("observer", "127.0.0.1", broker.port);
+        options.set_max_packet_size(1024 * 1024, 1024 * 1024);
+        let (client, mut eventloop) = rumqttc::AsyncClient::new(options, 64);
+        client
+            .subscribe("#", rumqttc::QoS::AtLeastOnce)
+            .await
+            .unwrap();
+        let messages = Arc::new(Mutex::new(HashMap::new()));
+        let kept = Arc::clone(&messages);
+        tokio::spawn(async move {
+            loop {
+                match eventloop.poll().await {
+                    Ok(rumqttc::Event::Incoming(rumqttc::Packet::Publish(message))) => {
+                        let mut kept = kept.lock().unwrap();
+                        if message.payload.is_empty() {
+                            kept.remove(&message.topic);
+                        } else {
+                            kept.insert(message.topic, message.payload.to_vec());
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(_) => tokio::time::sleep(std::time::Duration::from_millis(50)).await,
+                }
+            }
+        });
+        Self { client, messages }
+    }
+
+    /// The last message on `topic` once `accept` takes it, as JSON when it is.
+    pub async fn wait(&self, topic: &str, accept: impl Fn(&Value) -> bool) -> Value {
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        loop {
+            let message = self.messages.lock().unwrap().get(topic).cloned();
+            if let Some(bytes) = message {
+                let value = serde_json::from_slice(&bytes).unwrap_or_else(|_| {
+                    Value::String(String::from_utf8_lossy(&bytes).into_owned())
+                });
+                if accept(&value) {
+                    return value;
+                }
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "no accepted message on {topic}: {:?}",
+                self.messages
+                    .lock()
+                    .unwrap()
+                    .get(topic)
+                    .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+    }
+
+    /// Waits until `topic` holds no message.
+    pub async fn gone(&self, topic: &str) {
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        while self.messages.lock().unwrap().contains_key(topic) {
+            assert!(tokio::time::Instant::now() < deadline, "{topic} stayed");
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+    }
+
+    pub async fn publish(&self, topic: &str, payload: &str, retain: bool) {
+        self.client
+            .publish(
+                topic,
+                rumqttc::QoS::AtLeastOnce,
+                retain,
+                payload.as_bytes().to_vec(),
+            )
+            .await
+            .unwrap();
     }
 }

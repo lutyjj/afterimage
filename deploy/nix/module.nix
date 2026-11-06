@@ -74,9 +74,9 @@ in
       example = "/run/secrets/afterimage.env";
       description = ''
         A file of environment variables the service manager reads at start,
-        for secrets: `AFTERIMAGE_OIDC_CLIENT_ID`, `AFTERIMAGE_OIDC_CLIENT_SECRET`
-        and the `AFTERIMAGE_SECRET_<NAME>` values data sources read as
-        `secrets.<NAME>`.
+        for secrets: `AFTERIMAGE_OIDC_CLIENT_ID`, `AFTERIMAGE_OIDC_CLIENT_SECRET`,
+        `AFTERIMAGE_MQTT_PASSWORD` and the `AFTERIMAGE_SECRET_<NAME>` values data
+        sources read as `secrets.<NAME>`.
       '';
     };
   };

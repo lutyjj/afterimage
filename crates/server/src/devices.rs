@@ -287,6 +287,64 @@ impl Devices {
         Ok(())
     }
 
+    /// The device, whichever account owns it.
+    ///
+    /// # Errors
+    ///
+    /// When storage fails.
+    pub async fn any(&self, id: i64) -> Result<Option<Device>, Error> {
+        let mut tx = self.pool.begin().await?;
+        let Some(account_id) =
+            sqlx::query_scalar!("SELECT account_id FROM devices WHERE id = ?", id)
+                .fetch_optional(&mut *tx)
+                .await?
+        else {
+            return Ok(None);
+        };
+        Ok(load(&mut tx, account_id, id).await?)
+    }
+
+    /// Every device of every account.
+    ///
+    /// # Errors
+    ///
+    /// When storage fails.
+    pub async fn all(&self) -> Result<Vec<Device>, Error> {
+        let mut tx = self.pool.begin().await?;
+        let rows = sqlx::query!("SELECT id, account_id FROM devices ORDER BY id")
+            .fetch_all(&mut *tx)
+            .await?;
+        let mut devices = Vec::with_capacity(rows.len());
+        for row in rows {
+            if let Some(device) = load(&mut tx, row.account_id, row.id).await? {
+                devices.push(device);
+            }
+        }
+        Ok(devices)
+    }
+
+    /// The device whose registration has this MAC, as `Mac` writes it; the
+    /// earliest claimed when accounts share one.
+    ///
+    /// # Errors
+    ///
+    /// When storage fails.
+    pub async fn with_mac(&self, mac: &str) -> Result<Option<Device>, Error> {
+        let mut tx = self.pool.begin().await?;
+        let Some(row) = sqlx::query!(
+            "SELECT devices.id, devices.account_id FROM devices
+             JOIN registrations ON registrations.id = devices.registration_id
+             WHERE registrations.mac = ? ORDER BY devices.id LIMIT 1",
+            mac
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        else {
+            return Ok(None);
+        };
+        Ok(load(&mut tx, row.account_id, row.id).await?)
+    }
+
     /// The device holding a registration, whichever account owns it.
     ///
     /// # Errors
@@ -426,15 +484,20 @@ impl Devices {
         Ok(device)
     }
 
-    /// Removes the account's device; `false` when it has no such device. Its
-    /// registration goes back to unclaimed, or with `reset` waits to erase the
-    /// device at its next check-in. Either way it ends after [`IDLE_SECONDS`] without
-    /// a check-in.
+    /// Removes the account's device and returns its MAC; `None` when it has no
+    /// such device. Its registration goes back to unclaimed, or with `reset` waits
+    /// to erase the device at its next check-in. Either way it ends after
+    /// [`IDLE_SECONDS`] without a check-in.
     ///
     /// # Errors
     ///
     /// When storage fails.
-    pub async fn delete(&self, account_id: i64, id: i64, reset: bool) -> Result<bool, Error> {
+    pub async fn delete(
+        &self,
+        account_id: i64,
+        id: i64,
+        reset: bool,
+    ) -> Result<Option<String>, Error> {
         let expires_at = self.clock.now() + IDLE_SECONDS;
         let mut tx = self.pool.begin().await?;
         let Some(registration_id) = sqlx::query_scalar!(
@@ -445,18 +508,18 @@ impl Devices {
         .fetch_optional(&mut *tx)
         .await?
         else {
-            return Ok(false);
+            return Ok(None);
         };
-        sqlx::query!(
-            "UPDATE registrations SET expires_at = ?, reset = ? WHERE id = ?",
+        let mac = sqlx::query_scalar!(
+            "UPDATE registrations SET expires_at = ?, reset = ? WHERE id = ? RETURNING mac",
             expires_at,
             reset,
             registration_id
         )
-        .execute(&mut *tx)
+        .fetch_one(&mut *tx)
         .await?;
         tx.commit().await?;
-        Ok(true)
+        Ok(Some(mac))
     }
 }
 

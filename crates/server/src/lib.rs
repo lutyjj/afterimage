@@ -25,4 +25,5 @@ pub mod screens;
 pub mod secrets;
 pub mod sessions;
 pub mod showing;
+pub mod telemetry;
 pub mod time_zone;

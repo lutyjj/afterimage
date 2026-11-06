@@ -84,6 +84,7 @@ pub async fn claim_device(
         Claim::Replaced(device) => (device, true),
     };
     tracing::info!(device = device.id, replaced, "device claimed");
+    state.telemetry.device(device.id);
     Ok(output::ClaimDeviceOutput {
         device: shown(&state, device)?,
         replaced,
@@ -146,6 +147,7 @@ pub async fn update_device(
     if board_chosen {
         state.firmware.forget_unused().await;
     }
+    state.telemetry.device(device.id);
     Ok(output::UpdateDeviceOutput {
         device: shown(&state, device)?,
     })
@@ -184,14 +186,15 @@ pub async fn delete_device(
     caller: Caller,
 ) -> Result<output::DeleteDeviceOutput, error::DeleteDeviceError> {
     let reset = input.reset.unwrap_or(false);
-    let deleted = state
+    let Some(mac) = state
         .devices
         .delete(caller.account.id, *input.device_id.inner(), reset)
         .await
-        .map_err(|error| internal(&error))?;
-    if !deleted {
+        .map_err(|error| internal(&error))?
+    else {
         return Err(not_found().into());
-    }
+    };
+    state.telemetry.removed(&mac);
     if let Err(error) = state.images.forget(*input.device_id.inner()) {
         tracing::warn!(%error, "a removed device's images stay on disk");
     }

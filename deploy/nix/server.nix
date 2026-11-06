@@ -2,6 +2,7 @@
   lib,
   rustPlatform,
   contract,
+  mosquitto,
 }:
 
 let
@@ -41,6 +42,8 @@ rustPlatform.buildRustPackage {
   ];
   # Every crate's tests, the conformance test against TRMNL's document included.
   cargoTestFlags = [ "--workspace" ];
+  # The broker the MQTT tests publish to.
+  nativeCheckInputs = [ mosquitto ];
 
   meta = {
     inherit (manifest.package) description;

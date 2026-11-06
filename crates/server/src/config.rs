@@ -4,7 +4,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use crate::oidc;
+use crate::{oidc, telemetry};
 
 #[derive(Debug, Clone, clap::Parser)]
 #[command(
@@ -73,6 +73,37 @@ pub struct Config {
     /// What the sign-in button calls the OIDC provider.
     #[arg(long, env = "AFTERIMAGE_OIDC_NAME", default_value = "Single sign-on")]
     pub oidc_name: String,
+
+    /// The MQTT broker to publish device state to, with Home Assistant's
+    /// discovery, such as `mqtt://broker.example:1883` or `mqtts://` with TLS;
+    /// nothing is published without it.
+    #[arg(long, env = "AFTERIMAGE_MQTT_URL", value_parser = parse_mqtt_url)]
+    pub mqtt_url: Option<url::Url>,
+
+    #[arg(long, env = "AFTERIMAGE_MQTT_USERNAME", requires = "mqtt_url")]
+    pub mqtt_username: Option<String>,
+
+    #[arg(
+        long,
+        env = "AFTERIMAGE_MQTT_PASSWORD",
+        requires = "mqtt_username",
+        hide_env_values = true
+    )]
+    pub mqtt_password: Option<String>,
+
+    /// The topic every device's state is published under, which is also the
+    /// server's client ID at the broker.
+    #[arg(long, env = "AFTERIMAGE_MQTT_TOPIC", default_value = "afterimage", value_parser = parse_topic)]
+    pub mqtt_topic: String,
+
+    /// Home Assistant's MQTT discovery prefix.
+    #[arg(
+        long,
+        env = "AFTERIMAGE_MQTT_DISCOVERY_PREFIX",
+        default_value = "homeassistant",
+        value_parser = parse_topic
+    )]
+    pub mqtt_discovery_prefix: String,
 }
 
 impl Config {
@@ -96,6 +127,19 @@ impl Config {
         )
     }
 
+    /// The broker and topics to publish to, when a broker is configured.
+    #[must_use]
+    pub fn mqtt(&self) -> Option<telemetry::Settings> {
+        Some(telemetry::Settings {
+            url: self.mqtt_url.clone()?,
+            username: self.mqtt_username.clone(),
+            password: self.mqtt_password.clone(),
+            topic: self.mqtt_topic.clone(),
+            discovery_prefix: self.mqtt_discovery_prefix.clone(),
+            public_url: self.public_url.clone(),
+        })
+    }
+
     /// Where firmware images are cached.
     #[must_use]
     pub fn cache_dir(&self) -> PathBuf {
@@ -110,6 +154,35 @@ impl Config {
         self.public_url
             .as_deref()
             .map(|url| url.starts_with("https://"))
+    }
+}
+
+fn parse_mqtt_url(text: &str) -> Result<url::Url, String> {
+    let url = url::Url::parse(text).map_err(|error| error.to_string())?;
+    if !matches!(url.scheme(), "mqtt" | "mqtts") {
+        return Err("must start with mqtt:// or mqtts://".to_owned());
+    }
+    if url.host_str().is_none_or(str::is_empty) || !matches!(url.path(), "" | "/") {
+        return Err("must be a scheme, a host and a port, with no path".to_owned());
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err("takes no credentials; set the MQTT username and password".to_owned());
+    }
+    Ok(url)
+}
+
+/// A topic of one or more levels, without wildcards or empty levels.
+fn parse_topic(text: &str) -> Result<String, String> {
+    let valid = !text.is_empty()
+        && text.split('/').all(|level| {
+            !level.is_empty()
+                && !level.contains(['+', '#'])
+                && level.chars().all(|c| c.is_ascii_graphic())
+        });
+    if valid {
+        Ok(text.to_owned())
+    } else {
+        Err("must be topic levels of visible ASCII, without + or # or empty levels".to_owned())
     }
 }
 
@@ -170,6 +243,33 @@ mod tests {
         assert_eq!(config.oidc().unwrap().client_id, "afterimage");
         assert_eq!(config.landing(), "https://afterimage.example/");
         assert_eq!(config.public_url_is_https(), Some(true));
+    }
+
+    #[test]
+    fn mqtt_needs_a_broker_url_without_credentials_and_clean_topics() {
+        assert!(parse(&[]).unwrap().mqtt().is_none());
+        let config = parse(&["--mqtt-url", "mqtt://broker.example.test:1883"]).unwrap();
+        let mqtt = config.mqtt().unwrap();
+        assert_eq!(
+            (mqtt.topic.as_str(), mqtt.discovery_prefix.as_str()),
+            ("afterimage", "homeassistant")
+        );
+        for url in [
+            "http://broker.example.test",
+            "mqtt://",
+            "mqtt://broker.example.test/path",
+            "mqtt://user:secret@broker.example.test",
+        ] {
+            assert!(parse(&["--mqtt-url", url]).is_err(), "{url}");
+        }
+        assert!(
+            parse(&["--mqtt-username", "afterimage"]).is_err(),
+            "a username needs a broker"
+        );
+        for topic in ["", "a/#", "a/+/b", "a//b", "a b"] {
+            assert!(parse(&["--mqtt-topic", topic]).is_err(), "{topic:?}");
+        }
+        assert!(parse(&["--mqtt-topic", "home/afterimage"]).is_ok());
     }
 
     #[test]
