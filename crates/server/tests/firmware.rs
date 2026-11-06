@@ -177,7 +177,7 @@ async fn a_board_comes_from_a_choice_or_from_the_model_the_firmware_reports() {
     let id = device["id"].as_i64().unwrap();
     assert_eq!(
         device["firmware"],
-        json!({ "boardChosen": false }),
+        json!({ "boardChosen": false, "updateAvailable": false }),
         "TRMNL names no board og"
     );
     server
@@ -185,7 +185,8 @@ async fn a_board_comes_from_a_choice_or_from_the_model_the_firmware_reports() {
         .await;
     assert_eq!(
         firmware_of(&server, id).await,
-        json!({ "board": "xteink_x4", "boardChosen": false, "latestVersion": "1.8.9" })
+        json!({ "board": "xteink_x4", "boardChosen": false, "latestVersion": "1.8.9",
+                "updateAvailable": false })
     );
     let (status, body) = server
         .call(
@@ -197,7 +198,9 @@ async fn a_board_comes_from_a_choice_or_from_the_model_the_firmware_reports() {
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(
         body["device"]["firmware"],
-        json!({ "board": "seeed_OG_DIY_Kit", "boardChosen": true, "latestVersion": "1.8.18" })
+        json!({ "board": "seeed_OG_DIY_Kit", "boardChosen": true, "latestVersion": "1.8.18",
+                "updateAvailable": true }),
+        "1.8.9 is older"
     );
     let (status, body) = server
         .call(
@@ -432,7 +435,10 @@ async fn without_trmnls_list_there_is_no_board_to_choose() {
     let (status, body) = server.call("GET", "/manage/firmware-boards", None).await;
     assert_eq!(status, StatusCode::BAD_GATEWAY, "{body}");
     let (device, _) = server.claim(&mac(1)).await;
-    assert_eq!(device["firmware"], json!({ "boardChosen": false }));
+    assert_eq!(
+        device["firmware"],
+        json!({ "boardChosen": false, "updateAvailable": false })
+    );
 }
 
 #[tokio::test]

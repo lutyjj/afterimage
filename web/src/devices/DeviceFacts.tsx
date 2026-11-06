@@ -45,7 +45,10 @@ export function DeviceFacts({
         {signal !== undefined ? signalQuality(signal) : "Not reported"}
         {signal !== undefined && <Aside> {signal} dBm</Aside>}
       </Fact>
-      <Fact label="Firmware">{firmwareVersion ?? "Not reported"}</Fact>
+      <Fact label="Firmware">
+        {firmwareVersion ?? "Not reported"}
+        {device.firmware.updateAvailable && <Aside> · {device.firmware.latestVersion} available</Aside>}
+      </Fact>
       {children}
     </dl>
   );

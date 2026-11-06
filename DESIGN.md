@@ -293,6 +293,10 @@ A device state in proofer's red: narrow capitals between a 1.5px rule and a 1px 
 
 One day from midnight to midnight, each playlist entry a lane whose ink bars are as long as the time the entry is current. Lane names stand in a 6.5rem column of narrow blue text before the track, hour ticks fall every 3 hours (stronger every 6), and a Non-repro Blue marker shows now.
 
+### Routing slip
+
+An install request's three legs (Requested, Sent, Installed) side by side, each a 2px rule over its narrow label and its time. A leg that happened is Pencil Blue, the leg under way is dashed Non-repro Blue, a leg still to come is Hairline Blue with its label in Blue Gray, and a leg that failed is Proofer's Red with "Not installed" in Red Pencil at 720.
+
 ### Sheets
 
 The claim panel, the sign-in form and the first-display guide are white sheets with crop marks on paper, padded 1.5 to 2rem. The claim sheet holds the six-cell code field: white cells in the narrow cut, the active one ringed in Non-repro Blue with a blinking caret.

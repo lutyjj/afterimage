@@ -49,6 +49,11 @@ structure DeviceFirmware {
     /// cannot be read.
     latestVersion: FirmwareVersion
 
+    /// Whether `latestVersion` is newer than the release the device reports, or
+    /// differs from one that does not read as a version.
+    @required
+    updateAvailable: Boolean
+
     /// The latest install request, until another replaces it.
     update: FirmwareUpdate
 }

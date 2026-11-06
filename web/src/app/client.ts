@@ -5,6 +5,7 @@ import {
   NotFound,
   SignInRefused,
   Unauthenticated,
+  UpstreamFailure,
   ValidationException,
 } from "@afterimage/management-client";
 import { QueryCache, MutationCache, QueryClient, queryOptions } from "@tanstack/react-query";
@@ -55,7 +56,8 @@ export function messageOf(error: unknown): string {
     error instanceof NotFound ||
     error instanceof Conflict ||
     error instanceof SignInRefused ||
-    error instanceof Unauthenticated
+    error instanceof Unauthenticated ||
+    error instanceof UpstreamFailure
   ) {
     return error.message;
   }

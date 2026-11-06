@@ -9,6 +9,7 @@ import { Stamp } from "../proof/Stamp";
 import { screensQuery } from "../screens/queries";
 import styles from "./DeviceDetail.module.css";
 import { Aside, DeviceFacts, Fact } from "./DeviceFacts";
+import { DeviceFirmware } from "./DeviceFirmware";
 import { DeviceSettings } from "./DeviceSettings";
 import { PlaylistEditor } from "./PlaylistEditor";
 import { deviceQuery, findDisplay, imageUrl } from "./queries";
@@ -88,6 +89,7 @@ export function DeviceDetail() {
 
       <PlaylistEditor device={data} screens={screens} timeZone={timeZone} />
       <DeviceSettings device={data} models={models} />
+      <DeviceFirmware device={data} timeZone={timeZone} />
       <RemoveDevice device={data} />
     </div>
   );

@@ -62,6 +62,26 @@ impl Board {
             .map(|(_, release)| release)
     }
 
+    /// Whether the newest release is newer than `installed`, or differs from an
+    /// `installed` that does not read as a version, such as a build of the
+    /// firmware's own.
+    #[must_use]
+    pub fn newer_than(&self, installed: Option<&str>) -> bool {
+        let Some(latest) = self.latest() else {
+            return false;
+        };
+        let Some(installed) = installed else {
+            return false;
+        };
+        match (
+            semver::Version::parse(&latest.version),
+            semver::Version::parse(installed),
+        ) {
+            (Ok(latest), Ok(installed)) => latest > installed,
+            _ => latest.version != installed,
+        }
+    }
+
     #[must_use]
     pub fn release(&self, version: &str) -> Option<&Release> {
         self.releases
@@ -267,6 +287,20 @@ mod tests {
             ..boards[0].clone()
         };
         assert_eq!(none.latest(), None);
+    }
+
+    #[test]
+    fn a_release_is_newer_by_semantic_version() {
+        let og = &parse(LIST.as_bytes()).unwrap()[0];
+        assert!(og.newer_than(Some("1.6.10")));
+        assert!(og.newer_than(Some("1.8.18-dev")), "a pre-release is older");
+        assert!(!og.newer_than(Some("1.8.18")));
+        assert!(!og.newer_than(Some("1.9.0")));
+        assert!(
+            og.newer_than(Some("1.8")),
+            "not a version: any other is news"
+        );
+        assert!(!og.newer_than(None), "nothing to compare");
     }
 
     #[test]

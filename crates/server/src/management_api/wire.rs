@@ -52,6 +52,8 @@ pub fn device(device: Device, boards: Option<&[Board]>) -> Result<model::Device,
             .and_then(Board::latest)
             .map(|release| fit(release.version.clone()))
             .transpose()?,
+        update_available: board
+            .is_some_and(|board| board.newer_than(device.readings.firmware_version.as_deref())),
         update: device.firmware_update.map(firmware_update).transpose()?,
     };
     Ok(model::Device {

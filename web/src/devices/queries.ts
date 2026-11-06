@@ -30,3 +30,10 @@ export function findDisplay(models: DisplayModel[] | undefined, device: Device) 
   const palette = model?.palettes.find((candidate) => candidate.id === device.display.palette);
   return { model, palette };
 }
+
+/** TRMNL's firmware boards, which change with its releases every few weeks. */
+export const firmwareBoardsQuery = queryOptions({
+  queryKey: ["firmware-boards"],
+  queryFn: async () => (await client.listFirmwareBoards({})).boards,
+  staleTime: 10 * 60_000,
+});
