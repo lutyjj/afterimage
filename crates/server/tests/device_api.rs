@@ -9,12 +9,12 @@ mod common;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
+use afterimage_server::keys::token_hash;
+use afterimage_server::registrations::{IDLE_SECONDS, UNCLAIMED_LIMIT, UNUSED_SECONDS};
 use common::{FIRMWARE, MODEL};
 use common::{
     READINGS, Readings, ScriptedIds, UNKNOWN_KEY, json, log_entry, mac, start, start_with,
 };
-use afterimage_server::keys::token_hash;
-use afterimage_server::registrations::{IDLE_SECONDS, UNCLAIMED_LIMIT, UNUSED_SECONDS};
 use reqwest::StatusCode;
 use serde_json::json;
 use sqlx::Row;

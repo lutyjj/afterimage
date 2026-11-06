@@ -1,9 +1,9 @@
 //! The account's personal API tokens.
 
-use aws_smithy_types::DateTime;
 use afterimage_management_api::model::{self, TokenScope};
 use afterimage_management_api::server::Extension;
 use afterimage_management_api::{error, input, output};
+use aws_smithy_types::DateTime;
 
 use super::wire::fit;
 use super::{Caller, Credential, Shared, internal};

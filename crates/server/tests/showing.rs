@@ -5,12 +5,12 @@ mod common;
 
 use std::sync::{Arc, Mutex};
 
+use afterimage_server::secrets::Secrets;
 use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::routing::get;
 use common::{FIRMWARE, READINGS, mac, start, start_with_secrets};
-use afterimage_server::secrets::Secrets;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 

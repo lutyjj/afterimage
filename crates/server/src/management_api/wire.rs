@@ -3,11 +3,11 @@
 //! Stored values were validated when they were written, so a value that no longer
 //! fits its shape is a server fault, answered as `InternalFailure`.
 
-use aws_smithy_types::DateTime;
 use afterimage_management_api::error::InternalFailure;
 use afterimage_management_api::model;
 use afterimage_management_api::serde::{SerializationSettings, SerializeConfigured};
 use afterimage_trmnl::catalog::Catalog;
+use aws_smithy_types::DateTime;
 
 use crate::accounts::Account;
 use crate::devices::{self, Device, Entry};

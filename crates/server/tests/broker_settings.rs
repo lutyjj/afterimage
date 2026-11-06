@@ -7,8 +7,8 @@ mod common;
 
 use std::sync::Arc;
 
-use common::{Broker, Observer, Server, browser, mac, start, start_on_data, start_with};
 use afterimage_server::keys::OsEntropy;
+use common::{Broker, Observer, Server, browser, mac, start, start_on_data, start_with};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
@@ -201,7 +201,8 @@ async fn a_change_while_the_broker_is_away_does_not_wait_for_it() {
 #[tokio::test]
 async fn refused_new_credentials_leave_the_displays_unavailable() {
     // The broker knows the first password only; the second is refused.
-    let broker = Broker::start_with_users(&[("afterimage", "first"), ("observer", "observer")]).await;
+    let broker =
+        Broker::start_with_users(&[("afterimage", "first"), ("observer", "observer")]).await;
     let observer = Observer::start_as(&broker, Some(("observer", "observer")));
     let server = start().await;
     server.sign_up().await;

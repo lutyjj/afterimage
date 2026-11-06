@@ -5,9 +5,9 @@ mod common;
 
 use std::sync::Arc;
 
+use afterimage_server::keys::OsEntropy;
 use common::oidc::{Flaw, NAME, PUBLIC_URL, Person};
 use common::{Server, start, start_with, start_with_provider};
-use afterimage_server::keys::OsEntropy;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 

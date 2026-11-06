@@ -9,6 +9,135 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "afterimage-conformance"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "afterimage-device-api"
+version = "0.1.0"
+dependencies = [
+ "aws-smithy-http",
+ "aws-smithy-http-server",
+ "aws-smithy-json",
+ "aws-smithy-runtime-api",
+ "aws-smithy-schema",
+ "aws-smithy-types",
+ "bytes",
+ "futures-util",
+ "http",
+ "http-body",
+ "hyper",
+ "mime",
+ "nom",
+ "percent-encoding",
+ "pin-project-lite",
+ "regex",
+ "tower 0.4.13",
+ "tracing",
+]
+
+[[package]]
+name = "afterimage-management-api"
+version = "0.1.0"
+dependencies = [
+ "aws-smithy-http",
+ "aws-smithy-http-server",
+ "aws-smithy-json",
+ "aws-smithy-runtime-api",
+ "aws-smithy-schema",
+ "aws-smithy-types",
+ "bytes",
+ "form_urlencoded",
+ "futures-util",
+ "http",
+ "http-body",
+ "hyper",
+ "mime",
+ "nom",
+ "pin-project-lite",
+ "regex",
+ "serde",
+ "tower 0.4.13",
+ "tracing",
+]
+
+[[package]]
+name = "afterimage-render-typst"
+version = "0.1.0"
+dependencies = [
+ "afterimage-trmnl",
+ "include_dir",
+ "png",
+ "pulldown-cmark",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tiny-skia",
+ "typst",
+ "typst-as-lib",
+ "typst-layout",
+ "typst-render",
+]
+
+[[package]]
+name = "afterimage-server"
+version = "0.1.0"
+dependencies = [
+ "afterimage-device-api",
+ "afterimage-management-api",
+ "afterimage-render-typst",
+ "afterimage-trmnl",
+ "aws-smithy-types",
+ "axum",
+ "base64 0.23.1",
+ "bytes",
+ "chrono",
+ "clap",
+ "cookie",
+ "data-url",
+ "esp-idf-part",
+ "getrandom 0.4.3",
+ "http",
+ "http-body",
+ "hyper",
+ "jiff",
+ "minijinja",
+ "minijinja-contrib",
+ "openidconnect",
+ "password-auth",
+ "png",
+ "reqwest",
+ "rsa",
+ "rumqttc",
+ "rustls-native-certs",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tower 0.5.3",
+ "tower-http 0.7.1",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "afterimage-trmnl"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3545,135 +3674,6 @@ name = "powerfmt"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a6394b9e965e73d0a289ee54f589087e2c676aedf60885baf52c76b771e4958"
-
-[[package]]
-name = "afterimage-conformance"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "afterimage-device-api"
-version = "0.1.0"
-dependencies = [
- "aws-smithy-http",
- "aws-smithy-http-server",
- "aws-smithy-json",
- "aws-smithy-runtime-api",
- "aws-smithy-schema",
- "aws-smithy-types",
- "bytes",
- "futures-util",
- "http",
- "http-body",
- "hyper",
- "mime",
- "nom",
- "percent-encoding",
- "pin-project-lite",
- "regex",
- "tower 0.4.13",
- "tracing",
-]
-
-[[package]]
-name = "afterimage-management-api"
-version = "0.1.0"
-dependencies = [
- "aws-smithy-http",
- "aws-smithy-http-server",
- "aws-smithy-json",
- "aws-smithy-runtime-api",
- "aws-smithy-schema",
- "aws-smithy-types",
- "bytes",
- "form_urlencoded",
- "futures-util",
- "http",
- "http-body",
- "hyper",
- "mime",
- "nom",
- "pin-project-lite",
- "regex",
- "serde",
- "tower 0.4.13",
- "tracing",
-]
-
-[[package]]
-name = "afterimage-render-typst"
-version = "0.1.0"
-dependencies = [
- "include_dir",
- "png",
- "afterimage-trmnl",
- "pulldown-cmark",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "tiny-skia",
- "typst",
- "typst-as-lib",
- "typst-layout",
- "typst-render",
-]
-
-[[package]]
-name = "afterimage-server"
-version = "0.1.0"
-dependencies = [
- "aws-smithy-types",
- "axum",
- "base64 0.23.1",
- "bytes",
- "chrono",
- "clap",
- "cookie",
- "data-url",
- "esp-idf-part",
- "getrandom 0.4.3",
- "http",
- "http-body",
- "hyper",
- "jiff",
- "minijinja",
- "minijinja-contrib",
- "openidconnect",
- "password-auth",
- "png",
- "afterimage-device-api",
- "afterimage-management-api",
- "afterimage-render-typst",
- "afterimage-trmnl",
- "reqwest",
- "rsa",
- "rumqttc",
- "rustls-native-certs",
- "semver",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "sqlx",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tower 0.5.3",
- "tower-http 0.7.1",
- "tracing",
- "tracing-subscriber",
- "url",
-]
-
-[[package]]
-name = "afterimage-trmnl"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "ppv-lite86"

@@ -6,10 +6,10 @@ use std::sync::Arc;
 
 use std::convert::Infallible;
 
+use afterimage_device_api::server::body::{BoxBody, boxed};
 use http::header::{CACHE_CONTROL, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED};
 use http::{HeaderValue, Request, Response, StatusCode};
 use hyper::body::Incoming;
-use afterimage_device_api::server::body::{BoxBody, boxed};
 use tower::steer::Steer;
 use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt, service_fn};

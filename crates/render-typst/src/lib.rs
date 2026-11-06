@@ -15,8 +15,8 @@ mod tokens;
 
 use std::collections::BTreeMap;
 
-use include_dir::{Dir, include_dir};
 use afterimage_trmnl::catalog::{Model, Palette};
+use include_dir::{Dir, include_dir};
 use typst::foundations::{Array, Bytes, Dict, IntoValue, Str};
 use typst::layout::{Abs, Frame, FrameItem, Point};
 use typst::text::{Font, FontVariations};

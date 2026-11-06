@@ -6,10 +6,10 @@ mod common;
 
 use std::sync::Arc;
 
+use afterimage_server::keys::OsEntropy;
 use common::{
     Broker, Observer, READINGS, Readings, Server, app_image, flash_image, mac, start_with,
 };
-use afterimage_server::keys::OsEntropy;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 

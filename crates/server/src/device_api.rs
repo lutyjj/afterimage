@@ -4,12 +4,12 @@
 use std::convert::Infallible;
 use std::sync::Arc;
 
-use aws_smithy_types::{Document, Number};
-use http::{Request, Response};
 use afterimage_device_api::server::body::BoxBody;
 use afterimage_device_api::server::{AddExtensionLayer, Extension};
 use afterimage_device_api::{DeviceApi, DeviceApiConfig, error, input, output};
 use afterimage_trmnl::{DisplayStatus, Mac, Readings, SetupStatus, panel_size};
+use aws_smithy_types::{Document, Number};
+use http::{Request, Response};
 use tower::Service;
 
 use crate::clock::Clock;

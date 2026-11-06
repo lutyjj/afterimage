@@ -2,12 +2,12 @@ use std::io::IsTerminal;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use clap::Parser;
 use afterimage_server::app;
 use afterimage_server::clock::SystemClock;
 use afterimage_server::config::Config;
 use afterimage_server::keys::OsEntropy;
 use afterimage_server::secrets::Secrets;
+use clap::Parser;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 

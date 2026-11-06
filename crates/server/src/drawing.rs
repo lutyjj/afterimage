@@ -19,10 +19,10 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use minijinja::value::{Kwargs, Serde, Value as Template};
-use minijinja::{Environment, Error, ErrorKind, State, UndefinedBehavior, context};
 use afterimage_render_typst::{Image, Renderer};
 use afterimage_trmnl::catalog::{Catalog, Model, Palette};
+use minijinja::value::{Kwargs, Serde, Value as Template};
+use minijinja::{Environment, Error, ErrorKind, State, UndefinedBehavior, context};
 use serde_json::{Map, Value, json};
 use tokio::sync::Semaphore;
 use tokio::time::Instant;

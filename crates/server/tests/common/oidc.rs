@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
+use afterimage_server::clock::Clock;
 use axum::extract::{Form, Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
@@ -27,7 +28,6 @@ use openidconnect::{
     Nonce, PkceCodeChallenge, PkceCodeVerifier, PrivateSigningKey, ResponseTypes, Scope,
     StandardClaims, SubjectIdentifier, TokenUrl,
 };
-use afterimage_server::clock::Clock;
 use rsa::pkcs1::{EncodeRsaPrivateKey, LineEnding};
 use tokio::net::TcpListener;
 

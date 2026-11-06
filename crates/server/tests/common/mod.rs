@@ -15,13 +15,13 @@ use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use axum::routing::get;
 
-use clap::Parser;
-use esp_idf_part::{AppType, DataType, Flags, Partition, PartitionTable, SubType, Type};
 use afterimage_server::app;
 use afterimage_server::clock::Clock;
 use afterimage_server::config::Config;
 use afterimage_server::keys::{Entropy, OsEntropy};
 use afterimage_server::secrets::Secrets;
+use clap::Parser;
+use esp_idf_part::{AppType, DataType, Flags, Partition, PartitionTable, SubType, Type};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};

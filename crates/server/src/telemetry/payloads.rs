@@ -211,6 +211,9 @@ mod tests {
             Some("41b41039a10f")
         );
         assert_eq!(device_key("afterimage", "afterimage//state", "state"), None);
-        assert_eq!(device_key("afterimage", "afterimage/a/firmware", "state"), None);
+        assert_eq!(
+            device_key("afterimage", "afterimage/a/firmware", "state"),
+            None
+        );
     }
 }
