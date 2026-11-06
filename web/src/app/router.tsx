@@ -41,6 +41,12 @@ async function signedOutOnly() {
   return null;
 }
 
+/** The page is blank while the first loader asks whether anyone is signed in, a
+ * moment too short for a placeholder that would only flash. */
+function Starting() {
+  return null;
+}
+
 // The editor carries CodeMirror and the document schema, so it loads on first use.
 const screenEditor = async () => {
   const { ScreenEditor } = await import("../screens/editor/ScreenEditor");
@@ -48,12 +54,13 @@ const screenEditor = async () => {
 };
 
 export const router = createBrowserRouter([
-  { path: "/sign-in", loader: signedOutOnly, Component: SignIn, ErrorBoundary: RouteError },
+  { path: "/sign-in", loader: signedOutOnly, Component: SignIn, HydrateFallback: Starting, ErrorBoundary: RouteError },
   { path: "/sign-out", action: signOutAction(client, queryClient), ErrorBoundary: RouteError },
   {
     path: "/",
     loader: requireAccount,
     Component: Shell,
+    HydrateFallback: Starting,
     ErrorBoundary: RouteError,
     children: [
       { index: true, Component: DeviceList },

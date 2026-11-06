@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 
 import { displayModelsQuery, messageOf, serverQuery } from "../app/client";
+import { Page } from "../app/Page";
 import { CropMarks } from "../proof/CropMarks";
 import { Proof } from "../proof/Proof";
 import { Stamp } from "../proof/Stamp";
@@ -23,11 +24,7 @@ export function DeviceList() {
   const timeZone = useQuery(serverQuery).data?.timeZone;
 
   return (
-    <div className={styles.page}>
-      <header className={styles.head}>
-        <h1 className={styles.heading}>Devices</h1>
-        {timeZone && <p className="annotation">Times in {timeZone}</p>}
-      </header>
+    <Page title="Devices" note={timeZone && `Times in ${timeZone}`}>
       <div className={styles.layout}>
         <aside className={styles.claim}>
           <ClaimPanel />
@@ -49,7 +46,7 @@ export function DeviceList() {
           </ol>
         </section>
       </div>
-    </div>
+    </Page>
   );
 }
 

@@ -8,6 +8,8 @@ import { useMutation, useQuery, type UseMutationResult } from "@tanstack/react-q
 import { useState, type FormEvent } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
+import { Page } from "../app/Page";
+import { Section } from "../app/Section";
 import { mqttQuery } from "./queries";
 import styles from "./ServerPage.module.css";
 
@@ -23,22 +25,11 @@ export function ServerPage() {
   });
 
   return (
-    <div className={styles.page}>
-      <header className={styles.head}>
-        <h1 className={styles.heading}>Server</h1>
-        <p className="annotation">Settings for everyone on this server</p>
-      </header>
-
-      <section className={styles.section} aria-labelledby="mqtt-title">
-        <div className={styles.sectionHead}>
-          <h2 id="mqtt-title" className={styles.title}>
-            MQTT broker
-          </h2>
-          <p className="hint">
-            Afterimage publishes every claimed display to Home Assistant through its MQTT discovery: battery, signal,
-            last check-in, the screen it shows, and a firmware update Home Assistant can install.
-          </p>
-        </div>
+    <Page title="Server" note="Settings for everyone on this server" narrow>
+      <Section
+        title="MQTT broker"
+        intro="Afterimage publishes every claimed display to Home Assistant through its MQTT discovery: battery, signal, last check-in, the screen it shows, and a firmware update Home Assistant can install."
+      >
 
         {mqtt.isPending && <p className="annotation">Loading the broker</p>}
         {mqtt.isError && (
@@ -53,8 +44,8 @@ export function ServerPage() {
         {mqtt.data && !mqtt.data.setByDeployment && (
           <BrokerForm key={JSON.stringify({ ...mqtt.data, connection: undefined })} settings={mqtt.data} save={save} />
         )}
-      </section>
-    </div>
+      </Section>
+    </Page>
   );
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
 import { minutesLabel } from "../app/format";
+import { Section } from "../app/Section";
 import styles from "./DeviceSettings.module.css";
 import { deviceQuery, devicesQuery } from "./queries";
 
@@ -61,10 +62,7 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
   };
 
   return (
-    <section className={styles.section} aria-labelledby="settings-title">
-      <h2 id="settings-title" className={styles.title}>
-        Settings
-      </h2>
+    <Section title="Settings">
       <form className={styles.form} onSubmit={submit} onChange={() => setSaved(false)}>
         <label className="field">
           <span>Name</span>
@@ -137,6 +135,6 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
           )}
         </div>
       </form>
-    </section>
+    </Section>
   );
 }

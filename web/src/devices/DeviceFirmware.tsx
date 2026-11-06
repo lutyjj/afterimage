@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
 import { moment } from "../app/format";
+import { Section } from "../app/Section";
 import styles from "./DeviceFirmware.module.css";
 import { nextCheckIn, updateSteps, type Step } from "./firmwareSteps";
 import { deviceQuery, devicesQuery, firmwareBoardsQuery } from "./queries";
@@ -45,13 +46,7 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
     firmware.updateAvailable && latest !== undefined && !pending && update?.state !== "not_installed" && !choosing;
 
   return (
-    <section className={styles.section} aria-labelledby="firmware-title">
-      <div className={styles.head}>
-        <h2 id="firmware-title" className={styles.title}>
-          Firmware
-        </h2>
-        <p className="hint">{lead(device)}</p>
-      </div>
+    <Section title="Firmware" intro={lead(device)}>
 
       <BoardChoice
         device={device}
@@ -164,7 +159,7 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
           {messageOf(install.error)}
         </p>
       )}
-    </section>
+    </Section>
   );
 }
 

@@ -3,8 +3,11 @@
   gap: var(--space-3);
   justify-items: start;
   min-width: 0;
-  /* Room for the crop marks, which stand outside the image. */
-  padding: 1.25rem;
+  /* Room for the crop marks, which stand outside the image. Sideways the room
+     lies in what surrounds the proof, so its plate lines up with the content
+     beside and above it on both edges. */
+  padding: var(--crop-room);
+  margin-inline: calc(-1 * var(--crop-room));
 }
 
 .plate {
@@ -57,7 +60,7 @@
   align-items: center;
   gap: var(--space-2) var(--space-4);
   width: 100%;
-  padding-right: 1.25rem;
+  padding-right: var(--crop-room);
 }
 
 .wedge {

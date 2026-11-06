@@ -238,13 +238,13 @@ A warm neutral paper, one ink, one family of non-repro blues, and one proofer's 
 
 ## Layout
 
-The page sits inside a gutter of `clamp(1rem, 3vw, 2.5rem)` under a sticky top bar 3.25rem tall. Spacing follows one scale from 0.25rem to 4rem; groups sit tight (0.25 to 0.75rem) and sections stand apart (1.5 to 4rem), each section opened by a hairline rule rather than a box.
+The page sits inside a gutter of `clamp(1rem, 3vw, 2.5rem)` under a sticky top bar 3.25rem tall. Every page opens with its name, a note in the annotation style beneath it and its actions at the right; pages of forms (the account, the server) keep to a 48rem measure. A plate lines up with the content around it on both edges, its crop marks standing in the gutter or the gap beside it. Spacing follows one scale from 0.25rem to 4rem; groups sit tight (0.25 to 0.75rem) and sections stand apart (1.5 to 4rem), each section opened by a hairline rule rather than a box.
 
-The devices list is a proof sheet, not a card grid. Each display is a row: its plate in a shared track `800px + 1.25rem` wide, so an 800-pixel display shows at 1:1 on a 1440-pixel screen, its facts in a single column of at least 13rem beside it, and its day strip under the plate. Every row starts its facts and its strip's track at one edge. The claim sheet takes a 17.5rem column at the right, level with the first plate, and stays in view while the list scrolls.
+The devices list is a proof sheet, not a card grid. Each display is a row: its plate in a shared track 800px wide, so an 800-pixel display shows at 1:1 on a 1440-pixel screen, with its crop marks standing in the gap beside it, its facts in a single column of at least 13rem beside it, and its day strip under the plate. Every row starts its facts and its strip's track at one edge. The claim sheet takes a 17.5rem column at the right, level with the first plate, and stays in view while the list scrolls.
 
 Below 72rem a row stacks: plate, facts in two columns, then the strip. Below 52rem the claim sheet moves above the list. Below 40rem crop marks shrink to fit the narrower gutter.
 
-The screen editor fills the viewport: the YAML on the left, the proof on the right at the device's real pixels, and the data sources' answers below the proof in a column that scrolls on its own.
+The screen editor fills the viewport: the YAML on the left, the proof on the right at the device's real pixels, and the data sources' answers below the proof in a column that scrolls on its own. Below 64rem the proof moves under the editor, centred and as wide as the display where it fits.
 
 ## Elevation & Depth
 
@@ -254,7 +254,7 @@ The proofroom is flat. Nothing casts a shadow. Depth comes from material: white 
 
 ## Shapes
 
-Controls have hairline corners (2px): buttons, inputs, selects, code cells. Sheets, plates and stamps are square. The signature forms are drawn geometry: crop marks (two 1px blue strokes at a plate's top-left and bottom-right corners, 0.875rem long and stopping 0.375rem short of the trim), the stamp's double rule, the step wedge's row of patches, and the crossed box of a plate that has no image yet.
+Controls have hairline corners (2px): buttons, inputs, selects, code cells. Sheets, plates and stamps are square. The signature forms are drawn geometry: crop marks (two 1px blue strokes at a plate's top-left and bottom-right corners, 0.875rem long and stopping 0.375rem short of the trim, and smaller in proportion on a phone), the stamp's double rule, the step wedge's row of patches, and the crossed box of a plate that has no image yet.
 
 ## Components
 

@@ -1,14 +1,3 @@
-.section {
-  display: grid;
-  gap: var(--space-4);
-  padding-top: var(--space-5);
-  border-top: var(--rule);
-}
-
-.title {
-  font-size: var(--text-lg);
-}
-
 .closed {
   display: grid;
   justify-items: start;

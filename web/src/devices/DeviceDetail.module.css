@@ -36,17 +36,18 @@
   font-size: var(--text-sm);
 }
 
+/* The plate, and its facts level with its top edge; the crop marks stand in
+   the gap between them. */
 .top {
   display: grid;
   grid-template-columns: minmax(0, auto) minmax(14rem, 22rem);
   justify-content: start;
-  gap: var(--space-5);
+  gap: var(--space-5) calc(var(--crop-room) + var(--space-5));
   align-items: start;
-  margin-left: -1.25rem;
 }
 
 .facts {
-  padding-top: 1.25rem;
+  padding-top: var(--crop-room);
 }
 
 @media (max-width: 64rem) {
@@ -57,6 +58,6 @@
 
   .facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding: 0 0 0 1.25rem;
+    padding-top: 0;
   }
 }

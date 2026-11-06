@@ -2,8 +2,11 @@
   padding: var(--space-6) var(--gutter);
 }
 
+/* One column: a track sized by its content would grow to the starters' full
+   row and push the page wider than the viewport. */
 .page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto auto auto 1fr;
   gap: var(--space-3);
   height: calc(100dvh - var(--bar-height));
@@ -149,7 +152,7 @@
 
 .bench {
   display: grid;
-  grid-template-columns: minmax(22rem, 1fr) minmax(0, auto);
+  grid-template-columns: minmax(22rem, 1fr) auto;
   gap: var(--space-5);
   min-height: 0;
 }
@@ -159,17 +162,19 @@
   min-width: 0;
 }
 
+/* The proof at the display's own pixels where the viewport allows, in a column
+   that scrolls on its own. Scrolling clips what lies outside the column, so the
+   crop marks stand in its padding, and the column reaches back into the bench's
+   gap by as much to keep its content level with the editor's edge. */
 .proofColumn {
   display: grid;
   align-content: start;
   gap: var(--space-3);
+  width: min(calc(var(--display-width, 100%) + 2 * var(--crop-room) + var(--space-1)), 62vw);
   min-height: 0;
   overflow-y: auto;
-  padding-right: var(--space-1);
-}
-
-.proofColumn > figure {
-  margin-left: -1.25rem;
+  margin-inline-start: calc(-1 * var(--crop-room));
+  padding-inline: var(--crop-room) calc(var(--crop-room) + var(--space-1));
 }
 
 .toolbar {
@@ -285,8 +290,12 @@
     height: 60dvh;
   }
 
+  /* Under the editor, centred, as wide as the display where it fits. */
   .proofColumn {
-    width: auto !important;
+    justify-self: center;
+    width: min(100%, var(--display-width, 100%));
+    margin: 0;
+    padding: 0;
     overflow: visible;
   }
 }

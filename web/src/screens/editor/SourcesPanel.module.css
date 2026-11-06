@@ -32,7 +32,6 @@
 
 .source code,
 .panel p code {
-  font-family: var(--mono);
   font-size: 0.85em;
 }
 
@@ -141,10 +140,6 @@
 .copied {
   color: var(--blue-text);
   font-size: var(--text-xs);
-}
-
-.copied code {
-  font-family: var(--mono);
 }
 
 .copied code[data-select] {

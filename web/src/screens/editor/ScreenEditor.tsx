@@ -1,7 +1,7 @@
 import type { Display, Screen, ScreenDocument } from "@afterimage/management-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Grid3x3 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useBlocker, useLocation, useNavigate, useParams } from "react-router";
 
 import { client, displayModelsQuery, messageOf, queryClient, serverQuery } from "../../app/client";
@@ -257,7 +257,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
         <aside
           className={styles.proofColumn}
           aria-label="Proof"
-          style={{ width: model ? `min(calc(${model.width}px + 2.75rem), 62vw)` : "62vw" }}
+          style={model ? ({ "--display-width": `${model.width}px` } as CSSProperties) : undefined}
         >
           <div className={styles.toolbar}>
             <label className={styles.target}>

@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { client, messageOf, queryClient } from "../app/client";
+import { Section } from "../app/Section";
 import { DayStrip } from "./DayStrip";
 import styles from "./PlaylistEditor.module.css";
 import { draftOf, entryOf, newKey, sameAs, type Draft } from "./playlistDraft";
@@ -70,16 +71,15 @@ export function PlaylistEditor({
   const noDays = draft.some((entry) => entry.days?.length === 0);
 
   return (
-    <section className={styles.section} aria-labelledby="playlist-title">
-      <div className={styles.head}>
-        <h2 id="playlist-title" className={styles.title}>
-          Playlist
-        </h2>
-        <p className="hint">
+    <Section
+      title="Playlist"
+      intro={
+        <>
           At each check-in the display shows the next screen that is current, in this order.
           {timeZone && <> Times are in {timeZone}.</>}
-        </p>
-      </div>
+        </>
+      }
+    >
 
       {now && (
         <div className={styles.today}>
@@ -152,7 +152,7 @@ export function PlaylistEditor({
           )}
         </>
       )}
-    </section>
+    </Section>
   );
 }
 
@@ -264,18 +264,6 @@ function EntryRow({
             </span>
           )}
         </div>
-        <div className={styles.strip}>
-          <DayStrip
-            day="monday"
-            entries={[{ entry: window, name: "" }]}
-            hours={index === count - 1}
-            names={false}
-            label={`${daysLabel(entry.days)}, ${windowLabel(entryOf(entry))}`}
-          />
-          <span className="annotation">
-            {daysLabel(entry.days)} · {windowLabel(entryOf(entry))}
-          </span>
-        </div>
       </div>
       <div className={styles.tools}>
         <button type="button" className="icon-button" onClick={() => onMove(-1)} disabled={index === 0} aria-label="Move up">
@@ -293,6 +281,18 @@ function EntryRow({
         <button type="button" className="icon-button" onClick={onRemove} aria-label="Remove from playlist">
           <X size={16} />
         </button>
+      </div>
+      <div className={styles.strip}>
+        <DayStrip
+          day="monday"
+          entries={[{ entry: window, name: "" }]}
+          hours={index === count - 1}
+          names={false}
+          label={`${daysLabel(entry.days)}, ${windowLabel(entryOf(entry))}`}
+        />
+        <span className="annotation">
+          {daysLabel(entry.days)} · {windowLabel(entryOf(entry))}
+        </span>
       </div>
     </li>
   );

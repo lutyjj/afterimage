@@ -46,12 +46,23 @@
 
   --rule: 1px solid var(--blue-rule);
   --gutter: clamp(1rem, 3vw, 2.5rem);
+  /* The width of a form or a passage, read in one sweep. */
+  --measure: 48rem;
+  /* The room a proof's crop marks stand in, outside its plate; they shrink with
+     the gutter on a phone. */
+  --crop-room: 1.25rem;
   /* The top bar's height, rule included; what sits under it measures from here. */
   --bar-height: calc(3.25rem + 1px);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
   color-scheme: light;
   accent-color: var(--blue-text);
+}
+
+@media (max-width: 40rem) {
+  :root {
+    --crop-room: 0.75rem;
+  }
 }
 
 *,
@@ -136,8 +147,14 @@ textarea {
   color: inherit;
 }
 
-/* Chrome text: what Afterimage says, in non-repro blue. */
-.annotation {
+code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+/* Chrome text: what Afterimage says, in non-repro blue; a field's label too. */
+.annotation,
+.field > span:first-child {
   color: var(--blue-text);
   font-size: var(--text-xs);
   font-stretch: var(--narrow);
@@ -260,15 +277,6 @@ textarea {
   display: grid;
   align-content: start;
   gap: var(--space-1);
-}
-
-.field > span:first-child {
-  color: var(--blue-text);
-  font-size: var(--text-xs);
-  font-stretch: var(--narrow);
-  font-weight: 560;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .input,

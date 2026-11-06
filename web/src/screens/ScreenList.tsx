@@ -4,6 +4,7 @@ import { Link } from "react-router";
 
 import { messageOf } from "../app/client";
 import { ago } from "../app/format";
+import { Page } from "../app/Page";
 import { devicesQuery } from "../devices/queries";
 import { screensQuery } from "./queries";
 import styles from "./ScreenList.module.css";
@@ -17,13 +18,14 @@ export function ScreenList() {
     [];
 
   return (
-    <div className={styles.page}>
-      <header className={styles.head}>
-        <h1 className={styles.heading}>Screens</h1>
+    <Page
+      title="Screens"
+      actions={
         <Link to="/screens/new" className="button" data-variant="primary">
           <Plus size={16} aria-hidden="true" /> New screen
         </Link>
-      </header>
+      }
+    >
       {screens.isPending && <p className="annotation">Loading screens</p>}
       {screens.isError && <p className="error-text">{messageOf(screens.error)}</p>}
       {screens.data?.length === 0 && (
@@ -68,6 +70,6 @@ export function ScreenList() {
           </tbody>
         </table>
       )}
-    </div>
+    </Page>
   );
 }

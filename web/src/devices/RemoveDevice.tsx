@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { client, messageOf, queryClient } from "../app/client";
+import { Section } from "../app/Section";
 import styles from "./RemoveDevice.module.css";
 import { deviceQuery, devicesQuery } from "./queries";
 
@@ -25,10 +26,7 @@ export function RemoveDevice({ device }: { device: Device }) {
   });
 
   return (
-    <section className={styles.section} aria-labelledby="remove-title">
-      <h2 id="remove-title" className={styles.title}>
-        Remove
-      </h2>
+    <Section title="Remove">
       {!open ? (
         <div className={styles.closed}>
           <p className="hint">Take {device.name} off this server, keeping or erasing its Wi-Fi setup.</p>
@@ -88,6 +86,6 @@ export function RemoveDevice({ device }: { device: Device }) {
           )}
         </div>
       )}
-    </section>
+    </Section>
   );
 }

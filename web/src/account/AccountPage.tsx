@@ -4,6 +4,8 @@ import { Check, Copy } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { accountQuery, client, messageOf, queryClient, serverQuery } from "../app/client";
+import { Page } from "../app/Page";
+import { Section } from "../app/Section";
 import { ago, moment } from "../app/format";
 import styles from "./AccountPage.module.css";
 import { tokensQuery } from "./queries";
@@ -16,24 +18,20 @@ export function AccountPage() {
   const [created, setCreated] = useState<{ token: AccessToken; secret: string } | undefined>();
 
   return (
-    <div className={styles.page}>
-      <header className={styles.head}>
-        <h1 className={styles.heading}>{account?.name ?? "Account"}</h1>
-        <p className="annotation">
-          {account?.username ? `Signs in as ${account.username}` : "Signs in through single sign-on"}
-        </p>
-      </header>
-
-      <section className={styles.section} aria-labelledby="tokens-title">
-        <div className={styles.sectionHead}>
-          <h2 id="tokens-title" className={styles.title}>
-            API tokens
-          </h2>
-          <p className="hint">
+    <Page
+      title={account?.name ?? "Account"}
+      note={account?.username ? `Signs in as ${account.username}` : "Signs in through single sign-on"}
+      narrow
+    >
+      <Section
+        title="API tokens"
+        intro={
+          <>
             Scripts and agents send a token instead of signing in, as <code>Authorization: Bearer</code> and the
             token. It acts as you until you revoke it. Give each script its own, so that you can revoke one alone.
-          </p>
-        </div>
+          </>
+        }
+      >
 
         {created ? (
           <ShownOnce created={created} onDone={() => setCreated(undefined)} />
@@ -55,8 +53,8 @@ export function AccountPage() {
             ))}
           </ul>
         )}
-      </section>
-    </div>
+      </Section>
+    </Page>
   );
 }
 

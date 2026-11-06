@@ -1,27 +1,14 @@
-.section {
-  display: grid;
-  gap: var(--space-4);
-  padding-top: var(--space-5);
-  border-top: var(--rule);
-}
-
-.head {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.title {
-  font-size: var(--text-lg);
+/* Today's strip, the entries and their actions share one measure, so every
+   track ends at one edge. */
+.today,
+.entries,
+.actions {
+  max-width: 66rem;
 }
 
 .today {
   display: grid;
   gap: var(--space-1);
-  max-width: 56rem;
-}
-
-.today :global(.annotation) {
-  text-transform: uppercase;
 }
 
 .empty {
@@ -31,7 +18,6 @@
 
 .entries {
   display: grid;
-  max-width: 72rem;
 }
 
 .entry {
@@ -54,8 +40,8 @@
   font-weight: 640;
 }
 
-/* The controls on one line, and under them the entry's window as a strip that
-   starts at the same edge in every row. */
+/* The controls on one line, and under them, across the row, the entry's window
+   as a strip that starts at the same edge in every row. */
 .fields {
   display: grid;
   grid-template-columns: minmax(10rem, 14rem) auto minmax(0, 1fr);
@@ -145,10 +131,9 @@
 }
 
 .strip {
-  grid-column: 1 / -1;
+  grid-column: 2 / -1;
   display: grid;
   gap: 0.125rem;
-  max-width: 56rem;
 }
 
 .tools {
@@ -161,7 +146,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
-  max-width: 72rem;
 }
 
 .spacer {

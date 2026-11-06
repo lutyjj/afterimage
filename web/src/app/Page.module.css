@@ -1,0 +1,26 @@
+.page {
+  display: grid;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--gutter) var(--space-8);
+}
+
+.page[data-narrow] {
+  max-width: calc(var(--measure) + 2 * var(--gutter));
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.titles {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.title {
+  font-size: var(--text-xl);
+}
