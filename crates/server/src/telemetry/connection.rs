@@ -99,10 +99,14 @@ impl Open {
         state.send_replace(Connection::Connecting);
 
         // The event loop is polled on its own, since a publish waits on it. It
-        // writes and flushes the goodbye before it reports it, then goes on until
-        // the publisher has dropped the client or the broker has closed the
-        // connection, so no request the publisher queued is lost.
+        // writes and flushes the goodbye before it reports it, then reads on until
+        // the broker closes the connection. It holds a client of its own so that
+        // the publisher letting go does not end it first: a socket closed with
+        // the broker's acknowledgements unread is reset rather than closed, and
+        // the broker can then lose the goodbye and publish the last will.
+        let holding = client.clone();
         let polling = tokio::spawn(async move {
+            let _holding = holding;
             let mut connected = true;
             let mut leaving = false;
             loop {
