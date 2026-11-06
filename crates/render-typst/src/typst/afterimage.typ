@@ -27,11 +27,26 @@
   if ratio == none or ratio <= 0 { 1.2 } else { ratio }
 }
 
-#let typeface(t, component, size) = (
-  font: (family(sized(t, component, size, "-font-family")), "Inter"),
-  size: sized(t, component, size, "-font-size") * 1pt,
-  weight: int(sized(t, component, size, "-font-weight") / 100) * 100,
-)
+// CSS's line box as the text's edges: `ratio` times the size tall, with the
+// font's ascent and descent (`@metrics`, read from the font files) centred in
+// it, so lines stack and sit on their baselines where a browser puts them.
+#let line-box(t, name, size, ratio) = {
+  let metrics = t.at("@metrics")
+  let (ascent, descent) = metrics.at(name, default: metrics.at("Inter"))
+  let half = (ratio - ascent - descent) / 2
+  (top-edge: (ascent + half) * size, bottom-edge: -(descent + half) * size)
+}
+
+#let typeface(t, component, size) = {
+  let name = family(sized(t, component, size, "-font-family"))
+  let em = sized(t, component, size, "-font-size") * 1pt
+  (
+    font: (name, "Inter"),
+    size: em,
+    weight: int(sized(t, component, size, "-font-weight") / 100) * 100,
+    ..line-box(t, name, em, leading-of(t, component, size)),
+  )
+}
 
 // What the stylesheet paints for one part of a component (`tools/tokens` reads
 // it from the release's own markup): its fill as a color, a dither tile or a
@@ -111,10 +126,11 @@
 }
 
 // Text in `face`, cut to `lines` lines with an ellipsis, as TRMNL's clamp: the
-// longest start of the text that fits, found by halving.
-#let clamped(face, leading, words, lines) = {
+// longest start of the text that fits, found by halving. Its edges are the line
+// box, so lines stack with no leading of their own.
+#let clamped(face, words, lines) = {
   let set-text(body) = {
-    set par(leading: (leading - 1) * face.size)
+    set par(leading: 0pt)
     text(..face, body)
   }
   if lines == none or words == "" { return set-text(words) }
@@ -153,13 +169,13 @@
 #let text-component(t, component, value) = {
   let size = value.at("size", default: "base")
   let face = typeface(t, component, size)
-  clamped(face, leading-of(t, component, size), shown(value.text), value.at("clamp", default: none))
+  clamped(face, shown(value.text), value.at("clamp", default: none))
 }
 
 #let label(t, value, grays) = {
   let size = value.at("size", default: "base")
   let face = typeface(t, "--label", size)
-  let body = clamped(face, leading-of(t, "--label", size), shown(value.text), value.at("clamp", default: none))
+  let body = clamped(face, shown(value.text), value.at("clamp", default: none))
   let inset = (x: px(t, "--gap-xsmall", default: 5), y: 1pt)
   let radius = px(t, "--rounded-xsmall", default: 5)
   let style = value.at("style", default: "plain")
@@ -180,9 +196,12 @@
 #let value(t, value) = {
   let size = value.at("size", default: "base")
   let base = sized(t, "--value", size, "-font-size") * 1pt
+  let name = family(tok(t, "--value-font-family"))
+  let ratio = leading-of(t, "--value", size)
   let face(size) = (
-    font: (family(tok(t, "--value-font-family")), "Inter"),
+    font: (name, "Inter"),
     size: size,
+    ..line-box(t, name, size, ratio),
     weight: int(sized(t, "--value", value.at("size", default: "base"), "-font-weight") / 100) * 100,
     number-width: if value.at("tabular", default: false) { "tabular" } else { "proportional" },
   )
@@ -314,7 +333,10 @@
   let divider(child) = child.keys().first() == "divider"
   let children = v.children
   let (length, breadth) = if direction == "column" { (bounds.h, bounds.w) } else { (bounds.w, bounds.h) }
-  let tracks = children.map(child => if length and not divider(child) and grows(child) { 1fr } else { auto })
+  // A divider is a track one rule thick, filled with the rule: a stroke would be
+  // centred on a track's edge and cover two device rows.
+  let thick = thickness-of(t, "divider")
+  let tracks = children.map(child => if divider(child) { thick } else if length and grows(child) { 1fr } else { auto })
   let spacing = gap(t, v.at("gap", default: "medium"))
   let justify = v.at("justify", default: "start")
   // Absent for an item's children, which keep the alignment around the item.
@@ -322,32 +344,27 @@
   let free = length and not tracks.contains(1fr)
   let gutter = if free and justify == "between" and children.len() > 1 { 1fr } else { spacing }
   let cells = children.zip(tracks).map(((child, track)) => {
-    if divider(child) { return [] }
+    if divider(child) { return grid.cell(fill: fill-of(t, paint(t, "divider"), down: direction == "row"), []) }
     let shared = track == 1fr
     draw(child, if direction == "column" { (w: breadth, h: shared) } else { (w: shared, h: breadth) })
   })
-  let dividers = children.enumerate().filter(((_, child)) => divider(child)).map(((at, _)) => at)
   let across = if breadth { 100% } else { auto }
-  let (lead, tracks, cells) = if free and justify in ("end", "center") {
+  let (tracks, cells) = if free and justify in ("end", "center") {
     let edge = if justify == "center" { ((1fr,), ([],)) } else { ((), ()) }
-    (1, (1fr,) + tracks + edge.at(0), ([],) + cells + edge.at(1))
+    ((1fr,) + tracks + edge.at(0), ([],) + cells + edge.at(1))
   } else if free and justify == "start" {
-    (0, tracks + (1fr,), cells + ([],))
+    (tracks + (1fr,), cells + ([],))
   } else {
-    (0, tracks, cells)
+    (tracks, cells)
   }
   if direction == "column" {
     let horizontal = if cross == "center" { center } else if cross == "end" { right } else { left }
     let aligned = if cross == none { (:) } else { (align: horizontal) }
-    let stroke = (paint: fill-of(t, paint(t, "divider")), thickness: thickness-of(t, "divider"))
-    let rules = dividers.map(at => grid.hline(y: at + lead, stroke: stroke))
-    grid(columns: (across,), rows: tracks, row-gutter: gutter, ..aligned, ..cells, ..rules)
+    grid(columns: (across,), rows: tracks, row-gutter: gutter, ..aligned, ..cells)
   } else {
     let vertical = if cross == "center" { horizon } else if cross == "end" { bottom } else { top }
     let aligned = if cross == none { (:) } else { (align: vertical) }
-    let stroke = (paint: fill-of(t, paint(t, "divider"), down: true), thickness: thickness-of(t, "divider"))
-    let rules = dividers.map(at => grid.vline(x: at + lead, stroke: stroke))
-    grid(rows: (across,), columns: tracks, column-gutter: gutter, ..aligned, ..cells, ..rules)
+    grid(rows: (across,), columns: tracks, column-gutter: gutter, ..aligned, ..cells)
   }
 }
 
@@ -380,7 +397,8 @@
   let emphasis = int(v.at("emphasis", default: 1))
   let meta = fill-of(t, paint(t, if emphasis == 1 { "item-meta" } else { "item-meta-emphasis-" + str(emphasis) }))
   // Its children are a column, so a divider among them is one as a column draws it.
-  let content = stack-of(t, (children: v.children, gap: "small"), "column", (w: bounds.w, h: false), draw)
+  // TRMNL's item content sets its parts one under another with no gap.
+  let content = stack-of(t, (children: v.children, gap: "none"), "column", (w: bounds.w, h: false), draw)
   if v.at("plain", default: false) { return content }
   let index = v.at("index", default: none)
   let face = typeface(t, "--item-index", "base")
@@ -406,9 +424,7 @@
   let small = size in ("xsmall", "small")
   let infix = if size == "base" { "" } else { "-" + size }
   let head-face = typeface(t, "--title", if small { "small" } else { "base" })
-  let head-leading = leading-of(t, "--title", if small { "small" } else { "base" })
   let cell-face = typeface(t, "--label", if small { "small" } else { "base" })
-  let cell-leading = leading-of(t, "--label", if small { "small" } else { "base" })
   let head-height = px(t, "--table" + infix + "-thead-height", default: 36)
   let row-height = px(t, "--table" + infix + "-tbody-height", default: 46)
   let columns = v.at("columns", default: ())
@@ -434,9 +450,9 @@
       )
       if rule-name != none { place(bottom + left, rule(t, rule-name)) }
     })
-    let cell(face, leading, value, column) = align(across(column.at("align", default: "start")),
-      clamped(face, leading, shown(value), column.at("clamp", default: 1)))
-    let headings = columns.map(column => cell(head-face, head-leading, column.heading, column))
+    let cell(face, value, column) = align(across(column.at("align", default: "start")),
+      clamped(face, shown(value), column.at("clamp", default: 1)))
+    let headings = columns.map(column => cell(head-face, column.heading, column))
     stack(
       row-of(head-height, headings, "table-head-rule", []),
       ..rows.enumerate().map(((at, row)) => {
@@ -449,7 +465,7 @@
           place(left + top, dy: 4pt, rect(width: meta-width, height: row-height - 8pt, radius: 3pt, fill: fill-of(t, meta), stroke: none))
           place(left + horizon, box(width: meta-width, align(center, haloed(t, color: halo, text(..typeface(t, "--item-index", "base"), fill: index-ink, str(at + 1))))))
         }
-        row-of(row-height, columns.enumerate().map(((index, column)) => cell(cell-face, cell-leading, row.at(index, default: none), column)), if last { none } else { "table-body-rule" }, start)
+        row-of(row-height, columns.enumerate().map(((index, column)) => cell(cell-face, row.at(index, default: none), column)), if last { none } else { "table-body-rule" }, start)
       }),
       ..if more == none { () } else {
         (block(height: if small { px(t, "--table-xsmall-tbody-height", default: 22) } else { px(t, "--table-small-tbody-height", default: 31) },
@@ -477,10 +493,12 @@
   let label = v.at("label", default: none)
   let figure = v.at("figure", default: none)
   block(width: if bounds.w { 100% } else { 320pt }, breakable: false, {
+    // The parts' own boxes and gaps space them, as in the stylesheet.
+    set block(spacing: 0pt)
     if label != none or figure != none {
       grid(
         columns: (1fr, auto),
-        align: (left + bottom, right + bottom),
+        align: (left + horizon, right + horizon),
         text(..typeface(t, "--label", if small { "small" } else { "base" }), shown(label)),
         text(..typeface(t, "--value", "xxsmall"), shown(figure)),
       )
@@ -516,7 +534,6 @@
 #let rich-text(t, v, bounds) = {
   let size = v.at("size", default: "base")
   let face = typeface(t, "--richtext", size)
-  let leading = leading-of(t, "--richtext", size)
   let spacing = gap(t, v.at("gap", default: "medium"))
   let horizontal = across(v.at("align", default: "start"))
   let runs(items) = items.map(run => if run.at("break", default: false) { linebreak() } else {
@@ -533,7 +550,7 @@
   }).join()
   let body = {
     set text(..face)
-    set par(leading: (leading - 1) * face.size, spacing: spacing, justify: false)
+    set par(leading: 0pt, spacing: spacing, justify: false)
     set list(spacing: spacing)
     set enum(spacing: spacing)
     set align(horizontal)
@@ -616,15 +633,17 @@
     fill: fill-of(t, bar-paint),
     radius: px(t, "--title-bar-border-radius", default: 10),
     inset: (x: px(t, "--gap", default: 10)),
+    // Without an icon the title starts at the bar's padding, with no gutter
+    // before it; the instance takes the title's face, as TRMNL's does.
     grid(
-      columns: (auto, auto, 1fr, auto),
-      column-gutter: px(t, "--gap-small", default: 7),
+      columns: if icon == none { (0pt, auto, 1fr, auto) } else { (auto, auto, 1fr, auto) },
+      column-gutter: (if icon == none { 0pt } else { px(t, "--gap-small", default: 7) }, px(t, "--gap-small", default: 7)),
       align: horizon,
       rows: (100%,),
       if icon == none { [] } else { icon },
-      haloed(t, text(..face, fill: ink, shown(bar.title))),
+      pad(top: px(t, "--title-bar-padding-top"), haloed(t, text(..face, fill: ink, shown(bar.title)))),
       [],
-      haloed(t, text(..face, weight: "regular", fill: ink, shown(bar.at("instance", default: none)))),
+      haloed(t, text(..face, fill: ink, shown(bar.at("instance", default: none)))),
     ),
   )
 }

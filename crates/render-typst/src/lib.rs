@@ -16,7 +16,9 @@ use std::collections::BTreeMap;
 
 use include_dir::{Dir, include_dir};
 use afterimage_trmnl::catalog::{Model, Palette};
-use typst::foundations::{Bytes, Dict, IntoValue, Str};
+use typst::foundations::{Array, Bytes, Dict, IntoValue, Str};
+use typst::layout::{Abs, Frame, FrameItem, Point};
+use typst::text::{Font, FontVariations};
 use typst_as_lib::{TypstAsLibError, TypstEngine};
 use typst_layout::PagedDocument;
 
@@ -52,6 +54,9 @@ pub enum Error {
 /// serves every display; it is cheap to share and safe to use from many threads.
 pub struct Renderer {
     engine: TypstEngine,
+    /// Each font family's ascent and descent in ems, which the library sets
+    /// CSS's line boxes with.
+    metrics: Dict,
 }
 
 impl Default for Renderer {
@@ -63,19 +68,35 @@ impl Default for Renderer {
 impl Renderer {
     #[must_use]
     pub fn new() -> Self {
-        let fonts = FONTS
+        let fonts: Vec<&'static [u8]> = FONTS
             .files()
             .filter(|file| {
                 file.path()
                     .extension()
                     .is_some_and(|extension| extension == "ttf")
             })
-            .map(include_dir::File::contents);
+            .map(include_dir::File::contents)
+            .collect();
+        let mut metrics = Dict::new();
+        for font in fonts.iter().flat_map(|data| Font::iter(Bytes::new(*data))) {
+            let family = Str::from(font.info().family.as_str());
+            if metrics.get(&family).is_err() {
+                // Vertical metrics, which no axis of these fonts varies.
+                let variant = font.info().variant;
+                let instance = font.instantiate(variant, Abs::pt(16.0), &FontVariations::default());
+                let em = instance.metrics();
+                let sizes: Array = [em.ascender.get(), -em.descender.get()]
+                    .into_iter()
+                    .map(IntoValue::into_value)
+                    .collect();
+                metrics.insert(family, sizes.into_value());
+            }
+        }
         let engine = TypstEngine::builder()
             .fonts(fonts)
             .with_static_source_file_resolver([("main.typ", MAIN), ("afterimage.typ", LIBRARY)])
             .build();
-        Self { engine }
+        Self { engine, metrics }
     }
 
     /// Whether this renderer can draw for `model` showing `palette`: it writes the
@@ -124,6 +145,7 @@ impl Renderer {
         inputs.insert("screen".into(), Str::from(screen.to_string()).into_value());
         inputs.insert("tokens".into(), Str::from(tokens).into_value());
         inputs.insert("images".into(), files.into_value());
+        inputs.insert("metrics".into(), self.metrics.clone().into_value());
         // Gray text needs a gray to land on: a full-color palette, or one that lists
         // a gray between black and white. Elsewhere it is black.
         let grays = palette.rgb().is_none_or(|colors| {
@@ -153,7 +175,9 @@ impl Renderer {
             pixel_per_pt: model.scale_factor.into(),
             render_bleed: false,
         };
-        let pixmap = typst_render::render(page, &options);
+        let mut page = page.clone();
+        page.frame = snapped(&page.frame, Point::zero(), model.scale_factor);
+        let pixmap = typst_render::render(&page, &options);
         let colors = palette.rgb();
         let bytes = raster::encode(&pixmap, model.rotation, colors.as_deref())?;
         if let Some(limit) = model.image_size_limit
@@ -181,4 +205,43 @@ fn describe(error: &TypstAsLibError) -> String {
             .join("; "),
         other => other.to_string(),
     }
+}
+
+/// `frame` with every text run's origin, the start of its baseline, moved to the
+/// nearest whole device pixel at `scale` device pixels per point, as browsers
+/// place text, so glyphs drawn on a pixel grid, such as TRMNL's pixel fonts, stay
+/// on it instead of blurring across two pixels. `origin` is the frame's place on
+/// the page; inside a group that scales or skews, positions stay as laid out.
+fn snapped(frame: &Frame, origin: Point, scale: f64) -> Frame {
+    let nudge = |at: Abs| Abs::pt((at.to_pt() * scale).round() / scale) - at;
+    let mut out = Frame::new(frame.size(), frame.kind());
+    if frame.has_baseline() {
+        out.set_baseline(frame.baseline());
+    }
+    for (position, item) in frame.items() {
+        let at = origin + *position;
+        match item {
+            FrameItem::Group(group) => {
+                let transform = group.transform;
+                let mut group = group.clone();
+                let translates_only = transform.sx.get() == 1.0
+                    && transform.sy.get() == 1.0
+                    && transform.kx.get() == 0.0
+                    && transform.ky.get() == 0.0;
+                if translates_only {
+                    group.frame = snapped(
+                        &group.frame,
+                        at + Point::new(transform.tx, transform.ty),
+                        scale,
+                    );
+                }
+                out.push(*position, FrameItem::Group(group));
+            }
+            FrameItem::Text(_) => {
+                out.push(*position + Point::new(nudge(at.x), nudge(at.y)), item.clone());
+            }
+            _ => out.push(*position, item.clone()),
+        }
+    }
+    out
 }
