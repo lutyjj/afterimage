@@ -1,0 +1,15 @@
+{
+  "https://trmnl.com/css/3.4.4/plugins.css": "af12fdc34f6186fa0a208fe1c1dc37a14e98c8bfa09139e1be02e0600669be18",
+  "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc/public/framework/docs/3.4/tokens.md": "58426e2536b4f011276e490a18762bde709ebe0b19855ebcff8f038a695c0f74",
+  "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc/db/data/framework_fonts.yml": "43a4e78aac3806e2026406f607f84b137748feb2aa2a7fde654d38c8e82197bb",
+  "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc/LICENSE": "625120fbe9ba35bab1d0376cdc5352b0f08c91d0c68711a58cc606e563c3176b",
+  "https://raw.githubusercontent.com/rsms/inter/e3a3d4c57d5ecc01453a575621882a384c1995a3/LICENSE.txt": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a",
+  "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc/public/fonts/Inter.ttf": "0be2399ea925f1f83ff974764761da9860ec50742ed29a5d4c1ffd0c5c7ac3a8",
+  "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc/public/fonts/Inter-Italic.ttf": "6136f73372fedc37b80fd1a8ec3e21734073ff17376f3672718f186779672e7a",
+  "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc/public/fonts/TRMNL12-Regular.ttf": "17711493bd26695a40b9c72557a6c2f4611a30a81845c5aaa117648f3a0b3795",
+  "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc/public/fonts/TRMNL12-Bold.ttf": "1b7a292a4dec1708f9c78b69a5380c617a6add97636284c2d22803018b6b57cc",
+  "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc/public/fonts/TRMNL16-Regular.ttf": "d442c4a1fa1973b2210f8745a604f0353ceb422448825445884b2b9719e43095",
+  "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc/public/fonts/TRMNL16-Bold.ttf": "8907dc5ef0db8a14731ad24917db79fb5f2e019f0fc03b624cb675538d598958",
+  "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc/public/fonts/TRMNL21-Regular.ttf": "1ece6f9200955d51f8e6c941e13fa3d121555e532a76f0c0b88664915c5c444f",
+  "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc/public/fonts/TRMNL21-Bold.ttf": "1f82225e7fbcfda2047f01184ac6f387ce8d3796ac9615cc38e4fa2048310b31"
+}

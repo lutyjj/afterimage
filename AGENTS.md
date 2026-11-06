@@ -35,8 +35,8 @@ Generated output is never edited by hand. Each project builds on its own and
 depends on the others only through code generated from the model, except that
 any Rust project may use the shared library `crates/trmnl`, and the server links
 the renderer library `crates/render-typst`, which draws in its process. The Rust projects
-share one Cargo workspace, so every Cargo command needs `gen/`: run
-`tools/generate` first in a fresh checkout.
+share one Cargo workspace, so every Cargo command needs `gen/` (the contract and
+the renderer's design): run `tools/generate` first in a fresh checkout.
 
 The flake owns the toolchains; do not install unmanaged versions on the host.
 The [README](README.md#development) lists the commands.

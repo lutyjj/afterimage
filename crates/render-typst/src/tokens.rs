@@ -24,7 +24,7 @@ pub struct Tokens {
 }
 
 static TOKENS: LazyLock<Tokens> = LazyLock::new(|| {
-    let document: Document = serde_json::from_str(include_str!("../design/tokens.json"))
+    let document: Document = serde_json::from_str(include_str!("../../../gen/design/tokens.json"))
         .expect("the generated tokens parse");
     let sets = document
         .sets

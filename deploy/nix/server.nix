@@ -2,6 +2,7 @@
   lib,
   rustPlatform,
   contract,
+  design,
   mosquitto,
 }:
 
@@ -27,9 +28,11 @@ rustPlatform.buildRustPackage {
 
   cargoLock.lockFile = ../../Cargo.lock;
 
-  # The generated contract, laid out as tools/generate writes it in a checkout.
+  # The generated contract and design, laid out as tools/generate writes them in
+  # a checkout.
   postPatch = ''
     cp -r --no-preserve=mode ${contract} gen
+    cp -r --no-preserve=mode ${design} gen/design
   '';
 
   cargoBuildFlags = [

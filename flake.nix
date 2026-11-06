@@ -32,7 +32,7 @@
     {
       packages = forSystems (system: {
         default = scope.${system}.afterimage;
-        inherit (scope.${system}) contract server web tokens;
+        inherit (scope.${system}) contract design server web tokens;
       });
 
       # The server's build runs every Rust test; lint runs clippy and rustfmt; the
@@ -54,7 +54,7 @@
           services.afterimage.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
         };
 
-      # tools/tokens/refresh runs this.
+      # The token generator, for a run outside the build.
       apps = forSystems (system: {
         tokens = {
           type = "app";

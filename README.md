@@ -16,12 +16,11 @@ On NixOS, the flake's `nixosModules.default` runs it as `services.afterimage`: `
 
 | Command | Does |
 |---|---|
-| `tools/generate` | Generates the contract into `gen/` from `model/smithy/`: both services' Rust server crates and OpenAPI documents, and the management API's TypeScript client |
+| `tools/generate` | Generates `gen/`: from `model/smithy/` both services' Rust server crates and OpenAPI documents and the management API's TypeScript client, and the renderer's design tokens and fonts from the pinned release of TRMNL's design system (`tools/tokens/sources.json`) |
 | `cargo test --workspace` | Runs every Rust test, the conformance test included |
 | `pnpm install` | Installs the web UI's dependencies, after `tools/generate` |
 | `pnpm --filter afterimage-web dev` | Serves the web UI with hot reload at `http://127.0.0.1:5173`, sending `/api` and `/manage` to a server on port 8080 |
 | `pnpm --filter afterimage-web check` | Type-checks the web UI with the generated client and runs its tests |
 | `tools/trmnl-excerpt` | Refreshes the excerpt of TRMNL's published device contract |
 | `tools/trmnl-catalog` | Refreshes the snapshot of TRMNL's display models and palettes |
-| `tools/tokens/refresh` | Refreshes the renderer's design tokens and fonts from the pinned release of TRMNL's design system |
 | `nix flake check` | Builds the server and the web UI from the pinned contract, runs every test, runs clippy and rustfmt, and boots the NixOS module in a VM |

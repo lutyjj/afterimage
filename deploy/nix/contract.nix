@@ -84,7 +84,7 @@ stdenvNoCC.mkDerivation {
   # tools/generate owns the layout of gen/, in a checkout and here.
   buildPhase = ''
     runHook preBuild
-    HOME=$TMPDIR SMITHY_MAVEN_CACHE=$TMPDIR/maven sh tools/generate
+    HOME=$TMPDIR SMITHY_MAVEN_CACHE=$TMPDIR/maven sh tools/generate contract
     runHook postBuild
   '';
 

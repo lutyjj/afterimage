@@ -12,6 +12,6 @@ writeShellApplication {
   text = ''
     export PLAYWRIGHT_BROWSERS_PATH=${playwright-driver.browsers}
     export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
-    exec python3 -I ${../../tools/tokens/generate.py} "$@"
+    exec python3 -I ${../../tools/tokens}/generate.py "$@"
   '';
 }

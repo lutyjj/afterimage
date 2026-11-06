@@ -5,7 +5,8 @@
 //! every template with its value and expanded every `each`, as JSON. The Typst
 //! library in `src/typst/` draws each component from the design tokens that
 //! `tools/tokens` resolves from TRMNL's design system for the display's profile
-//! (`design/tokens.json`), with the fonts of that release (`design/fonts/`).
+//! (`gen/design/tokens.json`, which `tools/generate` writes), with the fonts of
+//! that release (`gen/design/fonts/`).
 //! Images arrive as bytes under the keys the screen's `url` members name.
 
 mod markdown;
@@ -24,7 +25,7 @@ use typst_layout::PagedDocument;
 
 use crate::tokens::Tokens;
 
-static FONTS: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/design/fonts");
+static FONTS: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../gen/design/fonts");
 const MAIN: &str = include_str!("typst/main.typ");
 const LIBRARY: &str = include_str!("typst/afterimage.typ");
 

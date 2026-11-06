@@ -1,16 +1,33 @@
 #!/bin/sh
-# Generates the contract into gen/: for each service its Rust server crate and its
-# OpenAPI document, and the management API's TypeScript client. The Nix contract
-# build (deploy/nix/contract.nix) runs this script too, so it alone owns the layout.
+# Generates gen/, which every build reads and nobody edits:
+#
+#   contract  from model/smithy/: for each service its Rust server crate and its
+#             OpenAPI document, and the management API's TypeScript client
+#   design    the renderer's design tokens and fonts, which the flake's design
+#             package resolves from the pinned release of TRMNL's design system
+#
+# Without an argument, both. The Nix builds lay gen/ out the same way:
+# deploy/nix/contract.nix runs this script's contract part, and the server's
+# build copies the design package to gen/design.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
-rm -rf build/smithy
-smithy build
-rm -rf gen/device-api gen/device-api.openapi.json gen/management-api gen/management-api.openapi.json gen/management-client
+part=${1:-all}
 mkdir -p gen
-cp -r build/smithy/device/rust-server-codegen gen/device-api
-cp build/smithy/device/openapi/DeviceApi.openapi.json gen/device-api.openapi.json
-cp -r build/smithy/management/rust-server-codegen gen/management-api
-cp build/smithy/management/openapi/Management.openapi.json gen/management-api.openapi.json
-cp -r build/smithy/management/typescript-client-codegen gen/management-client
+
+if [ "$part" != design ]; then
+	rm -rf build/smithy
+	smithy build
+	rm -rf gen/device-api gen/device-api.openapi.json gen/management-api gen/management-api.openapi.json gen/management-client
+	cp -r build/smithy/device/rust-server-codegen gen/device-api
+	cp build/smithy/device/openapi/DeviceApi.openapi.json gen/device-api.openapi.json
+	cp -r build/smithy/management/rust-server-codegen gen/management-api
+	cp build/smithy/management/openapi/Management.openapi.json gen/management-api.openapi.json
+	cp -r build/smithy/management/typescript-client-codegen gen/management-client
+fi
+
+if [ "$part" != contract ]; then
+	nix build "$root#design" --out-link build/design
+	rm -rf gen/design
+	cp -rL --no-preserve=mode build/design gen/design
+fi
