@@ -9,6 +9,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use chrono::{DateTime, Utc};
 use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
 use openidconnect::{
     AccessTokenHash, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointMaybeSet,
@@ -243,7 +244,11 @@ impl Oidc {
                 }
             })?;
         let token = tokens.id_token().ok_or(Error::Refused)?;
-        let verifier = client.id_token_verifier();
+        // The token's expiry is judged at the server's time, as every other
+        // expiry is; a time past chrono's range refuses every token.
+        let verifier = client.id_token_verifier().set_time_fn(|| {
+            DateTime::from_timestamp(self.clock.now(), 0).unwrap_or(DateTime::<Utc>::MAX_UTC)
+        });
         let claims = token
             .claims(&verifier, &Nonce::new(flow.nonce))
             .map_err(|_| Error::Refused)?;
@@ -262,18 +267,17 @@ impl Oidc {
         if subject.is_empty() || subject.len() > 255 {
             return Err(Error::Refused);
         }
-        let name = claims
-            .name()
-            .and_then(|name| name.get(None))
-            .map(|name| name.as_str().to_owned())
-            .or_else(|| {
-                claims
-                    .preferred_username()
-                    .map(|name| name.as_str().to_owned())
-            })
-            .map(|name| name.chars().take(64).collect::<String>())
-            .filter(|name| !name.trim().is_empty())
-            .unwrap_or_else(|| "Account".to_owned());
+        let profile_name = claims.name().and_then(|name| name.get(None));
+        let username = claims.preferred_username();
+        let name = [
+            profile_name.map(|name| name.as_str()),
+            username.map(|name| name.as_str()),
+        ]
+        .into_iter()
+        .flatten()
+        .map(|name| name.chars().take(64).collect::<String>())
+        .find(|name| !name.trim().is_empty())
+        .unwrap_or_else(|| "Account".to_owned());
         Ok(Identity {
             issuer: self.issuer.as_str().to_owned(),
             subject: subject.to_owned(),

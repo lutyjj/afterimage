@@ -2,10 +2,7 @@
 
 mod common;
 
-use std::sync::Arc;
-
-use common::{READINGS, mac, start, start_with};
-use afterimage_server::keys::OsEntropy;
+use common::{READINGS, mac, start};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 use sqlx::Row;
@@ -148,23 +145,6 @@ async fn stores_only_a_hash_of_the_password_and_the_session() {
             path.display()
         );
     }
-}
-
-#[tokio::test]
-async fn oidc_sign_in_is_absent_until_configured() {
-    let server = start().await;
-    assert!(
-        server
-            .call("GET", "/manage/auth", None)
-            .await
-            .1
-            .get("oidc")
-            .is_none()
-    );
-    assert_eq!(
-        server.call("GET", "/manage/auth/oidc", None).await.0,
-        StatusCode::NOT_FOUND
-    );
 }
 
 #[tokio::test]
@@ -722,84 +702,6 @@ async fn a_session_ends_after_thirty_days() {
         server.call("GET", "/manage/account", None).await.0,
         StatusCode::UNAUTHORIZED
     );
-}
-
-/// A provider at a port nothing listens on.
-const OIDC_SETTINGS: [&str; 10] = [
-    "--oidc-issuer",
-    "http://127.0.0.1:9",
-    "--oidc-client-id",
-    "afterimage",
-    "--oidc-client-secret",
-    "secret",
-    "--oidc-name",
-    "Example ID",
-    "--public-url",
-    "http://afterimage.example",
-];
-
-#[tokio::test]
-async fn with_password_sign_in_off_no_password_works() {
-    let settings: Vec<&str> = OIDC_SETTINGS
-        .iter()
-        .copied()
-        .chain(["--password-sign-in", "false"])
-        .collect();
-    let server = start_with(Arc::new(OsEntropy), &settings).await;
-    let (_, options) = server.call("GET", "/manage/auth", None).await;
-    assert_eq!(options["password"], false);
-    assert_eq!(options["oidc"]["name"], "Example ID");
-    let account = json!({ "name": "Ada", "username": "ada", "password": "correct horse battery" });
-    assert_eq!(
-        server
-            .call("POST", "/manage/auth/first-account", Some(account))
-            .await
-            .0,
-        StatusCode::CONFLICT
-    );
-    let credentials = json!({ "username": "ada", "password": "correct horse battery" });
-    assert_eq!(
-        server
-            .call("POST", "/manage/auth/password", Some(credentials))
-            .await
-            .0,
-        StatusCode::UNAUTHORIZED
-    );
-}
-
-/// Sign-in that cannot finish sends the browser back to the web UI with the
-/// reason, and starts no session.
-#[tokio::test]
-async fn an_oidc_sign_in_that_cannot_finish_returns_to_the_web_ui() {
-    let server = start_with(Arc::new(OsEntropy), &OIDC_SETTINGS).await;
-    let http = reqwest::Client::builder()
-        .tls_certs_only([])
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .unwrap();
-    let get = |path: &str| http.get(format!("{}{path}", server.url)).send();
-
-    let started = get("/manage/auth/oidc").await.unwrap();
-    assert_eq!(started.status(), StatusCode::FOUND);
-    assert_eq!(
-        started.headers()["location"],
-        "http://afterimage.example/?signInError=unavailable"
-    );
-    assert!(started.headers().get("set-cookie").is_none());
-
-    for query in ["?code=c&state=s", "?error=access_denied", ""] {
-        let back = get(&format!("/manage/auth/oidc/callback{query}"))
-            .await
-            .unwrap();
-        assert_eq!(back.status(), StatusCode::FOUND, "{query}");
-        assert_eq!(
-            back.headers()["location"],
-            "http://afterimage.example/?signInError=refused",
-            "{query}"
-        );
-        assert!(back.headers().get("set-cookie").is_none(), "{query}");
-    }
-    assert!(server.stored("SELECT id FROM accounts").await.is_empty());
 }
 
 /// A session that cannot be read is a server failure, in restJson1's error form,

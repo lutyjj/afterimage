@@ -4,6 +4,8 @@
 
 #![allow(dead_code, unreachable_pub)]
 
+pub mod oidc;
+
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
@@ -176,9 +178,36 @@ pub async fn start_with_secrets(secrets: Secrets) -> Server {
     start_full(Arc::new(OsEntropy), &[], secrets).await
 }
 
+/// The server signing in through a stand-in OIDC provider at the server's time,
+/// with these extra settings.
+pub async fn start_with_provider(settings: &[&str]) -> (Server, oidc::Provider) {
+    let clock = new_clock();
+    let provider = oidc::Provider::start(clock.clone()).await;
+    let provider_settings = provider.settings();
+    let settings: Vec<&str> = provider_settings
+        .iter()
+        .map(String::as_str)
+        .chain(settings.iter().copied())
+        .collect();
+    let server = start_at(clock, Arc::new(OsEntropy), &settings, Secrets::default()).await;
+    (server, provider)
+}
+
+fn new_clock() -> Arc<ManualClock> {
+    Arc::new(ManualClock(AtomicI64::new(1_800_000_000)))
+}
+
 async fn start_full(entropy: Arc<dyn Entropy>, settings: &[&str], secrets: Secrets) -> Server {
+    start_at(new_clock(), entropy, settings, secrets).await
+}
+
+async fn start_at(
+    clock: Arc<ManualClock>,
+    entropy: Arc<dyn Entropy>,
+    settings: &[&str],
+    secrets: Secrets,
+) -> Server {
     let data = TempDir::new().unwrap();
-    let clock = Arc::new(ManualClock(AtomicI64::new(1_800_000_000)));
     let data_dir = data.path().to_str().unwrap().to_owned();
     let trmnl = Trmnl::start().await;
     let arguments = [

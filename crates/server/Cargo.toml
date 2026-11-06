@@ -23,6 +23,8 @@ afterimage-trmnl = { path = "../trmnl" }
 aws-smithy-types = "1.9.1"
 base64 = "0.23.1"
 bytes = "1.12.1"
+# The server's clock for ID token expiry, in the time type openidconnect takes.
+chrono = { version = "0.4.45", default-features = false }
 clap = { version = "4.6.7", features = ["derive", "env"] }
 # Cookie parsing and Set-Cookie formatting. Nothing is signed: cookies carry opaque
 # random tokens whose hashes the database holds.
@@ -68,10 +70,13 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 url = "2.5.8"
 
 [dev-dependencies]
-# A stand-in data source for the tests.
-axum = { version = "0.8.9", default-features = false, features = ["tokio", "http1", "json"] }
+# Stand-ins for data sources, TRMNL's site and an OIDC provider.
+axum = { version = "0.8.9", default-features = false, features = ["tokio", "http1", "json", "form", "query"] }
 png = "0.18.1"
 reqwest = { version = "0.13", default-features = false, features = ["cookies", "json"] }
+# The stand-in OIDC provider's signing keys, made at run time; openidconnect
+# signs with the same release.
+rsa = { version = "0.9.10", features = ["getrandom"] }
 tempfile = "3"
 
 [lints]
