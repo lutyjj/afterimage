@@ -2,18 +2,19 @@
 //!
 //! A request waits for the device's next check-in, whose answer carries it once;
 //! the check-in after that decides it by the version the device reports. Both
-//! firmware lines act on such an answer: 1.8 installs the image, restarts and
-//! checks in with the new version, or records the failure and tries again only a
-//! day later (`otaAttemptDue` in `lib/trmnl/src/ota_schedule.cpp`); 1.6 installs
-//! it and starts it at its next wake (`checkAndPerformFirmwareUpdate` in
-//! `src/bl.cpp`). 1.6 has no such pause, so a request sent at every check-in
-//! would make a failing device download the image at every wake.
+//! firmware lines act on such an answer and restart at once: 1.8 after it
+//! installed the image, or after a failure it records so as to try again only a
+//! day later (`otaAttemptDue` in `lib/trmnl/src/ota_schedule.cpp`); 1.6 after
+//! any attempt, installed or not (`bl_init` in `src/bl.cpp`). 1.6 has no such
+//! pause, so a request sent at every check-in would restart a failing device
+//! over and over.
 
 use std::sync::Arc;
 
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
 use crate::clock::Clock;
+use crate::firmware::releases;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Update {
@@ -52,6 +53,8 @@ impl Update {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Delivery {
     Nothing,
+    /// This check-in decided the request, whose image no device needs now.
+    Finished,
     /// The answer carries the request for this cached image.
     Send(String),
     /// The request's image left the cache; it has to be cut again first.
@@ -72,7 +75,11 @@ impl Updates {
         Self { pool, clock }
     }
 
-    /// Records a request, replacing the device's last one.
+    /// Records a request, replacing the device's last one, when `board` is
+    /// still the device's: the one a user chose, or with none chosen the one
+    /// named like its firmware's model. `false` when the board changed since the
+    /// caller read it, so that no request for another board's image survives a
+    /// board change.
     ///
     /// # Errors
     ///
@@ -83,8 +90,24 @@ impl Updates {
         board: &str,
         version: &str,
         image: &str,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<bool, sqlx::Error> {
         let now = self.clock.now();
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let still = sqlx::query_scalar!(
+            "SELECT devices.id FROM devices
+             JOIN registrations ON registrations.id = devices.registration_id
+             WHERE devices.id = ?
+               AND (devices.firmware_board = ?
+                    OR (devices.firmware_board IS NULL AND registrations.model = ?))",
+            device_id,
+            board,
+            board
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if still.is_none() {
+            return Ok(false);
+        }
         sqlx::query!(
             "INSERT OR REPLACE INTO firmware_updates (device_id, board, version, image, requested_at)
              VALUES (?, ?, ?, ?, ?)",
@@ -94,9 +117,10 @@ impl Updates {
             image,
             now
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
-        Ok(())
+        tx.commit().await?;
+        Ok(true)
     }
 
     /// Forgets the device's request, whatever its state.
@@ -116,7 +140,8 @@ impl Updates {
 
     /// Moves the device's request on at a check-in where it reports `version`
     /// (its latest known one): one that was sent ends, installed or not; one
-    /// that waits is sent when `cached` holds its image.
+    /// that waits is sent when the answer can carry it (`deliverable`) and
+    /// `cached` holds its image.
     ///
     /// # Errors
     ///
@@ -125,6 +150,7 @@ impl Updates {
         &self,
         device_id: i64,
         version: Option<&str>,
+        deliverable: bool,
         cached: impl Fn(&str) -> bool,
     ) -> Result<Delivery, sqlx::Error> {
         let now = self.clock.now();
@@ -135,7 +161,8 @@ impl Updates {
         let delivery = match update.state() {
             State::Installed | State::NotInstalled => Delivery::Nothing,
             State::Sent => {
-                let installed = version == Some(update.version.as_str());
+                let installed =
+                    version == Some(releases::reported_version(&update.version).as_str());
                 sqlx::query!(
                     "UPDATE firmware_updates SET finished_at = ?, installed = ? WHERE device_id = ?",
                     now,
@@ -144,8 +171,9 @@ impl Updates {
                 )
                 .execute(&mut *tx)
                 .await?;
-                Delivery::Nothing
+                Delivery::Finished
             }
+            State::Requested if !deliverable => Delivery::Nothing,
             State::Requested if cached(&update.image) => {
                 sqlx::query!(
                     "UPDATE firmware_updates SET sent_at = ? WHERE device_id = ?",

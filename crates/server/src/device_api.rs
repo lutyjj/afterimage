@@ -210,9 +210,12 @@ async fn get_display(
             )
             .await
             .map_err(|error| internal_failure(&error))?;
+            // Firmware sends `special_function` only when it woke for one.
+            let special_function =
+                input.firmware_special_function.is_some() || input.special_function.is_some();
             let firmware = state
                 .firmware
-                .check_in(&device)
+                .check_in(&device, special_function)
                 .await
                 .map_err(|error| internal_failure(&error))?;
             output::GetDisplayOutput {

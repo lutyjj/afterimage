@@ -62,7 +62,8 @@ pub async fn install_firmware(
             error @ (InstallError::NoBoard
             | InstallError::UnknownBoard(_)
             | InstallError::NoSuchRelease { .. }
-            | InstallError::NoRelease(_)),
+            | InstallError::NoRelease(_)
+            | InstallError::BoardChanged),
         ) => {
             return Err(error::Conflict {
                 message: error.to_string(),

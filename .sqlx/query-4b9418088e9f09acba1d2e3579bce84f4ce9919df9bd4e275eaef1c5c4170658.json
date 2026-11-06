@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT devices.id FROM devices\n             JOIN registrations ON registrations.id = devices.registration_id\n             WHERE devices.id = ?\n               AND (devices.firmware_board = ?\n                    OR (devices.firmware_board IS NULL AND registrations.model = ?))",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "devices",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4b9418088e9f09acba1d2e3579bce84f4ce9919df9bd4e275eaef1c5c4170658"
+}

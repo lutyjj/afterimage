@@ -75,12 +75,20 @@ pub struct Trmnl {
     flash: Arc<Mutex<HashMap<String, Vec<u8>>>>,
     /// Requests for the list so far.
     pub list_requests: Arc<AtomicUsize>,
+    /// Requests for flash images so far.
+    pub flash_requests: Arc<AtomicUsize>,
+    /// How long the list takes to answer.
+    list_delay: Arc<Mutex<std::time::Duration>>,
+    /// Flash images answer only while no test holds this.
+    flash_gate: Arc<tokio::sync::RwLock<()>>,
 }
 
 impl Trmnl {
     async fn start() -> Self {
         async fn list(State(trmnl): State<Trmnl>) -> axum::response::Response {
             trmnl.list_requests.fetch_add(1, Ordering::SeqCst);
+            let delay = *trmnl.list_delay.lock().unwrap();
+            tokio::time::sleep(delay).await;
             match trmnl.list.lock().unwrap().clone() {
                 Some(list) => axum::Json(list).into_response(),
                 None => StatusCode::SERVICE_UNAVAILABLE.into_response(),
@@ -90,6 +98,8 @@ impl Trmnl {
             State(trmnl): State<Trmnl>,
             Path(name): Path<String>,
         ) -> axum::response::Response {
+            trmnl.flash_requests.fetch_add(1, Ordering::SeqCst);
+            let _open = trmnl.flash_gate.read().await;
             match trmnl.flash.lock().unwrap().get(&name) {
                 Some(bytes) => bytes.clone().into_response(),
                 None => StatusCode::NOT_FOUND.into_response(),
@@ -101,6 +111,9 @@ impl Trmnl {
             list: Arc::new(Mutex::new(Some(json!({ "data": { "models": [] } })))),
             flash: Arc::new(Mutex::new(HashMap::new())),
             list_requests: Arc::new(AtomicUsize::new(0)),
+            flash_requests: Arc::new(AtomicUsize::new(0)),
+            list_delay: Arc::new(Mutex::new(std::time::Duration::ZERO)),
+            flash_gate: Arc::new(tokio::sync::RwLock::new(())),
         };
         let app = axum::Router::new()
             .route("/api/firmware/flash", get(list))
@@ -112,6 +125,15 @@ impl Trmnl {
 
     pub fn set_list(&self, list: Option<Value>) {
         *self.list.lock().unwrap() = list;
+    }
+
+    pub fn delay_list(&self, delay: std::time::Duration) {
+        *self.list_delay.lock().unwrap() = delay;
+    }
+
+    /// Holds every flash image's answer until the guard drops.
+    pub async fn hold_flash(&self) -> tokio::sync::OwnedRwLockWriteGuard<()> {
+        Arc::clone(&self.flash_gate).write_owned().await
     }
 
     /// Serves a flash image and returns its URL.

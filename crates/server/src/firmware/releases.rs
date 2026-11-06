@@ -90,6 +90,20 @@ impl Board {
     }
 }
 
+/// The version a release's firmware reports in `FW-Version`. TRMNL names a
+/// variant in its release (`1.8.18-push-to-refresh`) but not in the build, whose
+/// `FW_VERSION_STRING` is the plain version (`include/config.h`), so a variant
+/// reports the version it varies.
+#[must_use]
+pub fn reported_version(release: &str) -> String {
+    match semver::Version::parse(release) {
+        Ok(version) if !version.pre.is_empty() => {
+            format!("{}.{}.{}", version.major, version.minor, version.patch)
+        }
+        _ => release.to_owned(),
+    }
+}
+
 /// The board TRMNL names like the model the firmware reports, when one is.
 /// TRMNL publishes no other link from a firmware's `DEVICE_MODEL` to its boards:
 /// the two names differ for most boards (`xiao_epaper_display` is built as
@@ -155,14 +169,17 @@ fn parse(bytes: &[u8]) -> Result<Vec<Board>, String> {
         .collect())
 }
 
-/// The list, fetched when first needed and again once it is old.
+/// The list, fetched when first needed and again once it is old. A reader with
+/// a list on hand never waits for TRMNL: an old list is answered at once while a
+/// fresh one is fetched behind it. Only a reader with no list waits, for one
+/// fetch shared by every such reader.
 pub struct Releases {
     url: String,
     http: Outbound,
     clock: Arc<dyn Clock>,
-    /// Held across a fetch, so that callers wait for one fetch rather than start
-    /// their own.
-    cached: Mutex<Cached>,
+    cached: std::sync::Mutex<Cached>,
+    /// Held across a fetch, so that one runs at a time.
+    fetching: Mutex<()>,
 }
 
 #[derive(Default)]
@@ -170,6 +187,22 @@ struct Cached {
     boards: Option<(Arc<[Board]>, i64)>,
     /// The last failed fetch: when, and why.
     failure: Option<(i64, String)>,
+}
+
+impl Cached {
+    /// Whether a fetch is due: the list is missing or old, and no fetch failed
+    /// within [`RETRY_SECONDS`].
+    fn due(&self, now: i64) -> bool {
+        let stale = self
+            .boards
+            .as_ref()
+            .is_none_or(|(_, fetched_at)| now - fetched_at >= FRESH_SECONDS);
+        let failed_lately = self
+            .failure
+            .as_ref()
+            .is_some_and(|(failed_at, _)| now - failed_at < RETRY_SECONDS);
+        stale && !failed_lately
+    }
 }
 
 impl Releases {
@@ -180,49 +213,73 @@ impl Releases {
             url: format!("{trmnl}/api/firmware/flash"),
             http: Outbound::new(TIMEOUT),
             clock,
-            cached: Mutex::new(Cached::default()),
+            cached: std::sync::Mutex::new(Cached::default()),
+            fetching: Mutex::new(()),
         }
     }
 
-    /// TRMNL's boards: the list fetched within [`FRESH_SECONDS`], or else a new
-    /// fetch, or else the last list fetched.
+    /// TRMNL's boards: the last list fetched, which a fetch behind the answer
+    /// replaces once it is [`FRESH_SECONDS`] old, or else a first fetch.
     ///
     /// # Errors
     ///
-    /// Why the list could not be fetched, when none was before.
-    pub async fn boards(&self) -> Result<Arc<[Board]>, String> {
-        let mut cached = self.cached.lock().await;
-        let now = self.clock.now();
-        if let Some((boards, fetched_at)) = &cached.boards
-            && now - fetched_at < FRESH_SECONDS
-        {
-            return Ok(Arc::clone(boards));
-        }
-        let failed_lately = cached
-            .failure
-            .as_ref()
-            .filter(|(failed_at, _)| now - failed_at < RETRY_SECONDS);
-        let failure = match failed_lately {
-            Some((_, failure)) => failure.clone(),
-            None => match self.fetch().await {
-                Ok(boards) => {
-                    let boards: Arc<[Board]> = boards.into();
-                    cached.boards = Some((Arc::clone(&boards), now));
-                    cached.failure = None;
-                    return Ok(boards);
-                }
-                Err(failure) => {
-                    tracing::warn!(%failure, "TRMNL's firmware list could not be read");
-                    cached.failure = Some((now, failure.clone()));
-                    failure
-                }
-            },
+    /// Why the list could not be fetched, when none ever was.
+    pub async fn boards(self: &Arc<Self>) -> Result<Arc<[Board]>, String> {
+        let (boards, due) = {
+            let cached = self.lock();
+            (
+                cached.boards.as_ref().map(|(boards, _)| Arc::clone(boards)),
+                cached.due(self.clock.now()),
+            )
         };
-        cached
-            .boards
-            .as_ref()
-            .map(|(boards, _)| Arc::clone(boards))
-            .ok_or(failure)
+        if let Some(boards) = boards {
+            if due {
+                let releases = Arc::clone(self);
+                tokio::spawn(async move {
+                    if let Ok(_fetching) = releases.fetching.try_lock() {
+                        releases.refresh().await;
+                    }
+                });
+            }
+            return Ok(boards);
+        }
+        if due {
+            let _fetching = self.fetching.lock().await;
+            self.refresh().await;
+        }
+        let cached = self.lock();
+        match (&cached.boards, &cached.failure) {
+            (Some((boards, _)), _) => Ok(Arc::clone(boards)),
+            (None, Some((_, failure))) => Err(failure.clone()),
+            (None, None) => Err("has not answered yet".to_owned()),
+        }
+    }
+
+    /// Fetches the list when a fetch is still due. The caller holds `fetching`.
+    async fn refresh(&self) {
+        if !self.lock().due(self.clock.now()) {
+            return;
+        }
+        let fetched = self.fetch().await;
+        let now = self.clock.now();
+        let mut cached = self.lock();
+        match fetched {
+            Ok(boards) => {
+                cached.boards = Some((boards.into(), now));
+                cached.failure = None;
+            }
+            Err(failure) => {
+                tracing::warn!(%failure, "TRMNL's firmware list could not be read");
+                cached.failure = Some((now, failure));
+            }
+        }
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, Cached> {
+        // A panic while the guard is held leaves the cache as it was.
+        self.cached
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     async fn fetch(&self) -> Result<Vec<Board>, String> {
@@ -301,6 +358,14 @@ mod tests {
             "not a version: any other is news"
         );
         assert!(!og.newer_than(None), "nothing to compare");
+    }
+
+    #[test]
+    fn a_variant_reports_the_version_it_varies() {
+        assert_eq!(reported_version("1.8.18-push-to-refresh"), "1.8.18");
+        assert_eq!(reported_version("1.7.8-sensors"), "1.7.8");
+        assert_eq!(reported_version("1.8.18"), "1.8.18");
+        assert_eq!(reported_version("1.8"), "1.8");
     }
 
     #[test]

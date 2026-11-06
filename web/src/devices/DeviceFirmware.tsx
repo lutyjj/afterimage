@@ -53,7 +53,14 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
         <p className="hint">{lead(device)}</p>
       </div>
 
-      <BoardChoice device={device} boards={boards.data} board={board} onChange={setBoard} onSaved={stored} />
+      <BoardChoice
+        device={device}
+        boards={boards.data}
+        board={board}
+        locked={install.isPending}
+        onChange={setBoard}
+        onSaved={stored}
+      />
       {boards.isError && (
         <p className="error-text" role="alert">
           {messageOf(boards.error)}
@@ -70,8 +77,8 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
           </ol>
           {update.state === "sent" && (
             <p className="hint">
-              The display has the request and installs {update.version}, then starts it: firmware 1.8 at once,
-              firmware 1.6 at its next wake. It reports the release it runs when it checks in.
+              The display has the request. It installs {update.version}, restarts and checks in again, which
+              shows whether the new release runs.
             </p>
           )}
           {update.state === "not_installed" && (
@@ -208,12 +215,15 @@ function BoardChoice({
   device,
   boards,
   board,
+  locked,
   onChange,
   onSaved,
 }: {
   device: Device;
   boards: FirmwareBoard[] | undefined;
   board: string;
+  /** While an install fetches the current board's release. */
+  locked: boolean;
   onChange: (board: string) => void;
   onSaved: (device: Device) => void;
 }) {
@@ -237,7 +247,7 @@ function BoardChoice({
         <select
           className="select"
           value={board}
-          disabled={!boards}
+          disabled={!boards || locked}
           onChange={(event) => onChange(event.target.value)}
         >
           {board === "" && (

@@ -377,21 +377,27 @@ async fn a_request_can_be_withdrawn_or_replaced_by_another_board() {
 }
 
 #[tokio::test]
-async fn an_image_the_cache_lost_is_cut_again_before_it_is_sent() {
+async fn an_image_the_cache_lost_is_cut_again_once_before_it_is_sent() {
     let server = start().await;
     let app = publish(&server);
     let (id, key) = kit(&server).await;
     install(&server, id, json!({})).await;
+    assert_eq!(server.trmnl.flash_requests.load(Ordering::SeqCst), 1);
     for file in cached(&server) {
         std::fs::remove_file(file).unwrap();
     }
-    let answer = server.display(&key, &READINGS).await;
-    assert_eq!(answer["update_firmware"], false, "nothing to download yet");
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
-    while cached(&server).is_empty() {
-        assert!(tokio::time::Instant::now() < deadline, "never cut again");
-        tokio::time::sleep(Duration::from_millis(20)).await;
+    let hold = server.trmnl.hold_flash().await;
+    for _ in 0..3 {
+        let answer = server.display(&key, &READINGS).await;
+        assert_eq!(answer["update_firmware"], false, "nothing to download yet");
     }
+    drop(hold);
+    until(|| !cached(&server).is_empty(), "never cut again").await;
+    assert_eq!(
+        server.trmnl.flash_requests.load(Ordering::SeqCst),
+        2,
+        "check-ins that find the image missing share one download"
+    );
     let answer = server.display(&key, &READINGS).await;
     assert_eq!(answer["update_firmware"], true);
     let image = download(answer["firmware_url"].as_str().unwrap())
@@ -418,13 +424,170 @@ async fn trmnls_list_is_read_again_only_once_it_is_old() {
     server.clock.advance(6 * 60 * 60);
     let (status, _) = boards().await;
     assert_eq!(status, StatusCode::OK, "the last list stands in");
-    assert_eq!(server.trmnl.list_requests.load(Ordering::SeqCst), 2);
+    until(
+        || server.trmnl.list_requests.load(Ordering::SeqCst) == 2,
+        "the old list was never read again",
+    )
+    .await;
     boards().await;
     assert_eq!(
         server.trmnl.list_requests.load(Ordering::SeqCst),
         2,
         "a failed read waits before the next"
     );
+}
+
+/// A device read never waits for TRMNL while a list is on hand.
+#[tokio::test]
+async fn device_reads_answer_while_trmnl_is_slow() {
+    let server = start().await;
+    publish(&server);
+    server.sign_up().await;
+    server.claim(&mac(1)).await;
+    assert_eq!(
+        server.call("GET", "/manage/devices", None).await.0,
+        StatusCode::OK
+    );
+    server.trmnl.delay_list(Duration::from_secs(60));
+    server.clock.advance(6 * 60 * 60);
+    let read = tokio::time::timeout(
+        Duration::from_secs(5),
+        server.call("GET", "/manage/devices", None),
+    )
+    .await
+    .expect("the devices answered while TRMNL was slow");
+    assert_eq!(read.0, StatusCode::OK);
+    assert_eq!(read.1["devices"][0]["firmware"]["boardChosen"], false);
+}
+
+/// The board decides which image a device may get, so a board chosen while an
+/// install downloads the old board's image leaves no request behind.
+#[tokio::test]
+async fn a_board_chosen_during_an_install_wins() {
+    let server = start().await;
+    publish(&server);
+    let (id, key) = kit(&server).await;
+    let hold = server.trmnl.hold_flash().await;
+    let http = server.http.clone();
+    let url = format!("{}/manage/devices/{id}/firmware-update", server.url);
+    let installing = tokio::spawn(async move {
+        http.post(url)
+            .header("Content-Type", "application/json")
+            .body("{}")
+            .send()
+            .await
+            .unwrap()
+            .status()
+    });
+    until(
+        || server.trmnl.flash_requests.load(Ordering::SeqCst) == 1,
+        "the install never asked TRMNL for its image",
+    )
+    .await;
+    let chosen = tokio::time::timeout(
+        Duration::from_secs(5),
+        server.call(
+            "PATCH",
+            &format!("/manage/devices/{id}"),
+            Some(json!({ "firmwareBoard": "xteink_x4" })),
+        ),
+    )
+    .await
+    .expect("choosing a board does not wait for another's download");
+    assert_eq!(chosen.0, StatusCode::OK);
+    drop(hold);
+    assert_eq!(installing.await.unwrap(), StatusCode::CONFLICT);
+    assert!(firmware_of(&server, id).await["update"].is_null());
+    assert_eq!(
+        server.display(&key, &READINGS).await["update_firmware"],
+        false
+    );
+    assert!(
+        cached(&server).is_empty(),
+        "the old board's image leaves the cache"
+    );
+}
+
+/// Firmware 1.6 reads the update fields only on a check-in without a special
+/// function (`handleApiDisplayResponse` in `src/bl.cpp`).
+#[tokio::test]
+async fn a_check_in_for_a_special_function_carries_no_request() {
+    let server = start().await;
+    publish(&server);
+    let (id, key) = kit(&server).await;
+    install(&server, id, json!({})).await;
+    let answer: Value = server
+        .http
+        .get(format!("{}/api/display", server.url))
+        .header("ID", mac(1))
+        .header("Access-Token", &key)
+        .header("FW-Version", "1.6.10")
+        .header("Model", "xiao_epaper_display")
+        .header("special_function", "true")
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(answer["status"], 0);
+    assert_eq!(answer["update_firmware"], false);
+    assert_eq!(
+        firmware_of(&server, id).await["update"]["state"],
+        "requested"
+    );
+    let answer = server
+        .display_as(&key, &READINGS, "1.6.10", "xiao_epaper_display")
+        .await;
+    assert_eq!(answer["update_firmware"], true);
+}
+
+/// TRMNL names a variant in its release only; the build reports the version it
+/// varies (`FW_VERSION_STRING` in `include/config.h`).
+#[tokio::test]
+async fn a_variant_is_installed_when_the_device_reports_the_version_it_varies() {
+    let server = start().await;
+    publish(&server);
+    server.sign_up().await;
+    let (device, key) = server.claim(&mac(1)).await;
+    let id = device["id"].as_i64().unwrap();
+    server
+        .display_as(&key, &READINGS, "1.8.9", "xteink_x4")
+        .await;
+    let (status, body) = install(&server, id, json!({ "version": "1.8.18-push-to-refresh" })).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let answer = server
+        .display_as(&key, &READINGS, "1.8.9", "xteink_x4")
+        .await;
+    assert_eq!(answer["update_firmware"], true);
+    server
+        .display_as(&key, &READINGS, "1.8.18", "xteink_x4")
+        .await;
+    assert_eq!(
+        firmware_of(&server, id).await["update"]["state"],
+        "installed"
+    );
+}
+
+/// An image stays cached only while a device may still download it.
+#[tokio::test]
+async fn a_decided_or_removed_request_leaves_no_image_behind() {
+    let server = start().await;
+    publish(&server);
+    let (id, key) = kit(&server).await;
+    install(&server, id, json!({})).await;
+    server.display(&key, &READINGS).await;
+    assert_eq!(cached(&server).len(), 1, "sent and not yet decided");
+    server.display(&key, &READINGS).await;
+    assert!(cached(&server).is_empty(), "decided");
+
+    install(&server, id, json!({})).await;
+    assert_eq!(cached(&server).len(), 1);
+    let (status, _) = server
+        .call("DELETE", &format!("/manage/devices/{id}"), None)
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert!(cached(&server).is_empty(), "removed with its device");
 }
 
 #[tokio::test]
@@ -467,6 +630,16 @@ async fn download(url: impl reqwest::IntoUrl) -> reqwest::Result<reqwest::Respon
         .get(url)
         .send()
         .await
+}
+
+/// Waits for a condition that work the test started, such as a background
+/// fetch, brings about.
+async fn until(condition: impl Fn() -> bool, failure: &str) {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    while !condition() {
+        assert!(tokio::time::Instant::now() < deadline, "{failure}");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
 }
 
 /// The files in the firmware cache.

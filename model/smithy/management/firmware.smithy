@@ -82,9 +82,8 @@ enum FirmwareUpdateState {
     /// Waiting for the device's next check-in.
     REQUESTED = "requested"
 
-    /// The device has the request and has not checked in since. Firmware 1.8
-    /// restarts into the new release as soon as it is installed; firmware 1.6
-    /// starts it at its next wake.
+    /// The device has the request and has not checked in since. Both firmware
+    /// lines restart and check in as soon as they have tried to install it.
     SENT = "sent"
 
     /// The device checked in reporting `version`.

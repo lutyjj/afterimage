@@ -12,6 +12,7 @@ pub mod cache;
 pub mod releases;
 pub mod updates;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -34,6 +35,9 @@ use updates::{Delivery, Updates};
 const IMAGE_TIMEOUT: Duration = Duration::from_secs(120);
 /// Largest flash image read. TRMNL X's is 16 MB, its whole flash.
 const FLASH_BYTES: usize = 32 * 1024 * 1024;
+/// How long a device's lost image waits after an attempt to cut it again, so
+/// that its check-ins do not each fetch a flash image of up to 16 MB.
+const CUT_AGAIN_SECONDS: i64 = 10 * 60;
 
 #[derive(Debug, thiserror::Error)]
 pub enum InstallError {
@@ -45,6 +49,8 @@ pub enum InstallError {
     NoSuchRelease { board: String, version: String },
     #[error("TRMNL lists no release for {0}.")]
     NoRelease(String),
+    #[error("This device's board changed while its firmware was fetched. Install again.")]
+    BoardChanged,
     #[error("TRMNL's firmware list could not be read: it {0}.")]
     List(String),
     #[error("TRMNL's image of {version} for {board}: {reason}.")]
@@ -59,25 +65,19 @@ pub enum InstallError {
     Cache(#[from] std::io::Error),
 }
 
-/// Why an image could not be cut.
-#[derive(Debug, thiserror::Error)]
-enum CutError {
-    #[error("it {0}")]
-    Fetch(String),
-    #[error("{0}")]
-    Image(#[from] app_image::Error),
-    #[error(transparent)]
-    Cache(#[from] std::io::Error),
-}
-
 pub struct Firmware {
-    releases: Releases,
+    releases: Arc<Releases>,
     cache: Cache,
     updates: Updates,
     http: Outbound,
-    /// Held while an image is stored and its request recorded, so that the cache
-    /// is pruned only between installs.
-    installing: Mutex<()>,
+    clock: Arc<dyn Clock>,
+    /// Held while an image is stored and its request recorded, and while the
+    /// cache is pruned, so that a prune never removes an image a request is about
+    /// to name.
+    storing: Mutex<()>,
+    /// Devices whose lost image is being cut again, or failed to be, and since
+    /// when.
+    cutting_again: std::sync::Mutex<HashMap<i64, i64>>,
 }
 
 impl Firmware {
@@ -86,11 +86,13 @@ impl Firmware {
     #[must_use]
     pub fn new(trmnl: &str, cache_dir: PathBuf, pool: SqlitePool, clock: Arc<dyn Clock>) -> Self {
         Self {
-            releases: Releases::new(trmnl, Arc::clone(&clock)),
+            releases: Arc::new(Releases::new(trmnl, Arc::clone(&clock))),
             cache: Cache::new(cache_dir),
-            updates: Updates::new(pool, clock),
+            updates: Updates::new(pool, Arc::clone(&clock)),
             http: Outbound::new(IMAGE_TIMEOUT),
-            installing: Mutex::new(()),
+            clock,
+            storing: Mutex::new(()),
+            cutting_again: std::sync::Mutex::new(HashMap::new()),
         }
     }
 
@@ -119,8 +121,8 @@ impl Firmware {
     /// # Errors
     ///
     /// When the device has no board or TRMNL no such release, when TRMNL's list or
-    /// image cannot be read or the image fails its checks, and when storage
-    /// fails.
+    /// image cannot be read or the image fails its checks, when the device's board
+    /// changed meanwhile, and when storage fails.
     pub async fn install(
         &self,
         device: &Device,
@@ -142,18 +144,24 @@ impl Firmware {
                 .latest()
                 .ok_or_else(|| InstallError::NoRelease(board.label.clone()))?,
         };
-        let _installing = self.installing.lock().await;
-        let image = self.cut(release).await.map_err(|error| match error {
-            CutError::Cache(error) => InstallError::Cache(error),
-            other => InstallError::Image {
+        let app = self
+            .fetch_app(release)
+            .await
+            .map_err(|reason| InstallError::Image {
                 board: board.label.clone(),
                 version: release.version.clone(),
-                reason: other.to_string(),
-            },
-        })?;
-        self.updates
+                reason,
+            })?;
+        let _storing = self.storing.lock().await;
+        let image = self.cache.store(&app)?;
+        let recorded = self
+            .updates
             .request(device.id, &board.name, &release.version, &image)
             .await?;
+        if !recorded {
+            self.prune().await;
+            return Err(InstallError::BoardChanged);
+        }
         tracing::info!(
             device = device.id,
             board = board.name,
@@ -176,15 +184,17 @@ impl Firmware {
     }
 
     /// Removes cached images that no request names any more, as after a device's
-    /// board changed and withdrew its request.
+    /// board changed and withdrew its request, or the device was removed.
     pub async fn forget_unused(&self) {
-        let _installing = self.installing.lock().await;
+        let _storing = self.storing.lock().await;
         self.prune().await;
     }
 
-    /// The image this check-in's answer tells the device to install, if any. A
-    /// request whose image left the cache waits for it to be cut again, which
-    /// starts here.
+    /// The image this check-in's answer tells the device to install, if any. An
+    /// answer to a check-in on a special function carries none, since firmware
+    /// 1.6 reads the update fields only without one (`handleApiDisplayResponse` in
+    /// `src/bl.cpp`). A request whose image left the cache waits for it to be cut
+    /// again, which starts here.
     ///
     /// # Errors
     ///
@@ -192,17 +202,23 @@ impl Firmware {
     pub async fn check_in(
         self: &Arc<Self>,
         device: &Device,
+        special_function: bool,
     ) -> Result<Option<String>, sqlx::Error> {
         let delivery = self
             .updates
             .check_in(
                 device.id,
                 device.readings.firmware_version.as_deref(),
+                !special_function,
                 |image| self.cache.contains(image),
             )
             .await?;
         Ok(match delivery {
             Delivery::Nothing => None,
+            Delivery::Finished => {
+                self.forget_unused().await;
+                None
+            }
             Delivery::Send(image) => {
                 tracing::info!(
                     device = device.id,
@@ -212,9 +228,27 @@ impl Firmware {
                 Some(image)
             }
             Delivery::Missing { board, version } => {
-                let firmware = Arc::clone(self);
-                let device_id = device.id;
-                tokio::spawn(async move { firmware.cut_again(device_id, &board, &version).await });
+                let now = self.clock.now();
+                let started = {
+                    let mut cutting = self
+                        .cutting_again
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    let waiting = cutting
+                        .get(&device.id)
+                        .is_some_and(|since| now - since < CUT_AGAIN_SECONDS);
+                    if !waiting {
+                        cutting.insert(device.id, now);
+                    }
+                    !waiting
+                };
+                if started {
+                    let firmware = Arc::clone(self);
+                    let device_id = device.id;
+                    tokio::spawn(
+                        async move { firmware.cut_again(device_id, &board, &version).await },
+                    );
+                }
                 None
             }
         })
@@ -229,19 +263,22 @@ impl Firmware {
         self.cache.read(name)
     }
 
-    /// Fetches the release's flash image and caches its checked app image.
-    async fn cut(&self, release: &Release) -> Result<String, CutError> {
+    /// Fetches the release's flash image and returns its checked app image, or
+    /// why there is none.
+    async fn fetch_app(&self, release: &Release) -> Result<Vec<u8>, String> {
         let request = self.http.client().get(&release.url);
         let flash = self
             .http
             .read(request, FLASH_BYTES)
             .await
-            .map_err(CutError::Fetch)?;
-        let app = app_image::cut(&flash)?;
-        Ok(self.cache.store(app)?)
+            .map_err(|failure| format!("it {failure}"))?;
+        Ok(app_image::cut(&flash)
+            .map_err(|error| error.to_string())?
+            .to_vec())
     }
 
-    /// Cuts a waiting request's image again after the cache lost it.
+    /// Cuts a waiting request's image again after the cache lost it. A device
+    /// waits [`CUT_AGAIN_SECONDS`] after a failed attempt before the next.
     async fn cut_again(&self, device_id: i64, board: &str, version: &str) {
         let release = match self.boards().await {
             Ok(boards) => boards
@@ -263,17 +300,33 @@ impl Firmware {
             );
             return;
         };
-        let _installing = self.installing.lock().await;
-        match self.cut(&release).await {
-            Ok(image) => {
-                if let Err(error) = self.updates.replace_image(device_id, version, &image).await {
-                    tracing::error!(%error, device = device_id, "a firmware image was cut again but not recorded");
-                }
-            }
+        let app = match self.fetch_app(&release).await {
+            Ok(app) => app,
             Err(error) => {
                 tracing::warn!(%error, device = device_id, board, version, "a lost firmware image could not be cut again");
+                return;
+            }
+        };
+        let _storing = self.storing.lock().await;
+        let recorded = match self.cache.store(&app) {
+            Ok(image) => self.updates.replace_image(device_id, version, &image).await,
+            Err(error) => {
+                tracing::error!(%error, device = device_id, "a firmware image was cut again but not cached");
+                return;
+            }
+        };
+        match recorded {
+            Ok(()) => {
+                self.cutting_again
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .remove(&device_id);
+            }
+            Err(error) => {
+                tracing::error!(%error, device = device_id, "a firmware image was cut again but not recorded");
             }
         }
+        self.prune().await;
     }
 
     /// Removes cached images no device may still download. A failure leaves

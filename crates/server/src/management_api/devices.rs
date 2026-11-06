@@ -196,6 +196,8 @@ pub async fn delete_device(
     if let Err(error) = state.images.forget(*input.device_id.inner()) {
         tracing::warn!(%error, "a removed device's images stay on disk");
     }
+    // Its install request went with it.
+    state.firmware.forget_unused().await;
     tracing::info!(device = *input.device_id.inner(), reset, "device removed");
     Ok(output::DeleteDeviceOutput {})
 }
