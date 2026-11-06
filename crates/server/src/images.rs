@@ -14,9 +14,11 @@ pub const RETAIN: Duration = Duration::from_mins(5);
 
 pub struct Images {
     root: PathBuf,
-    /// Held while a device's images change, so that one check-in's store of an
+    /// Held while any device's images change, so that one check-in's store of an
     /// image cannot interleave with another's removal of old ones: the second
-    /// would read the first image's time before the first renews it.
+    /// would read the first image's time before the first renews it. One lock
+    /// serves every device, since a save takes milliseconds and a server drives
+    /// a household's few displays.
     changing: Mutex<()>,
 }
 

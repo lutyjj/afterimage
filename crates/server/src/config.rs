@@ -194,6 +194,11 @@ fn parse_topic(text: &str) -> Result<String, String> {
 /// An origin: `https://` or `http://`, a host and a port, kept as written but
 /// for a closing slash, since an OIDC provider matches its redirect URL exactly.
 fn parse_origin(text: &str) -> Result<String, String> {
+    // The URL parser drops spaces and control characters that the kept text
+    // would still hold.
+    if text.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("must not contain spaces or control characters".to_owned());
+    }
     let url = url::Url::parse(text).map_err(|error| error.to_string())?;
     if !matches!(url.scheme(), "https" | "http") {
         return Err("must start with https:// or http://".to_owned());
@@ -311,6 +316,9 @@ mod tests {
             "https://after image.example",
             "https://afterimage.example:port",
             "https://admin@afterimage.example",
+            "https://afterimage.example\n",
+            " https://afterimage.example",
+            "https://after\timage.example",
         ] {
             assert!(parse(&["--public-url", url]).is_err(), "{url}");
         }

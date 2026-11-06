@@ -718,3 +718,28 @@ fn a_divider_in_a_column_inks_one_device_row() {
         .count();
     assert_eq!(rule_rows, 1);
 }
+
+#[test]
+fn an_underlined_label_draws_a_one_row_bar_under_its_text() {
+    // TRMNL's underline is a one-pixel bar along the bottom of the label's box.
+    let label = screen_of(
+        &json!({ "label": { "text": "UNDERLINED", "size": "base", "style": "underline" } }),
+    );
+    let drawn = pixels(&render(&label, "og_plus", "gray-4"));
+    let ink = |row: &Vec<[u8; 3]>| {
+        row.iter()
+            .filter(|pixel| **pixel != [255, 255, 255])
+            .count()
+    };
+    let bar = (0..drawn.len())
+        .rev()
+        .find(|&y| ink(&drawn[y]) > 0)
+        .unwrap();
+    assert!(
+        drawn[bar].iter().all(|pixel| !is_gray(*pixel))
+            && ink(&drawn[bar - 1]) * 2 < ink(&drawn[bar]),
+        "a solid bar one row thick, not a stroke spread over two rows"
+    );
+    let text = (0..bar).filter(|&y| ink(&drawn[y]) > 0).max().unwrap();
+    assert!(text < bar - 1, "a gap between the text and the bar");
+}

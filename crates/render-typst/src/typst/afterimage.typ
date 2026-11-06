@@ -182,7 +182,12 @@
   if style == "outline" {
     box(stroke: 1pt + ink(t), inset: inset, radius: radius, body)
   } else if style == "underline" {
-    underline(offset: 2pt, body)
+    // TRMNL's underline: a one-pixel bar along the bottom of the label's box,
+    // where layout puts it, rather than a stroke under the glyphs.
+    context {
+      let width = measure(body).width
+      stack(body, rect(width: width, height: 1pt, fill: ink(t), stroke: none))
+    }
   } else if style == "gray" {
     text(fill: gray-ink(t, grays), body)
   } else if style == "filled" {
