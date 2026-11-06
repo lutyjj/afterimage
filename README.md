@@ -21,7 +21,6 @@ On NixOS, the flake's `nixosModules.default` runs it as `services.afterimage`: `
 | `pnpm install` | Installs the web UI's dependencies, after `tools/generate` |
 | `pnpm --filter afterimage-web dev` | Serves the web UI with hot reload at `http://127.0.0.1:5173`, sending `/api` and `/manage` to a server on port 8080 |
 | `pnpm --filter afterimage-web check` | Type-checks the web UI with the generated client and runs its tests |
-| `tools/prepare-queries` | Refreshes `.sqlx/` after a query or migration changes |
 | `tools/trmnl-excerpt` | Refreshes the excerpt of TRMNL's published device contract |
 | `tools/trmnl-catalog` | Refreshes the snapshot of TRMNL's display models and palettes |
 | `tools/tokens/refresh` | Refreshes the renderer's design tokens and fonts from the pinned release of TRMNL's design system |

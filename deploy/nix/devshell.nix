@@ -2,7 +2,6 @@
   mkShell,
   rust,
   smithy-cli,
-  sqlx-cli,
   sqlite,
   jq,
   curl,
@@ -24,7 +23,6 @@ mkShell {
       ];
     })
     smithy-cli
-    sqlx-cli
     sqlite
     jq
     curl

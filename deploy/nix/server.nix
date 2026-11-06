@@ -19,7 +19,6 @@ rustPlatform.buildRustPackage {
     fileset = fs.unions [
       ../../Cargo.toml
       ../../Cargo.lock
-      ../../.sqlx
       ../../crates
       ../../model/conformance
       ../../model/trmnl
@@ -32,9 +31,6 @@ rustPlatform.buildRustPackage {
   postPatch = ''
     cp -r --no-preserve=mode ${contract} gen
   '';
-
-  # Queries are checked against .sqlx/, which tools/prepare-queries writes.
-  env.SQLX_OFFLINE = "true";
 
   cargoBuildFlags = [
     "--package"
