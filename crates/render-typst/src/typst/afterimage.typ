@@ -136,7 +136,7 @@
   if not value.at("fit", default: false) { return body(base) }
   layout(region => {
     let width = measure(body(base)).width
-    if width > region.width and width > 0pt { body(base * region.width / width) } else { body(base) }
+    if width > region.width and width > 0pt { body(base * (region.width / width)) } else { body(base) }
   })
 }
 

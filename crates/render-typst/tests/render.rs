@@ -172,6 +172,21 @@ fn clamped_text_keeps_to_its_lines() {
 }
 
 #[test]
+fn a_fitted_value_shrinks_into_its_box() {
+    // Far wider than the first of four columns, a quarter of the 800-pixel screen.
+    let screen = json!({ "content": { "grid": { "columns": 4, "gap": "medium", "grow": false, "cells": [
+        { "span": 1, "content": { "value": { "text": "1234567890", "size": "peta", "fit": true, "tabular": false } } }
+    ] } } });
+    let bytes = render(&screen, "og_plus", "gray-4");
+    let rightmost = pixels(&bytes)
+        .iter()
+        .filter_map(|row| row.iter().rposition(|pixel| *pixel != [255, 255, 255]))
+        .max()
+        .unwrap();
+    assert!(rightmost < 200, "the value reaches x={rightmost}");
+}
+
+#[test]
 fn a_missing_image_or_value_leaves_the_rest_of_the_screen() {
     let screen = json!({ "content": { "column": { "gap": "medium", "align": "start", "justify": "start", "grow": false, "children": [
         { "image": { "url": null, "fit": "contain", "grow": false } },
