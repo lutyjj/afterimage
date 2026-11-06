@@ -26,21 +26,58 @@
   weight: int(sized(t, component, size, "-font-weight") / 100) * 100,
 )
 
-// A fill: a token's color, with its dither tile on displays of few grays.
-#let fill(t, color, image: none) = {
-  let base = rgb(tok(t, color, default: "#FFFFFF"))
-  let svg = if image == none { none } else { tok(t, image) }
-  if svg == none { return base }
-  let size = px(t, "--dither-bg-size", default: 16)
-  tiling(size: (size, size), {
-    place(rect(width: size, height: size, fill: base, stroke: none))
-    place(std.image(bytes(svg), format: "svg", width: size, height: size))
-  })
+// What the stylesheet paints for one part of a component (`tools/tokens` reads
+// it from the release's own markup): its fill as a color, a dither tile or a
+// row of pixels, its ink and its border. Inside an inverse element, its inverse.
+#let paint(t, name) = {
+  let scheme = if t.at("@inverse", default: false) { "paint/inverse/" } else { "paint/" }
+  let found = tok(t, scheme + name)
+  if found == none { (:) } else { found }
 }
 
-// Gray ink for text: the gray itself where the palette has a gray, or black,
-// since neither a mid gray nor a dither survives as small text without one.
-#let gray-ink(t, grays) = if grays { rgb(tok(t, "--gray-50", default: "#999999")) } else { black }
+// A paint's fill: its color under its dither tile, or its row of pixels (a
+// rule), which runs down instead of across where `down` is set. Pixels the row
+// leaves transparent show what is beneath.
+#let fill-of(t, p, down: false) = {
+  let base = if "color" in p { rgb(p.color) } else { none }
+  if "tile" in p {
+    let size = px(t, "--dither-bg-size", default: 16)
+    return tiling(size: (size, size), {
+      if base != none { place(rect(width: size, height: size, fill: base, stroke: none)) }
+      place(std.image(bytes(p.tile), format: "svg", width: size, height: size))
+    })
+  }
+  if "pattern" in p {
+    let row = p.pattern
+    let (across, along) = (row.len() * 1pt, 1pt)
+    return tiling(size: if down { (along, across) } else { (across, along) }, {
+      for (at, pixel) in row.enumerate() {
+        if pixel != none {
+          let (dx, dy) = if down { (0pt, at * 1pt) } else { (at * 1pt, 0pt) }
+          place(dx: dx, dy: dy, rect(width: 1pt, height: 1pt, fill: rgb(pixel), stroke: none))
+        }
+      }
+    })
+  }
+  base
+}
+
+// The ink text and lines take: black, or white inside an inverse element.
+#let ink(t) = rgb(paint(t, "canvas").at("ink", default: "#000000"))
+
+// A rule as the stylesheet draws a divider or a table's row line: one pixel
+// thick, across a column or down a row.
+#let rule(t, name, length: 100%, down: false) = {
+  let fill = fill-of(t, paint(t, name), down: down)
+  if down { rect(width: 1pt, height: length, fill: fill, stroke: none) } else { rect(width: length, height: 1pt, fill: fill, stroke: none) }
+}
+
+// Gray ink for text: the gray itself where the palette has a gray, or ink, since
+// neither a mid gray nor a dither survives as small text without one. Inside an
+// inverse element, the gray the stylesheet paints gray labels with there.
+#let gray-ink(t, grays) = if not grays { ink(t) } else if t.at("@inverse", default: false) {
+  rgb(paint(t, "label-gray").at("color", default: "#AAAAAA"))
+} else { rgb(tok(t, "--gray-50", default: "#999999")) }
 
 // Text kept legible over a dithered fill: a white outline under the ink, as
 // TRMNL's title bar draws it (`--title-bar-text-stroke-width`).
@@ -116,13 +153,14 @@
   let radius = px(t, "--rounded-xsmall", default: 5)
   let style = value.at("style", default: "plain")
   if style == "outline" {
-    box(stroke: 1pt + black, inset: inset, radius: radius, body)
+    box(stroke: 1pt + ink(t), inset: inset, radius: radius, body)
   } else if style == "underline" {
     underline(offset: 2pt, body)
   } else if style == "gray" {
     text(fill: gray-ink(t, grays), body)
   } else if style == "filled" {
-    box(fill: black, inset: inset, radius: radius, text(fill: white, body))
+    let canvas = paint(t, "canvas").at("color", default: "#FFFFFF")
+    box(fill: ink(t), inset: inset, radius: radius, text(fill: rgb(canvas), body))
   } else {
     body
   }
@@ -193,7 +231,7 @@
     let tick = low
     while tick <= high + step / 2 {
       let dash = if tick == low { none } else { "dotted" }
-      place(dx: axis-width, dy: y(tick), line(length: width, stroke: (thickness: 1pt, dash: dash)))
+      place(dx: axis-width, dy: y(tick), line(length: width, stroke: (paint: ink(t), thickness: 1pt, dash: dash)))
       let shown = if calc.abs(tick - calc.round(tick)) < 1e-9 { str(int(calc.round(tick))) } else { str(calc.round(tick, digits: 2)) }
       place(dy: calc.round((y(tick) - small.size / 2) / 1pt) * 1pt, box(width: axis-width - 8pt, align(right, text(..small, shown))))
       tick += step
@@ -219,7 +257,7 @@
           if v == none { continue }
           let top = y(calc.max(v, 0))
           let bottom = y(calc.min(v, 0))
-          let shade = if n == 0 { black } else { fill(t, "--framework-slot-item-meta-emphasis-2-bg-color", image: "--framework-slot-item-meta-emphasis-2-bg-image") }
+          let shade = if n == 0 { ink(t) } else { fill-of(t, paint(t, "item-meta-emphasis-2")) }
           place(dx: axis-width + width * i / count + slot * n + slot * 0.15, dy: top,
             rect(width: slot * 0.7, height: calc.max(bottom - top, 1pt), fill: shade, stroke: none))
         }
@@ -229,10 +267,10 @@
         for (i, v) in values.enumerate() {
           if v == none { if runs.at(-1) != () { runs.push(()) } } else { runs.at(-1).push((x(i), y(v))) }
         }
-        let stroke = (thickness: if n == 0 { 4pt } else { 3pt }, cap: "round", join: "round", dash: dashes.at(calc.rem(n, 4)))
+        let stroke = (paint: ink(t), thickness: if n == 0 { 4pt } else { 3pt }, cap: "round", join: "round", dash: dashes.at(calc.rem(n, 4)))
         for points in runs.filter(run => run.len() > 0) {
           if points.len() == 1 {
-            place(dx: points.at(0).at(0) - 2pt, dy: points.at(0).at(1) - 2pt, circle(radius: 2pt, fill: black, stroke: none))
+            place(dx: points.at(0).at(0) - 2pt, dy: points.at(0).at(1) - 2pt, circle(radius: 2pt, fill: ink(t), stroke: none))
             continue
           }
           let segments = (curve.move(points.at(0)),)
@@ -290,20 +328,21 @@
   if direction == "column" {
     let horizontal = if cross == "center" { center } else if cross == "end" { right } else { left }
     let aligned = if cross == none { (:) } else { (align: horizontal) }
-    let rules = dividers.map(at => grid.hline(y: at + lead, stroke: 1pt + black))
+    let stroke = (paint: fill-of(t, paint(t, "divider")), thickness: 1pt)
+    let rules = dividers.map(at => grid.hline(y: at + lead, stroke: stroke))
     grid(columns: (across,), rows: tracks, row-gutter: gutter, ..aligned, ..cells, ..rules)
   } else {
     let vertical = if cross == "center" { horizon } else if cross == "end" { bottom } else { top }
     let aligned = if cross == none { (:) } else { (align: vertical) }
-    let rules = dividers.map(at => grid.vline(x: at + lead, stroke: 1pt + black))
+    let stroke = (paint: fill-of(t, paint(t, "divider"), down: true), thickness: 1pt)
+    let rules = dividers.map(at => grid.vline(x: at + lead, stroke: stroke))
     grid(rows: (across,), columns: tracks, column-gutter: gutter, ..aligned, ..cells, ..rules)
   }
 }
 
 #let item(t, v, bounds, draw) = {
   let emphasis = int(v.at("emphasis", default: 1))
-  let slot = if emphasis == 1 { "--framework-slot-item-meta" } else { "--framework-slot-item-meta-emphasis-" + str(emphasis) }
-  let meta = fill(t, slot + "-bg-color", image: slot + "-bg-image")
+  let meta = fill-of(t, paint(t, if emphasis == 1 { "item-meta" } else { "item-meta-emphasis-" + str(emphasis) }))
   // Its children are a column, so a divider among them is one as a column draws it.
   let content = stack-of(t, (children: v.children, gap: "small"), "column", (w: bounds.w, h: false), draw)
   if v.at("plain", default: false) { return content }
@@ -356,7 +395,7 @@
     // Outside a stack, such as alone in a grid cell: as long as its parent fixes,
     // and nothing along an axis sized to content.
     let fixed = if direction == "row" { bounds.h } else { bounds.w }
-    if not fixed { [] } else if direction == "row" { line(angle: 90deg, length: 100%) } else { line(length: 100%) }
+    if not fixed { [] } else { rule(t, "divider", down: direction == "row") }
   } else if kind == "lineChart" {
     chart(t, v, "line", bounds)
   } else if kind == "barChart" {
@@ -368,7 +407,8 @@
 
 #let title-bar(t, images, bar) = {
   let face = typeface(t, "--title-bar", "base")
-  let ink = rgb(tok(t, "--framework-slot-title-bar-text-color", default: "#000000"))
+  let bar-paint = paint(t, "title-bar")
+  let ink = rgb(bar-paint.at("ink", default: "#000000"))
   let icon = bar.at("icon", default: none)
   let icon = if image-of(images, icon) == none { none } else {
     std.image(image-of(images, icon), height: px(t, "--title-bar-image-height", default: 24))
@@ -376,7 +416,7 @@
   block(
     width: 100%,
     height: px(t, "--title-bar-height", default: 40),
-    fill: fill(t, "--framework-slot-title-bar-bg-color", image: "--framework-slot-title-bar-bg-image"),
+    fill: fill-of(t, bar-paint),
     radius: px(t, "--title-bar-border-radius", default: 10),
     inset: (x: px(t, "--gap", default: 10)),
     grid(

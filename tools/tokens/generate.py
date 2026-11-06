@@ -2,10 +2,12 @@
 
 For each combination of CSS classes the catalogue's models and palettes give a
 screen (device, size, density, bit depth), the script loads the pinned compiled
-stylesheet in headless Chromium, applies every token the release documents, and
-the fill patterns, to a probe element of the matching kind, and records the
-computed value. It also copies the release's fonts with their notices and the
-licence texts that cover them and the tokens.
+stylesheet in headless Chromium, applies every token the release documents to a
+probe element of the matching kind and records the computed value. It also lays
+out the release's own markup for each component and records what each part
+paints, on the screen and inside an `.inverse` element: a color, a dither tile,
+or a row of pixels for a rule. It copies the release's fonts with their notices
+and the licence texts that cover them and the tokens.
 
 Usage: generate.py CATALOG_DIR OUTPUT_DIR
 
@@ -53,30 +55,50 @@ DIGESTS = {
     f"{REPOSITORY}/public/fonts/TRMNL21-Regular.ttf": "1ece6f9200955d51f8e6c941e13fa3d121555e532a76f0c0b88664915c5c444f",
     f"{REPOSITORY}/public/fonts/TRMNL21-Bold.ttf": "1f82225e7fbcfda2047f01184ac6f387ce8d3796ac9615cc38e4fa2048310b31",
 }
-# Fills and the slots components paint from are internal custom properties, not
-# documented tokens; these are the ones the components use.
-FILLS = [
-    "--dither-bg-size",
-    "--framework-fill-muted",
-    "--framework-fill-soft",
-    "--framework-fill-strong",
-    "--framework-semantic-fill-muted-bg-color",
-    "--framework-semantic-fill-muted-bg-image",
-    "--framework-semantic-fill-soft-bg-color",
-    "--framework-semantic-fill-soft-bg-image",
-    "--framework-semantic-fill-strong-bg-color",
-    "--framework-semantic-fill-strong-bg-image",
-    "--framework-slot-item-meta-bg-color",
-    "--framework-slot-item-meta-bg-image",
-    "--framework-slot-item-meta-emphasis-2-bg-color",
-    "--framework-slot-item-meta-emphasis-2-bg-image",
-    "--framework-slot-item-meta-emphasis-3-bg-color",
-    "--framework-slot-item-meta-emphasis-3-bg-image",
-    "--framework-slot-title-bar-bg-color",
-    "--framework-slot-title-bar-bg-image",
-    "--framework-slot-title-bar-text-color",
-    "--framework-slot-title-bar-stroke-color",
-]
+# Internal custom properties that are not documented tokens but that drawing
+# needs: the size of a dither tile.
+FILLS = ["--dither-bg-size"]
+
+# What each component paints, read from the computed style of the release's own
+# markup rather than from the slots behind it, so the stylesheet's cascade picks
+# the slot for each profile. Each paint is probed on the screen and again inside
+# an `.inverse` element, whose paints are recorded under `inverse/<name>`.
+PAINT_MARKUP = """
+<div class="title_bar"><span class="title">T</span><span class="instance">I</span></div>
+<div class="item"><div class="meta"></div><div class="content"><span class="title">T</span></div></div>
+<div class="item item--emphasis-2"><div class="meta"></div><div class="content"><span class="title">T</span></div></div>
+<div class="item item--emphasis-3"><div class="meta"></div><div class="content"><span class="title">T</span></div></div>
+<table class="table table--indexed"><thead><tr><th><span class="title">H</span></th></tr></thead>
+<tbody><tr><td><div class="meta"><span class="index">1</span></div><span class="label">A</span></td></tr>
+<tr><td><span class="label">B</span></td></tr></tbody></table>
+<div class="progress-bar"><div class="track"><div class="fill" style="width: 50%"></div></div></div>
+<div class="progress-bar progress-bar--emphasis-2"><div class="track"><div class="fill" style="width: 50%"></div></div></div>
+<div class="progress-bar progress-bar--emphasis-3"><div class="track"><div class="fill" style="width: 50%"></div></div></div>
+<div class="progress-dots"><div class="track"><div class="dot dot--filled"></div><div class="dot dot--current"></div><div class="dot"></div></div></div>
+<span class="label label--gray">G</span>
+<div class="divider"></div>
+"""
+# Paint name: the element's selector within the markup.
+PAINTS = {
+    "canvas": ":scope",
+    "title-bar": ".title_bar",
+    "item-meta": ".item:not([class*=emphasis]) .meta",
+    "item-meta-emphasis-2": ".item--emphasis-2 .meta",
+    "item-meta-emphasis-3": ".item--emphasis-3 .meta",
+    "table-head-rule": ".table thead tr",
+    "table-body-rule": ".table tbody tr:first-child",
+    "table-meta": ".table .meta",
+    "table-index": ".table .index",
+    "progress-track": ".progress-bar:not([class*=emphasis]) .track",
+    "progress-fill": ".progress-bar:not([class*=emphasis]) .fill",
+    "progress-fill-emphasis-2": ".progress-bar--emphasis-2 .fill",
+    "progress-fill-emphasis-3": ".progress-bar--emphasis-3 .fill",
+    "progress-dot": ".dot:not([class*=dot--])",
+    "progress-dot-current": ".dot--current",
+    "progress-dot-filled": ".dot--filled",
+    "label-gray": ".label--gray",
+    "divider": ".divider",
+}
 
 # Each token goes through the CSS property that resolves its kind, so lengths come
 # back in pixels and colors as rgb().
@@ -98,17 +120,49 @@ names => {
     if (/-font-family$/.test(name)) value = ['family', through('font-family', name)];
     else if (/-font-weight$/.test(name)) value = ['number', through('font-weight', name)];
     else if (/-line-height$/.test(name)) {
-      probe.style.setProperty('font-size', '100px');
-      value = ['line-height', through('line-height', name)];
+      // Against the font size of the same component and size, since a line
+      // height may be a ratio or a length; a ratio to that size either way.
+      const size = name.replace(/-line-height$/, '-font-size');
+      probe.style.setProperty('font-size', raw(size) ? `var(${size})` : '100px');
+      probe.style.setProperty('line-height', `var(${name})`);
+      const style = getComputedStyle(probe);
+      value = ['ratio', `${style.getPropertyValue('line-height')} ${style.getPropertyValue('font-size')}`];
+      probe.removeAttribute('style');
     }
-    else if (/-bg-image$/.test(name)) value = ['image', raw(name)];
-    else if (/^--(gray|black|white|color)|-(color|fill-muted|fill-soft|fill-strong)$/.test(name))
+    else if (/^--(gray|black|white|color)/.test(name))
       value = ['color', through('color', name)];
     else if (/-font-smoothing$/.test(name)) value = ['text', raw(name)];
     else value = ['length', through('width', name)];
     out[name] = value;
   }
   probe.remove();
+  return out;
+}
+"""
+
+# Builds the paint markup on the screen, inside an `.inverse` element when asked,
+# and reads what each paint's element draws.
+PAINT_PROBE = """
+([markup, paints, inverse]) => {
+  const screen = document.querySelector('.screen');
+  const root = document.createElement('div');
+  if (inverse) root.className = 'inverse';
+  root.innerHTML = markup;
+  screen.appendChild(root);
+  const out = {};
+  for (const [name, selector] of Object.entries(paints)) {
+    const element = selector === ':scope' ? root : root.querySelector(selector);
+    if (!element) { out[name] = null; continue; }
+    const style = getComputedStyle(element);
+    out[name] = {
+      color: style.backgroundColor,
+      image: style.backgroundImage,
+      size: style.backgroundSize,
+      ink: style.color,
+      border: style.borderTopStyle === 'none' ? '' : style.borderTopColor,
+    };
+  }
+  root.remove();
   return out;
 }
 """
@@ -138,10 +192,9 @@ def typed(kind: str, value: str):
         return float(match.group(1)) if match else None
     if kind == "number":
         return float(value) if re.fullmatch(r"-?[0-9.]+", value) else None
-    if kind == "line-height":
-        match = re.fullmatch(r"(-?[0-9.]+)px", value)
-        # Resolved against a 100px font, so this is the ratio to the font size.
-        return round(float(match.group(1)) / 100, 4) if match else None
+    if kind == "ratio":
+        match = re.fullmatch(r"(-?[0-9.]+)px (-?[0-9.]+)px", value)
+        return round(float(match.group(1)) / float(match.group(2)), 4) if match else None
     if kind == "color":
         match = re.fullmatch(r"rgba?\(([0-9]+), ([0-9]+), ([0-9]+)(?:, ([0-9.]+))?\)", value)
         if not match or (match.group(4) is not None and float(match.group(4)) == 0):
@@ -154,6 +207,63 @@ def typed(kind: str, value: str):
         match = re.fullmatch(r'url\("data:image/svg\+xml,(.*)"\)', value)
         return urllib.parse.unquote(match.group(1)) if match else None
     return value or None
+
+
+def split(text: str) -> list[str]:
+    """Comma-separated parts outside parentheses."""
+    parts, depth, start = [], 0, 0
+    for at, character in enumerate(text):
+        depth += {"(": 1, ")": -1}.get(character, 0)
+        if character == "," and depth == 0:
+            parts.append(text[start:at].strip())
+            start = at + 1
+    parts.append(text[start:].strip())
+    return parts
+
+
+def pattern(image: str, size: str):
+    """The first layer of a linear gradient as one row of pixel colours across
+    the layer's tile, `None` where it is transparent: how the stylesheet draws
+    table rules and dividers, as hard stops on few grays and one colour on many."""
+    layer = split(image)[0]
+    if not layer.startswith("linear-gradient("):
+        return None
+    arguments = split(layer[len("linear-gradient(") : -1])
+    if arguments and re.match(r"to |-?[0-9.]+deg$", arguments[0]):
+        arguments = arguments[1:]
+    stops = []
+    for stop in arguments:
+        match = re.fullmatch(r"(rgba?\([^)]*\))(?: ([0-9.]+)%)?", stop)
+        if not match:
+            return None
+        stops.append((typed("color", match.group(1)), match.group(2) and float(match.group(2))))
+    if len({color for color, _ in stops}) == 1:
+        return [stops[0][0]]
+    width = re.match(r"([0-9.]+)px", size)
+    if not width or any(position is None for _, position in stops):
+        return None
+    pixels = round(float(width.group(1)))
+    row = []
+    for pixel in range(pixels):
+        centre = (pixel + 0.5) * 100 / pixels
+        row.append(next((color for (color, start), (_, end) in zip(stops, stops[1:]) if start <= centre < end), None))
+    return row
+
+
+def paint(raw):
+    """What an element paints: its fill (a colour, a dither tile or a row of
+    pixels), its ink and its border colour, each present only when it has one."""
+    if raw is None:
+        return None
+    tile = typed("image", raw["image"])
+    found = {
+        "color": typed("color", raw["color"]),
+        "tile": tile,
+        "pattern": None if tile else pattern(raw["image"], raw["size"]),
+        "ink": typed("color", raw["ink"]),
+        "border": typed("color", raw["border"]) if raw["border"] else None,
+    }
+    return {key: value for key, value in found.items() if value is not None}
 
 
 def profiles(catalog: Path):
@@ -230,6 +340,10 @@ def main(catalog: Path, output: Path) -> None:
             )
             raw = page.evaluate(PROBE, names + FILLS)
             tokens = {name: typed(*raw[name]) for name in names + FILLS}
+            for inverse in (False, True):
+                painted = page.evaluate(PAINT_PROBE, [PAINT_MARKUP, PAINTS, inverse])
+                prefix = "paint/inverse/" if inverse else "paint/"
+                tokens.update({prefix + name: paint(painted[name]) for name in PAINTS})
             key = json.dumps(tokens, sort_keys=True)
             if key not in index:
                 index[key] = len(sets)
@@ -237,17 +351,30 @@ def main(catalog: Path, output: Path) -> None:
             chosen[profile] = index[key]
         browser.close()
     families = {value for tokens in sets for name, value in tokens.items() if name.endswith("-font-family") and value}
+    # The few distinct dither tiles stand once in `tiles`; a paint names its tile
+    # by index.
+    tiles: list[str] = []
+    for tokens in sets:
+        for value in tokens.values():
+            if isinstance(value, dict) and "tile" in value:
+                if value["tile"] not in tiles:
+                    tiles.append(value["tile"])
+                value["tile"] = tiles.index(value["tile"])
     output.mkdir(parents=True, exist_ok=True)
     document = {
         "framework": FRAMEWORK,
         "stylesheet_sha256": digest,
         "profiles": dict(sorted(chosen.items())),
         "sets": sets,
+        "tiles": tiles,
     }
     (output / "tokens.json").write_text(json.dumps(document, indent=1, sort_keys=True) + "\n")
     (output / "LICENSE").write_bytes(pinned(FRAMEWORK_LICENSE))
     fonts(output, families)
-    print(f"{len(chosen)} profiles, {len(sets)} token sets, fonts: {', '.join(sorted(families))}")
+    print(
+        f"{len(chosen)} profiles, {len(sets)} token sets, {len(tiles)} tiles, "
+        f"fonts: {', '.join(sorted(families))}"
+    )
 
 
 if __name__ == "__main__":

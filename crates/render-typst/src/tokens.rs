@@ -12,9 +12,12 @@ struct Document {
     /// `model/palette` to an index into `sets`.
     profiles: BTreeMap<String, usize>,
     sets: Vec<BTreeMap<String, Value>>,
+    /// The dither tiles, as SVG text, that paints name by index.
+    tiles: Vec<String>,
 }
 
-/// Each set as the JSON text the Typst library reads.
+/// Each set as the JSON text the Typst library reads, its paints holding their
+/// tiles' SVG text.
 pub struct Tokens {
     profiles: BTreeMap<String, usize>,
     sets: Vec<String>,
@@ -23,13 +26,25 @@ pub struct Tokens {
 static TOKENS: LazyLock<Tokens> = LazyLock::new(|| {
     let document: Document = serde_json::from_str(include_str!("../design/tokens.json"))
         .expect("the generated tokens parse");
+    let sets = document
+        .sets
+        .into_iter()
+        .map(|mut set| {
+            for paint in set.values_mut().filter_map(Value::as_object_mut) {
+                if let Some(index) = paint.get("tile").and_then(Value::as_u64) {
+                    let tile = usize::try_from(index)
+                        .ok()
+                        .and_then(|index| document.tiles.get(index))
+                        .expect("a paint names a tile the tokens hold");
+                    paint.insert("tile".to_owned(), Value::String(tile.clone()));
+                }
+            }
+            serde_json::to_string(&set).expect("tokens serialize")
+        })
+        .collect();
     Tokens {
         profiles: document.profiles,
-        sets: document
-            .sets
-            .iter()
-            .map(|set| serde_json::to_string(set).expect("tokens serialize"))
-            .collect(),
+        sets,
     }
 });
 
