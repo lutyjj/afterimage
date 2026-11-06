@@ -14,6 +14,8 @@ lib.makeScope pkgs.newScope (self: {
   web = self.callPackage ./web.nix { };
   # The server with the web UI it serves.
   afterimage = self.callPackage ./package.nix { };
+  # Boots the NixOS module (module.nix) with that package.
+  moduleTest = self.callPackage ./module-test.nix { };
   lint = self.callPackage ./lint.nix { };
   tokens = self.callPackage ./tokens.nix { };
 

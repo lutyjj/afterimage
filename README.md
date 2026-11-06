@@ -8,6 +8,8 @@ See [the design](docs/design.md).
 
 `nix build` produces `result/bin/afterimage`, which serves TRMNL's device API under `/api/`, the management API under `/manage/` and the web UI everywhere else. It listens on `AFTERIMAGE_BIND` (default `0.0.0.0:8080`) and keeps its database in `AFTERIMAGE_DATA_DIR` (default `./data`); `afterimage --help` lists every setting, each a flag or a `AFTERIMAGE_*` environment variable. Data sources read secrets from `AFTERIMAGE_SECRET_<NAME>` variables. In a device's Wi-Fi setup portal, set the server URL to this server's address.
 
+On NixOS, the flake's `nixosModules.default` runs it as `services.afterimage`: `settings` takes the `AFTERIMAGE_*` variables, `environmentFile` the secrets (`AFTERIMAGE_OIDC_CLIENT_SECRET` and the `AFTERIMAGE_SECRET_*` values), and the database lives in the service's state directory.
+
 ## Development
 
 `nix develop` provides every tool at its pinned version.
@@ -23,4 +25,4 @@ See [the design](docs/design.md).
 | `tools/trmnl-excerpt` | Refreshes the excerpt of TRMNL's published device contract |
 | `tools/trmnl-catalog` | Refreshes the snapshot of TRMNL's display models and palettes |
 | `tools/tokens/refresh` | Refreshes the renderer's design tokens and fonts from the pinned release of TRMNL's design system |
-| `nix flake check` | Builds the server and the web UI from the pinned contract, runs every test, and runs clippy and rustfmt |
+| `nix flake check` | Builds the server and the web UI from the pinned contract, runs every test, runs clippy and rustfmt, and boots the NixOS module in a VM |

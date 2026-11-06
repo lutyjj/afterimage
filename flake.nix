@@ -10,7 +10,11 @@
   };
 
   outputs =
-    { nixpkgs, rust-overlay, ... }:
+    {
+      self,
+      nixpkgs,
+      rust-overlay,
+    }:
     let
       inherit (nixpkgs) lib;
       forSystems = lib.genAttrs [
@@ -32,10 +36,21 @@
       });
 
       # The server's build runs every Rust test; lint runs clippy and rustfmt; the
-      # web UI's build type-checks it with the generated client and runs its tests.
+      # web UI's build type-checks it with the generated client and runs its tests;
+      # module boots the NixOS module in a VM.
       checks = forSystems (system: {
         inherit (scope.${system}) server lint web;
+        module = scope.${system}.moduleTest;
       });
+
+      # The NixOS module, running this flake's package unless
+      # services.afterimage.package says otherwise.
+      nixosModules.default =
+        { pkgs, ... }:
+        {
+          imports = [ ./deploy/nix/module.nix ];
+          services.afterimage.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+        };
 
       # tools/tokens/refresh runs this.
       apps = forSystems (system: {
