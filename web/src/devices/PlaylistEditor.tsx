@@ -31,15 +31,14 @@ export function PlaylistEditor({
   const saved = device.playlist;
   const dirty = !sameAs(draft, saved);
 
-  // A playlist saved elsewhere replaces an untouched draft.
-  const savedKey = JSON.stringify(saved);
+  // A playlist saved elsewhere replaces an untouched draft. The query keeps
+  // `saved` the same array while its content is unchanged (structural sharing).
   const previous = useRef(saved);
   useEffect(() => {
     const before = previous.current;
     previous.current = saved;
     setDraft((current) => (sameAs(current, before) ? draftOf(saved) : current));
-    // `saved` is a new array on every poll; its content is what changes.
-  }, [savedKey]);
+  }, [saved]);
 
   const save = useMutation({
     mutationFn: () => client.setPlaylist({ deviceId: device.id, playlist: draft.map(entryOf) }),

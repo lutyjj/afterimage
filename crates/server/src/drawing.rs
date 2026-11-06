@@ -879,6 +879,30 @@ mod tests {
     }
 
     #[test]
+    fn the_resolver_walks_every_member_the_model_gives_components() {
+        // The resolver finds components by member name; a member the model adds
+        // that holds one would otherwise be read as text and escape the bounds.
+        let contract: Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../gen/management-api.openapi.json"
+        )))
+        .unwrap();
+        let component = Value::from("#/components/schemas/Component");
+        let holders: std::collections::BTreeSet<&str> = contract["components"]["schemas"]
+            .as_object()
+            .unwrap()
+            .values()
+            .filter_map(|schema| schema["properties"].as_object())
+            .flatten()
+            .filter(|(_, property)| {
+                property["$ref"] == component || property["items"]["$ref"] == component
+            })
+            .map(|(member, _)| member.as_str())
+            .collect();
+        assert_eq!(holders, ["children", "content", "else", "then"].into());
+    }
+
+    #[test]
     fn plain_text_stays_text_and_a_single_expression_keeps_its_type() {
         let scope = context! { weather => Template::from(Serde(json!({ "temperature": 7.44, "forecast": [{ "t": 1 }, { "t": 3 }] }))) };
         let document = json!({ "content": { "column": { "children": [

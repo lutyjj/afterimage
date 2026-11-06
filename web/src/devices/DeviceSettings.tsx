@@ -29,8 +29,7 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
     setModel((current) => (current === before.model ? stored.model : current));
     setPalette((current) => (current === before.palette ? stored.palette : current));
     setRefresh((current) => (current === before.refresh ? stored.refresh : current));
-    // The stored values are what change; the object is new on every render.
-  }, [JSON.stringify(stored)]);
+  }, [stored.name, stored.model, stored.palette, stored.refresh]);
 
   const sorted = [...(models ?? [])].sort((a, b) => a.label.localeCompare(b.label));
   const chosen = sorted.find((candidate) => candidate.name === model);

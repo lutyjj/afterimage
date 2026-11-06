@@ -67,11 +67,15 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
 
   const preview = usePreview(parsed.value, chosenDisplay, chosenDevice?.id);
 
-  const located: Array<Located & { path?: string | undefined }> = preview.problems.map((problem) => {
-    const range = problem.path ? rangeOf(parsed.document, problem.path) : undefined;
-    return { from: range?.[0] ?? 0, to: range?.[1] ?? 0, message: problem.message, path: problem.path };
-  });
-  const inText = useMemo(() => located.filter((problem) => problem.to > problem.from), [JSON.stringify(located)]);
+  const located: Array<Located & { path?: string | undefined }> = useMemo(
+    () =>
+      preview.problems.map((problem) => {
+        const range = problem.path ? rangeOf(parsed.document, problem.path) : undefined;
+        return { from: range?.[0] ?? 0, to: range?.[1] ?? 0, message: problem.message, path: problem.path };
+      }),
+    [preview.problems, parsed.document],
+  );
+  const inText = useMemo(() => located.filter((problem) => problem.to > problem.from), [located]);
 
   const valid = parsed.value !== undefined && name.trim().length > 0;
 
