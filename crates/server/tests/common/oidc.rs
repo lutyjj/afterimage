@@ -1,6 +1,6 @@
 //! A stand-in OIDC provider: discovery, its published keys, and the
-//! authorization and token endpoints of the authorization-code flow, as a
-//! provider such as Pocket ID serves them. It signs RS256 ID tokens at the test's
+//! authorization and token endpoints of the authorization-code flow, as the
+//! `OpenID` Connect Core specification describes them. It signs RS256 ID tokens at the test's
 //! clock for whoever the test signs in as, holds the client to what the flow asks
 //! of it (its registered redirect, its secret, the PKCE verifier), and can flaw
 //! its next answer in one chosen way.

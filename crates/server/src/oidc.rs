@@ -275,8 +275,8 @@ impl Oidc {
         ]
         .into_iter()
         .flatten()
-        .map(|name| name.chars().take(64).collect::<String>())
-        .find(|name| !name.trim().is_empty())
+        .map(|name| name.trim().chars().take(64).collect::<String>())
+        .find(|name| !name.is_empty())
         .unwrap_or_else(|| "Account".to_owned());
         Ok(Identity {
             issuer: self.issuer.as_str().to_owned(),

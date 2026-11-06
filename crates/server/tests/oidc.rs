@@ -129,7 +129,7 @@ async fn a_sign_in_through_the_provider_starts_a_session_for_its_account() {
 }
 
 /// An account is named from the profile the provider shares: the name, else the
-/// username, else a placeholder; at most 64 characters.
+/// username, else a placeholder; trimmed, at most 64 characters.
 #[tokio::test]
 async fn an_account_is_named_from_the_profile() {
     let (server, provider) = start_with_provider(&[]).await;
@@ -138,6 +138,7 @@ async fn an_account_is_named_from_the_profile() {
         (Some("Grace Hopper"), Some("grace"), "Grace Hopper"),
         (None, Some("grace"), "grace"),
         (Some("  "), Some("grace"), "grace"),
+        (Some(" Grace "), None, "Grace"),
         (None, None, "Account"),
         (Some(long.as_str()), None, &long[..64]),
     ]
