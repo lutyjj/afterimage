@@ -583,7 +583,7 @@ impl Resolver {
             self.take_image(&mut bar, "icon", "/titleBar/icon");
             resolved.insert("titleBar".to_owned(), bar);
         }
-        let content = self.component(&document["content"], scope, "/content");
+        let content = self.content(&document["content"], scope, "/content");
         resolved.insert("content".to_owned(), content);
         Value::Object(resolved)
     }
@@ -637,9 +637,10 @@ impl Resolver {
                         .map(|(index, child)| {
                             self.component(child, scope, &format!("{here}/{index}"))
                         })
+                        .filter(|child| !child.is_null())
                         .collect(),
                 ),
-                ("content", child) => self.component(child, scope, &here),
+                ("content", child) => self.content(child, scope, &here),
                 ("cells" | "series", Value::Array(items)) => Value::Array(
                     items
                         .iter()
@@ -681,8 +682,17 @@ impl Resolver {
         !self.exhausted
     }
 
+    /// A component where one must stand: nothing becomes an empty column.
+    fn content(&mut self, node: &Value, scope: &Template, path: &str) -> Value {
+        match self.component(node, scope, path) {
+            Value::Null => empty(),
+            component => component,
+        }
+    }
+
+    /// The component resolved, or nothing (`Null`) for a `choose` that draws
+    /// nothing.
     fn component(&mut self, node: &Value, scope: &Template, path: &str) -> Value {
-        let empty = || json!({ "column": { "children": [] } });
         if !self.admit(path) {
             return empty();
         }
@@ -693,6 +703,7 @@ impl Resolver {
         let here = format!("{path}/{kind}");
         match kind.as_str() {
             "each" => self.each(value, scope, &here),
+            "choose" => self.choose(value, scope, &here),
             "image" => {
                 let mut image = self.fields(value, scope, &here);
                 self.take_image(&mut image, "url", &format!("{here}/url"));
@@ -704,6 +715,24 @@ impl Resolver {
                 Value::Object(resolved)
             }
         }
+    }
+
+    /// A `choose` becomes its `then` where `when` is true as Jinja's `if` tests
+    /// it, else its `else`; with no `else`, nothing, which its parent leaves out.
+    fn choose(&mut self, choose: &Value, scope: &Template, path: &str) -> Value {
+        let when = self.value(
+            choose["when"].as_str().unwrap_or_default(),
+            scope,
+            &format!("{path}/when"),
+        );
+        let branch = if Template::from(Serde(&when)).is_true() {
+            "then"
+        } else {
+            "else"
+        };
+        choose.get(branch).map_or(Value::Null, |component| {
+            self.component(component, scope, &format!("{path}/{branch}"))
+        })
     }
 
     /// An `each` becomes a column or row of its content once per element, and a
@@ -737,6 +766,7 @@ impl Resolver {
                 let scope = context! { item => Template::from(Serde(item)), ..scope.clone() };
                 self.component(&each["content"], &scope, &format!("{path}/content"))
             })
+            .filter(|child| !child.is_null())
             .collect();
         let hidden = items.len().saturating_sub(limit);
         if hidden > 0 {
@@ -762,6 +792,11 @@ impl Resolver {
         );
         Value::Object(stack)
     }
+}
+
+/// A column of nothing, where a component cannot be drawn.
+fn empty() -> Value {
+    json!({ "column": { "children": [] } })
 }
 
 #[cfg(test)]
@@ -814,6 +849,64 @@ mod tests {
         assert_eq!(children[1]["title"]["text"], "B");
         assert_eq!(children[2]["label"]["text"], "and 1 more");
         assert_eq!(children.as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn choose_draws_then_where_its_test_is_true_as_jinja_tests_it() {
+        for (value, expected) in [
+            (json!(false), "else"),
+            (json!(null), "else"),
+            (json!(0), "else"),
+            (json!(""), "else"),
+            (json!([]), "else"),
+            (json!({}), "else"),
+            (json!(true), "then"),
+            (json!(1), "then"),
+            (json!("no"), "then"),
+            (json!([0]), "then"),
+            (json!({ "a": 1 }), "then"),
+        ] {
+            let scope = context! { tested => Template::from(Serde(&value)) };
+            let document = json!({ "content": { "choose": {
+                "when": "{{ tested }}",
+                "then": { "label": { "text": "then" } },
+                "else": { "label": { "text": "else" } }
+            } } });
+            let (resolved, problems) = resolve(&document, &scope);
+            assert_eq!(problems, [], "{value}");
+            assert_eq!(resolved["content"]["label"]["text"], expected, "{value}");
+        }
+    }
+
+    #[test]
+    fn a_choose_without_else_where_its_test_is_false_is_left_out() {
+        let document = json!({ "content": { "row": { "children": [
+            { "label": { "text": "kept" } },
+            { "choose": { "when": "{{ false }}", "then": { "label": { "text": "then" } } } },
+            { "each": {
+                "items": "{{ [0, 1, 2] }}",
+                "content": { "choose": {
+                    "when": "{{ item == 1 }}",
+                    "then": { "value": { "text": "{{ item }}" } }
+                } }
+            } }
+        ] } } });
+        let (resolved, problems) = resolve(&document, &context! {});
+        assert_eq!(problems, []);
+        let children = &resolved["content"]["row"]["children"];
+        assert_eq!(children.as_array().unwrap().len(), 2);
+        assert_eq!(children[0]["label"]["text"], "kept");
+        assert_eq!(
+            children[1]["column"]["children"],
+            json!([{ "value": { "text": 1 } }])
+        );
+
+        let alone = json!({ "content": { "choose": {
+            "when": "{{ 0 }}",
+            "then": { "label": { "text": "then" } }
+        } } });
+        let (resolved, _) = resolve(&alone, &context! {});
+        assert_eq!(resolved["content"], json!({ "column": { "children": [] } }));
     }
 
     #[test]

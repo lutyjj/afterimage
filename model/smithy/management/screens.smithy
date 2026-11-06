@@ -120,6 +120,9 @@ union Component {
 
     /// Its content once for each element of a list.
     each: Each
+
+    /// One of two components, as a template decides.
+    choose: Choose
 }
 
 @length(min: 1, max: 32)
@@ -312,6 +315,23 @@ structure Each {
 
 @range(min: 1, max: 100)
 integer EachLimit
+
+/// `then` where `when` is true, `else` (or nothing) where it is not, so a
+/// template can choose a style, such as inverting the cell of today.
+structure Choose {
+    /// Tested as Jinja's `if` tests a value: false, nothing, zero and empty text
+    /// or lists are not true. Write the test as one `{{ expression }}`, which keeps
+    /// its value; text around it makes the template text, which is true unless
+    /// empty.
+    @required
+    when: Template
+
+    @required
+    then: Component
+
+    /// Absent draws nothing in its place.
+    else: Component
+}
 
 enum Direction {
     COLUMN = "column"
