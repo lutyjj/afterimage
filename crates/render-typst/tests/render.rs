@@ -294,6 +294,73 @@ fn a_divider_in_a_row_spans_the_row() {
     assert_eq!(line, Some(true), "no divider spans the row");
 }
 
+/// The blank space before and after the divider's line along one axis: from the
+/// end of the ink before it to the line, and from the line to the ink after it.
+fn gaps_around(ink: &[usize], line: usize) -> (usize, usize) {
+    let before = ink.iter().copied().filter(|&at| at < line).max().unwrap();
+    let after = ink.iter().copied().filter(|&at| at > line).min().unwrap();
+    (line - before, after - line)
+}
+
+#[test]
+fn a_divider_sits_midway_between_its_neighbours() {
+    // In a row: the line is the column holding the most ink.
+    let row = json!({ "content": stack("column", false, &[
+        stack("row", false, &[title("Left"), json!({ "divider": {} }), title("Right")]),
+    ]) });
+    let drawn = pixels(&render(&row, "og_plus", "gray-4"));
+    let (_, columns) = inked(&render(&row, "og_plus", "gray-4"));
+    let ink = |pixel: &[u8; 3]| *pixel != [255, 255, 255];
+    let line = *columns
+        .iter()
+        .max_by_key(|&&x| drawn.iter().filter(|row| ink(&row[x])).count())
+        .unwrap();
+    let others: Vec<usize> = columns
+        .iter()
+        .copied()
+        .filter(|&x| x.abs_diff(line) > 1)
+        .collect();
+    let (before, after) = gaps_around(&others, line);
+    assert!(
+        before.abs_diff(after) <= 3,
+        "{before} px before the line, {after} after"
+    );
+
+    // In a column: the line is the row holding the most ink.
+    let column = json!({ "content": stack("column", false, &[title("Above"), json!({ "divider": {} }), title("Below")]) });
+    let drawn = pixels(&render(&column, "og_plus", "gray-4"));
+    let (rows, _) = inked(&render(&column, "og_plus", "gray-4"));
+    let line = *rows
+        .iter()
+        .max_by_key(|&&y| drawn[y].iter().filter(|pixel| ink(pixel)).count())
+        .unwrap();
+    let others: Vec<usize> = rows
+        .iter()
+        .copied()
+        .filter(|&y| y.abs_diff(line) > 1)
+        .collect();
+    let (before, after) = gaps_around(&others, line);
+    assert!(
+        before.abs_diff(after) <= 3,
+        "{before} px above the line, {after} below"
+    );
+}
+
+#[test]
+fn a_divider_in_an_item_keeps_the_item_as_wide_as_its_content() {
+    // An item beside a title in a row that does not grow: the title follows the
+    // item's widest line, not the far edge of the screen.
+    let item = json!({ "item": { "emphasis": 1, "plain": false, "grow": false, "children": [
+        title("Short"), { "divider": {} }, title("Text")
+    ] } });
+    let screen = json!({ "content": stack("column", false, &[
+        stack("row", false, &[item, title("Right")]),
+    ]) });
+    let (_, columns) = inked(&render(&screen, "og_plus", "gray-4"));
+    let last = *columns.last().unwrap();
+    assert!(last < 300, "ink reaches x={last}");
+}
+
 #[test]
 fn a_column_that_does_not_grow_is_as_wide_as_its_content() {
     // Beside a column that grows, a column of one short title ends at the right edge.

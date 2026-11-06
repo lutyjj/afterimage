@@ -258,45 +258,42 @@
 
 // A column or row: children size to their content, and those that grow share
 // what is left when the stack's length is fixed. Without growing children,
-// `justify` places the free space. A divider is a line between two cells, as
-// long as the stack is broad, so it never sizes the stack itself.
+// `justify` places the free space. A divider is an empty track of no size with
+// a line along it, as long as the stack is broad: the gaps fall on both of its
+// sides, and it never sizes the stack itself.
 #let stack-of(t, v, direction, bounds, draw) = {
   let divider(child) = child.keys().first() == "divider"
-  let children = v.children.filter(child => not divider(child))
+  let children = v.children
   let (length, breadth) = if direction == "column" { (bounds.h, bounds.w) } else { (bounds.w, bounds.h) }
-  let tracks = children.map(child => if length and grows(child) { 1fr } else { auto })
+  let tracks = children.map(child => if length and not divider(child) and grows(child) { 1fr } else { auto })
   let spacing = gap(t, v.at("gap", default: "medium"))
   let justify = v.at("justify", default: "start")
   let cross = v.at("align", default: "start")
   let free = length and not tracks.contains(1fr)
   let gutter = if free and justify == "between" and children.len() > 1 { 1fr } else { spacing }
-  let rule = if direction == "column" { grid.hline(stroke: 1pt + black) } else { grid.vline(stroke: 1pt + black) }
-  let cells = ()
-  let at = 0
-  for child in v.children {
-    if divider(child) {
-      cells.push(rule)
-    } else {
-      let shared = tracks.at(at) == 1fr
-      cells.push(draw(child, if direction == "column" { (w: breadth, h: shared) } else { (w: shared, h: breadth) }))
-      at += 1
-    }
-  }
+  let cells = children.zip(tracks).map(((child, track)) => {
+    if divider(child) { return [] }
+    let shared = track == 1fr
+    draw(child, if direction == "column" { (w: breadth, h: shared) } else { (w: shared, h: breadth) })
+  })
+  let dividers = children.enumerate().filter(((_, child)) => divider(child)).map(((at, _)) => at)
   let across = if breadth { 100% } else { auto }
-  let (tracks, cells) = if free and justify in ("end", "center") {
+  let (lead, tracks, cells) = if free and justify in ("end", "center") {
     let edge = if justify == "center" { ((1fr,), ([],)) } else { ((), ()) }
-    ((1fr,) + tracks + edge.at(0), ([],) + cells + edge.at(1))
+    (1, (1fr,) + tracks + edge.at(0), ([],) + cells + edge.at(1))
   } else if free and justify == "start" {
-    (tracks + (1fr,), cells + ([],))
+    (0, tracks + (1fr,), cells + ([],))
   } else {
-    (tracks, cells)
+    (0, tracks, cells)
   }
   if direction == "column" {
     let horizontal = if cross == "center" { center } else if cross == "end" { right } else { left }
-    grid(columns: (across,), rows: tracks, row-gutter: gutter, align: horizontal, ..cells)
+    let rules = dividers.map(at => grid.hline(y: at + lead, stroke: 1pt + black))
+    grid(columns: (across,), rows: tracks, row-gutter: gutter, align: horizontal, ..cells, ..rules)
   } else {
     let vertical = if cross == "center" { horizon } else if cross == "end" { bottom } else { top }
-    grid(rows: (across,), columns: tracks, column-gutter: gutter, align: vertical, ..cells)
+    let rules = dividers.map(at => grid.vline(x: at + lead, stroke: 1pt + black))
+    grid(rows: (across,), columns: tracks, column-gutter: gutter, align: vertical, ..cells, ..rules)
   }
 }
 
@@ -304,8 +301,8 @@
   let emphasis = int(v.at("emphasis", default: 1))
   let slot = if emphasis == 1 { "--framework-slot-item-meta" } else { "--framework-slot-item-meta-emphasis-" + str(emphasis) }
   let meta = fill(t, slot + "-bg-color", image: slot + "-bg-image")
-  let children = (w: bounds.w, h: false)
-  let content = stack(spacing: px(t, "--gap-small", default: 7), ..v.children.map(child => draw(child, children)))
+  // Its children are a column, so a divider among them is one as a column draws it.
+  let content = stack-of(t, (children: v.children, gap: "small"), "column", (w: bounds.w, h: false), draw)
   if v.at("plain", default: false) { return content }
   let index = v.at("index", default: none)
   let face = typeface(t, "--item-index", "base")
@@ -353,7 +350,10 @@
       std.image(source, width: if bounds.w { 100% } else { auto }, height: if bounds.h { 100% } else { auto }, fit: v.at("fit", default: "contain"))
     }
   } else if kind == "divider" {
-    if direction == "row" { line(angle: 90deg, length: 100%) } else { line(length: 100%) }
+    // Outside a stack, such as alone in a grid cell: as long as its parent fixes,
+    // and nothing along an axis sized to content.
+    let fixed = if direction == "row" { bounds.h } else { bounds.w }
+    if not fixed { [] } else if direction == "row" { line(angle: 90deg, length: 100%) } else { line(length: 100%) }
   } else if kind == "lineChart" {
     chart(t, v, "line", bounds)
   } else if kind == "barChart" {
