@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { UserRound } from "lucide-react";
 import { Form, Link, NavLink, Outlet, useLocation, useNavigation } from "react-router";
 
 import { accountQuery } from "./client";
 import styles from "./Shell.module.css";
 
-/** The signed-in frame: the wordmark, the two places, and who is signed in. */
+/** The signed-in frame: the wordmark, the two places, and who is signed in, which
+ * leads to the account's page. */
 export function Shell() {
   const account = useQuery(accountQuery).data;
   const { pathname } = useLocation();
@@ -26,7 +28,10 @@ export function Shell() {
           </NavLink>
         </nav>
         <div className={styles.account}>
-          <span className={styles.accountName}>{account?.name}</span>
+          <NavLink to="/account" className={styles.accountLink} aria-label={`Account, ${account?.name ?? ""}`}>
+            <UserRound size={16} aria-hidden="true" />
+            <span className={styles.accountName}>{account?.name}</span>
+          </NavLink>
           <Form method="post" action="/sign-out">
             <button type="submit" className={styles.signOut} disabled={signingOut}>
               Sign out

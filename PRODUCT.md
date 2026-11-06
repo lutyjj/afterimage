@@ -35,6 +35,7 @@ One small server and one contract: the Smithy model defines every API, and scree
 - Display models and palettes come from TRMNL's published lists; a device's display can be any model and palette TRMNL lists.
 - Removing a device either returns it to its claim code or, with a reset, erases its Wi-Fi settings at its next check-in.
 - Secrets for data sources live in the server's environment; the UI shows only their names.
+- Scripts and agents act for an account with personal API tokens, created and revoked on the account page; a token's secret is shown once.
 - Firmware comes from TRMNL's published releases. A device's board is matched by the model its firmware reports or chosen once; an install happens at the device's next check-in, and the check-in after it shows whether it worked.
 - With an MQTT broker, every claimed device appears in Home Assistant with its battery, signal, last check-in, current screen and a firmware update it can install.
 

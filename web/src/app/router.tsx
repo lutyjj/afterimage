@@ -1,6 +1,7 @@
 import { Unauthenticated } from "@afterimage/management-client";
 import { createBrowserRouter, redirect } from "react-router";
 
+import { AccountPage } from "../account/AccountPage";
 import { DeviceDetail } from "../devices/DeviceDetail";
 import { DeviceList } from "../devices/DeviceList";
 import { ScreenList } from "../screens/ScreenList";
@@ -59,6 +60,7 @@ export const router = createBrowserRouter([
       { path: "screens", Component: ScreenList },
       { path: "screens/new", lazy: screenEditor },
       { path: "screens/:screenId", lazy: screenEditor },
+      { path: "account", Component: AccountPage },
       { path: "*", Component: NotFoundPage },
     ],
   },

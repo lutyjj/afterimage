@@ -73,8 +73,26 @@
   font-size: var(--text-sm);
 }
 
+.accountLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: 2px;
+  color: var(--blue-text);
+  text-decoration: none;
+}
+
+.accountLink:hover {
+  background: var(--blue-wash);
+  text-decoration: none;
+}
+
+.accountLink[aria-current="page"] {
+  font-weight: 640;
+}
+
 .accountName {
-  color: var(--ink-soft);
   max-width: 14rem;
   overflow: hidden;
   text-overflow: ellipsis;

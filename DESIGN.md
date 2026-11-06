@@ -279,7 +279,7 @@ Quiet and exact: a hairline frame that names its action.
 
 ### Navigation
 
-The top bar is paper with a hairline rule beneath it: the wordmark, then Devices and Screens as text tabs in Pencil Blue, the account name in Soft Ink and "Sign out" at the right. The current tab is heavier (640) and underlined by a 2px Non-repro Blue bar on the rule. On a phone the account name hides; the tabs and "Sign out" stay. Back links on inner pages lead with a lucide arrow.
+The top bar is paper with a hairline rule beneath it: the wordmark, then Devices and Screens as text tabs in Pencil Blue, and at the right the account (a person icon and the account's name, in Pencil Blue, leading to the account page with its API tokens) and "Sign out". The current tab is heavier (640) and underlined by a 2px Non-repro Blue bar on the rule; on the account page the account's name is heavier. On a phone the account's name hides behind its icon; the tabs and "Sign out" stay. Back links on inner pages lead with a lucide arrow.
 
 ### Proof plate (signature)
 
@@ -299,7 +299,7 @@ An install request's three legs (Requested, Sent, Installed) side by side, each 
 
 ### Sheets
 
-The claim panel, the sign-in form and the first-display guide are white sheets with crop marks on paper, padded 1.5 to 2rem. The claim sheet holds the six-cell code field: white cells in the narrow cut, the active one ringed in Non-repro Blue with a blinking caret.
+The claim panel, the sign-in form, the first-display guide and a new token's shown-once secret are white sheets with crop marks on paper, padded 1.5 to 2rem. The claim sheet holds the six-cell code field: white cells in the narrow cut, the active one ringed in Non-repro Blue with a blinking caret.
 
 ### Editor
 
