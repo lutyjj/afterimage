@@ -275,7 +275,14 @@ impl Oidc {
         ]
         .into_iter()
         .flatten()
-        .map(|name| name.trim().chars().take(64).collect::<String>())
+        .map(|name| {
+            name.trim()
+                .chars()
+                .take(64)
+                .collect::<String>()
+                .trim_end()
+                .to_owned()
+        })
         .find(|name| !name.is_empty())
         .unwrap_or_else(|| "Account".to_owned());
         Ok(Identity {

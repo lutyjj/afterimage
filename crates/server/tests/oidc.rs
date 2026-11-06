@@ -134,6 +134,7 @@ async fn a_sign_in_through_the_provider_starts_a_session_for_its_account() {
 async fn an_account_is_named_from_the_profile() {
     let (server, provider) = start_with_provider(&[]).await;
     let long = "A".repeat(70);
+    let cut_at_a_space = format!("{} Hopper", "A".repeat(63));
     for (index, (name, username, expected)) in [
         (Some("Grace Hopper"), Some("grace"), "Grace Hopper"),
         (None, Some("grace"), "grace"),
@@ -141,6 +142,7 @@ async fn an_account_is_named_from_the_profile() {
         (Some(" Grace "), None, "Grace"),
         (None, None, "Account"),
         (Some(long.as_str()), None, &long[..64]),
+        (Some(cut_at_a_space.as_str()), None, &long[..63]),
     ]
     .into_iter()
     .enumerate()
