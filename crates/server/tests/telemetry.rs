@@ -340,45 +340,18 @@ async fn one_mac_in_two_accounts_publishes_the_device_that_checks_in() {
     server.sign_up().await;
     let (stale, _) = server.claim(&mac(1)).await;
 
-    let pool = sqlx::SqlitePool::connect(&format!(
-        "sqlite://{}",
-        server.data.path().join("afterimage.db").display()
-    ))
-    .await
-    .unwrap();
-    let hash = password_auth::generate_hash("second password here");
-    sqlx::query("INSERT INTO accounts (name, username, password_hash, created_at) VALUES ('Eve', 'eve', ?, 0)")
-        .bind(hash)
-        .execute(&pool)
-        .await
-        .unwrap();
-    let eve = reqwest::Client::builder()
-        .tls_certs_only([])
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let signed_in = eve
-        .post(format!("{}/manage/auth/password", server.url))
-        .header("Content-Type", "application/json")
-        .body(json!({ "username": "eve", "password": "second password here" }).to_string())
-        .send()
-        .await
-        .unwrap();
-    assert!(signed_in.status().is_success());
+    let eve = server.second_account().await;
 
     server.clock.advance(60);
     let (key, code) = server.register(&mac(1)).await;
     server.display(&key, &READINGS).await;
-    let claimed: Value = eve
-        .post(format!("{}/manage/devices", server.url))
-        .header("Content-Type", "application/json")
-        .body(json!({ "code": code, "name": "Eve's display" }).to_string())
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
+    let (_, claimed) = eve
+        .call(
+            "POST",
+            "/manage/devices",
+            Some(json!({ "code": code, "name": "Eve's display" })),
+        )
+        .await;
     let live = claimed["device"]["id"].as_i64().unwrap();
     observer
         .wait(CONFIG, |config| config["device"]["name"] == "Eve's display")
@@ -397,14 +370,9 @@ async fn one_mac_in_two_accounts_publishes_the_device_that_checks_in() {
         .await;
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
     loop {
-        let eves: Value = eve
-            .get(format!("{}/manage/devices/{live}", server.url))
-            .send()
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
+        let (_, eves) = eve
+            .call("GET", &format!("/manage/devices/{live}"), None)
+            .await;
         if eves["device"]["firmware"]["update"]["state"] == "requested" {
             break;
         }

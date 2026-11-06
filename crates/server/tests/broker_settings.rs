@@ -7,7 +7,7 @@ mod common;
 
 use std::sync::Arc;
 
-use common::{Broker, Observer, Server, mac, start, start_on_data, start_with};
+use common::{Broker, Observer, Server, browser, mac, start, start_on_data, start_with};
 use afterimage_server::keys::OsEntropy;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
@@ -37,38 +37,6 @@ async fn connection(server: &Server, connection: &str) {
     }
 }
 
-/// A second account, which only the OIDC provider creates, written directly,
-/// signed in with a password on a client of its own.
-async fn second_account(server: &Server) -> Server {
-    let pool = sqlx::SqlitePool::connect(&format!(
-        "sqlite://{}",
-        server.data.path().join("afterimage.db").display()
-    ))
-    .await
-    .unwrap();
-    sqlx::query(
-        "INSERT INTO accounts (name, username, password_hash, created_at) VALUES ('Eve', 'eve', ?, 0)",
-    )
-    .bind(password_auth::generate_hash("second password here"))
-    .execute(&pool)
-    .await
-    .unwrap();
-    let eve = Server {
-        http: reqwest::Client::builder()
-            .tls_certs_only([])
-            .cookie_store(true)
-            .build()
-            .unwrap(),
-        ..server.clone_handle()
-    };
-    let credentials = json!({ "username": "eve", "password": "second password here" });
-    let (status, _) = eve
-        .call("POST", "/manage/auth/password", Some(credentials))
-        .await;
-    assert_eq!(status, StatusCode::OK);
-    eve
-}
-
 #[tokio::test]
 async fn only_the_first_account_administers_the_server() {
     let server = start().await;
@@ -90,7 +58,7 @@ async fn only_the_first_account_administers_the_server() {
         })
     );
 
-    let eve = second_account(&server).await;
+    let eve = server.second_account().await;
     assert_eq!(
         eve.call("GET", "/manage/account", None).await.1["account"]["administrator"],
         false
@@ -304,7 +272,7 @@ async fn tokens_act_as_their_account_on_the_broker_settings() {
         with(read_only, "PUT", Some(json!({}))).await,
         StatusCode::FORBIDDEN
     );
-    let eve = second_account(&server).await;
+    let eve = server.second_account().await;
     let members = token(&eve, Value::Null).await;
     assert_eq!(with(members, "GET", None).await, StatusCode::FORBIDDEN);
 }
@@ -344,11 +312,7 @@ async fn the_first_account_of_an_older_database_administers_it() {
     let server = start_on_data(data).await;
     for (username, administrator) in [("ada", true), ("eve", false)] {
         let client = Server {
-            http: reqwest::Client::builder()
-                .tls_certs_only([])
-                .cookie_store(true)
-                .build()
-                .unwrap(),
+            http: browser(),
             ..server.clone_handle()
         };
         let credentials = json!({ "username": username, "password": "correct horse battery" });
@@ -376,12 +340,7 @@ async fn a_saved_broker_holds_after_a_restart() {
     // saving no broker forgets the settings, so they are written back directly.
     save(&server, json!({})).await;
     observer.wait_gone(MOVED).await;
-    let pool = sqlx::SqlitePool::connect(&format!(
-        "sqlite://{}",
-        server.data.path().join("afterimage.db").display()
-    ))
-    .await
-    .unwrap();
+    let pool = server.database().await;
     sqlx::query(
         "INSERT INTO mqtt_settings (id, url, topic, discovery_prefix, updated_at)
          VALUES (1, ?, 'frames', 'homeassistant', 0)",
@@ -405,12 +364,7 @@ async fn a_saved_broker_the_server_cannot_read_leaves_publishing_off() {
     let server = start().await;
     server.sign_up().await;
     // An address with a query, which an earlier release took and this one refuses.
-    let pool = sqlx::SqlitePool::connect(&format!(
-        "sqlite://{}",
-        server.data.path().join("afterimage.db").display()
-    ))
-    .await
-    .unwrap();
+    let pool = server.database().await;
     sqlx::query(
         "INSERT INTO mqtt_settings (id, url, topic, discovery_prefix, updated_at)
          VALUES (1, 'mqtt://broker.example.test:1883?client_id=other', 'afterimage', 'homeassistant', 0)",

@@ -177,28 +177,17 @@ async fn a_token_reaches_only_its_owners_resources() {
     assert_eq!(status, StatusCode::CREATED, "{created}");
     let screen = created["screen"]["id"].as_i64().unwrap();
 
-    // A second account with a token, written directly: only the OIDC provider
-    // creates further accounts.
-    let pool = sqlx::SqlitePool::connect(&format!(
-        "sqlite://{}",
-        server.data.path().join("afterimage.db").display()
-    ))
-    .await
-    .unwrap();
-    let eve: i64 = sqlx::query_scalar(
-        "INSERT INTO accounts (name, created_at) VALUES ('Eve', 0) RETURNING id",
-    )
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    let secret = "eve-token-secret-for-this-test-0000000000000";
-    let hash = afterimage_server::keys::token_hash(secret);
-    sqlx::query("INSERT INTO access_tokens (account_id, name, token_hash, created_at) VALUES (?, 'Eve', ?, 0)")
-        .bind(eve)
-        .bind(hash)
-        .execute(&pool)
-        .await
-        .unwrap();
+    // A second account, with a token it creates as a person would.
+    let eve = server.second_account().await;
+    let (status, created) = eve
+        .call(
+            "POST",
+            "/manage/account/tokens",
+            Some(json!({ "name": "Eve's script" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    let secret = created["secret"].as_str().unwrap();
 
     let (status, _) = with_token(
         &server,

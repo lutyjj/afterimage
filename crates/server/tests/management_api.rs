@@ -289,35 +289,7 @@ async fn another_account_cannot_reach_a_device_or_screen() {
     let device = device["id"].as_i64().unwrap();
     let screen = create_screen(&server, "Private").await;
 
-    // A second account, which only the OIDC provider creates, written directly.
-    let hash = password_auth::generate_hash("second password here");
-    let pool = sqlx::SqlitePool::connect(&format!(
-        "sqlite://{}",
-        server.data.path().join("afterimage.db").display()
-    ))
-    .await
-    .unwrap();
-    sqlx::query("INSERT INTO accounts (name, username, password_hash, created_at) VALUES ('Eve', 'eve', ?, 0)")
-        .bind(hash)
-        .execute(&pool)
-        .await
-        .unwrap();
-    let eve = common::Server {
-        http: reqwest::Client::builder()
-            .tls_certs_only([])
-            .cookie_store(true)
-            .build()
-            .unwrap(),
-        ..clone_server(&server)
-    };
-    let (status, _) = eve
-        .call(
-            "POST",
-            "/manage/auth/password",
-            Some(json!({ "username": "eve", "password": "second password here" })),
-        )
-        .await;
-    assert_eq!(status, StatusCode::OK);
+    let eve = server.second_account().await;
 
     for (method, path, body) in [
         ("GET", format!("/manage/devices/{device}"), None),
@@ -379,19 +351,6 @@ async fn another_account_cannot_reach_a_device_or_screen() {
 }
 
 /// The same server, reached through another client.
-fn clone_server(server: &common::Server) -> common::Server {
-    common::Server {
-        url: server.url.clone(),
-        clock: server.clock.clone(),
-        data: std::sync::Arc::new(tempfile::TempDir::new().unwrap()),
-        http: reqwest::Client::builder()
-            .tls_certs_only([])
-            .build()
-            .unwrap(),
-        trmnl: server.trmnl.clone(),
-    }
-}
-
 fn document() -> Value {
     json!({
         "sources": { "weather": { "url": "https://ha.example.test/api/states/weather.home" } },
@@ -717,16 +676,7 @@ async fn a_session_ends_after_thirty_days() {
 async fn a_session_that_cannot_be_read_is_a_server_failure() {
     let server = start().await;
     server.sign_up().await;
-    let pool = sqlx::SqlitePool::connect(&format!(
-        "sqlite://{}",
-        server.data.path().join("afterimage.db").display()
-    ))
-    .await
-    .unwrap();
-    sqlx::query("DROP TABLE sessions")
-        .execute(&pool)
-        .await
-        .unwrap();
+    server.stored("DROP TABLE sessions").await;
     let response = server
         .http
         .get(format!("{}/manage/account", server.url))

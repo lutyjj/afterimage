@@ -227,6 +227,37 @@ pub async fn start_on_data(data: TempDir) -> Server {
 
 impl Server {
     /// Another handle on this server, with this one's cookies.
+    /// The server's database, for what a test sets up or checks directly.
+    pub async fn database(&self) -> sqlx::SqlitePool {
+        let path = self.data.path().join("afterimage.db");
+        sqlx::SqlitePool::connect(&format!("sqlite://{}", path.display()))
+            .await
+            .unwrap()
+    }
+
+    /// A second account, Eve, signed in with a password on a client of its own.
+    /// Only the OIDC provider creates further accounts, so it is written
+    /// directly.
+    pub async fn second_account(&self) -> Server {
+        sqlx::query(
+            "INSERT INTO accounts (name, username, password_hash, created_at) VALUES ('Eve', 'eve', ?, 0)",
+        )
+        .bind(password_auth::generate_hash(SECOND_PASSWORD))
+        .execute(&self.database().await)
+        .await
+        .unwrap();
+        let eve = Server {
+            http: browser(),
+            ..self.clone_handle()
+        };
+        let credentials = json!({ "username": "eve", "password": SECOND_PASSWORD });
+        let (status, body) = eve
+            .call("POST", "/manage/auth/password", Some(credentials))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        eve
+    }
+
     pub fn clone_handle(&self) -> Server {
         Server {
             url: self.url.clone(),
@@ -300,14 +331,22 @@ async fn start_on(
         url,
         clock,
         data,
-        http: reqwest::Client::builder()
-            .tls_certs_only([])
-            .cookie_store(true)
-            .build()
-            .unwrap(),
+        http: browser(),
         trmnl,
     }
 }
+
+/// A client that keeps cookies, as a browser does.
+pub fn browser() -> reqwest::Client {
+    reqwest::Client::builder()
+        .tls_certs_only([])
+        .cookie_store(true)
+        .build()
+        .unwrap()
+}
+
+/// The second account's password.
+const SECOND_PASSWORD: &str = "second password here";
 
 pub async fn json(response: reqwest::Response) -> Value {
     serde_json::from_slice(&response.bytes().await.unwrap()).unwrap()
@@ -434,11 +473,10 @@ impl Server {
     }
 
     pub async fn stored(&self, query: &'static str) -> Vec<sqlx::sqlite::SqliteRow> {
-        let path = self.data.path().join("afterimage.db");
-        let pool = sqlx::SqlitePool::connect(&format!("sqlite://{}", path.display()))
+        sqlx::query(query)
+            .fetch_all(&self.database().await)
             .await
-            .unwrap();
-        sqlx::query(query).fetch_all(&pool).await.unwrap()
+            .unwrap()
     }
 
     /// Every file of the database, the write-ahead log included.
