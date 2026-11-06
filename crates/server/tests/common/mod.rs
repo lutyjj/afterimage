@@ -584,41 +584,84 @@ pub struct Broker {
     _directory: TempDir,
 }
 
+/// Who a broker lets in.
+enum Access<'a> {
+    Anonymous,
+    /// Nobody: no anonymous client and no user.
+    Nobody,
+    /// These users, by name and password, and nobody else.
+    Users(&'a [(&'a str, &'a str)]),
+}
+
 impl Broker {
     pub async fn start() -> Self {
-        let port = std::net::TcpListener::bind("127.0.0.1:0")
-            .unwrap()
-            .local_addr()
-            .unwrap()
-            .port();
-        Self::start_on(port).await
+        Self::start_free(&Access::Anonymous).await
     }
 
     /// A broker on `port`, as after a restart; it keeps no retained messages.
     pub async fn start_on(port: u16) -> Self {
-        Self::start_with(port, true).await
+        Self::try_start(port, &Access::Anonymous)
+            .await
+            .unwrap_or_else(|| panic!("mosquitto could not listen on {port}"))
     }
 
-    /// A broker that refuses every client: it takes no anonymous client and
-    /// knows no user.
+    /// A broker that refuses every client.
     pub async fn start_refusing() -> Self {
-        let port = std::net::TcpListener::bind("127.0.0.1:0")
-            .unwrap()
-            .local_addr()
-            .unwrap()
-            .port();
-        Self::start_with(port, false).await
+        Self::start_free(&Access::Nobody).await
     }
 
-    async fn start_with(port: u16, anonymous: bool) -> Self {
+    /// A broker that lets in only these users.
+    pub async fn start_with_users(users: &[(&str, &str)]) -> Self {
+        Self::start_free(&Access::Users(users)).await
+    }
+
+    /// A broker on a free port: one that another test's broker took between
+    /// finding it and binding it is given up for another.
+    async fn start_free(access: &Access<'_>) -> Self {
+        loop {
+            let port = std::net::TcpListener::bind("127.0.0.1:0")
+                .unwrap()
+                .local_addr()
+                .unwrap()
+                .port();
+            if let Some(broker) = Self::try_start(port, access).await {
+                return broker;
+            }
+        }
+    }
+
+    /// The broker on `port`, or `None` when its mosquitto could not keep the
+    /// port, so that whatever answers there is not this test's.
+    async fn try_start(port: u16, access: &Access<'_>) -> Option<Self> {
         let directory = TempDir::new().unwrap();
         let config = directory.path().join("mosquitto.conf");
-        std::fs::write(
-            &config,
-            format!("listener {port} 127.0.0.1\nallow_anonymous {anonymous}\npersistence false\n"),
-        )
-        .unwrap();
-        let child = std::process::Command::new("mosquitto")
+        let mut text = format!("listener {port} 127.0.0.1\npersistence false\n");
+        match access {
+            Access::Anonymous => text.push_str("allow_anonymous true\n"),
+            Access::Nobody => text.push_str("allow_anonymous false\n"),
+            Access::Users(users) => {
+                let passwords = directory.path().join("passwords");
+                for (at, (user, password)) in users.iter().enumerate() {
+                    let mut command = std::process::Command::new("mosquitto_passwd");
+                    command.arg("-b");
+                    if at == 0 {
+                        command.arg("-c");
+                    }
+                    let status = command
+                        .arg(&passwords)
+                        .arg(user)
+                        .arg(password)
+                        .status()
+                        .expect("mosquitto_passwd is on PATH, as in `nix develop`");
+                    assert!(status.success());
+                }
+                text.push_str("allow_anonymous false\npassword_file ");
+                text.push_str(&passwords.display().to_string());
+                text.push('\n');
+            }
+        }
+        std::fs::write(&config, text).unwrap();
+        let mut child = std::process::Command::new("mosquitto")
             .arg("-c")
             .arg(&config)
             .stdout(std::process::Stdio::null())
@@ -630,17 +673,25 @@ impl Broker {
             .await
             .is_err()
         {
+            if child.try_wait().unwrap().is_some() {
+                return None;
+            }
             assert!(
                 tokio::time::Instant::now() < deadline,
                 "mosquitto never listened"
             );
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
-        Self {
+        // A mosquitto that lost the port to another exits at once.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        if child.try_wait().unwrap().is_some() {
+            return None;
+        }
+        Some(Self {
             port,
             child,
             _directory: directory,
-        }
+        })
     }
 
     pub fn url(&self) -> String {
@@ -672,8 +723,16 @@ pub struct Observer {
 
 impl Observer {
     pub fn start(broker: &Broker) -> Self {
+        Self::start_as(broker, None)
+    }
+
+    /// An observer that signs in to the broker with this user and password.
+    pub fn start_as(broker: &Broker, credentials: Option<(&str, &str)>) -> Self {
         let mut options = rumqttc::MqttOptions::new("observer", "127.0.0.1", broker.port);
         options.set_max_packet_size(1024 * 1024, 1024 * 1024);
+        if let Some((user, password)) = credentials {
+            options.set_credentials(user, password);
+        }
         let (client, mut eventloop) = rumqttc::AsyncClient::new(options, 64);
         let messages = Arc::new(Mutex::new(HashMap::new()));
         let kept = Arc::clone(&messages);

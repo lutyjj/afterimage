@@ -100,10 +100,13 @@ impl Open {
 
         // The event loop is polled on its own, since a publish waits on it. It
         // writes and flushes the goodbye before it reports it, then reads on until
-        // the broker closes the connection. It holds a client of its own so that
-        // the publisher letting go does not end it first: a socket closed with
-        // the broker's acknowledgements unread is reset rather than closed, and
-        // the broker can then lose the goodbye and publish the last will.
+        // the broker closes the connection, whatever has become of the publisher:
+        // it holds a client of its own, and what the broker sends after the
+        // publisher stopped listening (such as the echo of its own clearing) is
+        // dropped rather than ending it. A socket closed with the broker's
+        // messages unread is reset rather than closed, and the broker can then
+        // lose the goodbye and publish the last will. Retiring aborts the loop if
+        // the broker never closes.
         let holding = client.clone();
         let polling = tokio::spawn(async move {
             let _holding = holding;
@@ -115,9 +118,7 @@ impl Open {
                         tracing::info!("connected to the MQTT broker");
                         connected = true;
                         state.send_replace(Connection::Connected);
-                        if incoming_sender.send(Incoming::Connected).is_err() {
-                            return;
-                        }
+                        let _ = incoming_sender.send(Incoming::Connected);
                     }
                     Ok(Event::Incoming(Packet::Publish(message))) => {
                         let message = Incoming::Message {
@@ -125,9 +126,7 @@ impl Open {
                             payload: message.payload.to_vec(),
                             retained: message.retain,
                         };
-                        if incoming_sender.send(message).is_err() {
-                            return;
-                        }
+                        let _ = incoming_sender.send(message);
                     }
                     Ok(Event::Outgoing(Outgoing::Disconnect)) => leaving = true,
                     Ok(_) => {}
@@ -144,9 +143,7 @@ impl Open {
                         if connected {
                             tracing::warn!(%error, "the MQTT broker cannot be reached or refused; trying again");
                             connected = false;
-                            if incoming_sender.send(Incoming::Disconnected).is_err() {
-                                return;
-                            }
+                            let _ = incoming_sender.send(Incoming::Disconnected);
                         }
                         tokio::time::sleep(RECONNECT).await;
                     }
@@ -266,8 +263,10 @@ struct Publisher {
 
 impl Publisher {
     /// Says goodbye, first taking every device it published out of the broker
-    /// and emptying its status where `clear` is set; `false` when it is not
-    /// connected and so has nobody to tell.
+    /// and emptying its status where `clear` is set, or else marking its status
+    /// offline, since the clean goodbye sends no last will and the next
+    /// connection may be refused; `false` when it is not connected and so has
+    /// nobody to tell.
     async fn retire(&mut self, clear: bool) -> bool {
         if !self.connected {
             tracing::info!("the MQTT broker is out of reach; what was published there stays");
@@ -275,6 +274,8 @@ impl Publisher {
         }
         if clear {
             self.clear_all().await;
+        } else {
+            self.publish(&self.status.clone(), "offline").await;
         }
         if let Err(error) = self.client.disconnect().await {
             tracing::warn!(%error, "the MQTT goodbye was not sent");

@@ -82,7 +82,7 @@ impl Settings {
 ///
 /// What the address lacks or has too much of.
 pub fn broker_url(text: &str) -> Result<url::Url, String> {
-    let url = url::Url::parse(text).map_err(|error| error.to_string())?;
+    let mut url = url::Url::parse(text).map_err(|error| error.to_string())?;
     if !matches!(url.scheme(), "mqtt" | "mqtts") {
         return Err("must start with mqtt:// or mqtts://".to_owned());
     }
@@ -92,7 +92,20 @@ pub fn broker_url(text: &str) -> Result<url::Url, String> {
     if !url.username().is_empty() || url.password().is_some() {
         return Err("takes no credentials; set the MQTT username and password".to_owned());
     }
+    // One spelling for one broker, with or without a closing slash.
+    url.set_path("");
     Ok(url)
+}
+
+/// Whether two addresses name one broker: the same scheme, host and port.
+#[must_use]
+pub fn same_broker(one: &url::Url, other: &url::Url) -> bool {
+    (one.scheme(), one.host_str(), one.port_or_known_default())
+        == (
+            other.scheme(),
+            other.host_str(),
+            other.port_or_known_default(),
+        )
 }
 
 /// The connection to the broker.
@@ -190,8 +203,9 @@ impl Telemetry {
                             // What was published stays where only the credentials
                             // change; another broker or topics take it away.
                             let moves = settings.as_ref().is_none_or(|next| {
-                                (&next.url, &next.topic, &next.discovery_prefix)
-                                    != (&held.url, &held.topic, &held.discovery_prefix)
+                                !same_broker(&next.url, &held.url)
+                                    || (&next.topic, &next.discovery_prefix)
+                                        != (&held.topic, &held.discovery_prefix)
                             });
                             retiring.retire(moves).await;
                         }

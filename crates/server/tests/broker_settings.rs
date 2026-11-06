@@ -162,6 +162,9 @@ async fn other_credentials_or_the_same_settings_keep_what_was_published() {
     save(&server, settings).await;
     let rotated = json!({ "url": broker.url(), "username": "afterimage", "password": "second" });
     save(&server, rotated).await;
+    // The same broker spelt with a closing slash is still the same broker.
+    let slashed = json!({ "url": format!("{}/", broker.url()), "username": "afterimage" });
+    save(&server, slashed).await;
     connection(&server, "connected").await;
     observer.settle(CONFIG).await;
     assert!(
@@ -215,14 +218,40 @@ async fn a_change_while_the_broker_is_away_does_not_wait_for_it() {
     connection(&server, "connecting").await;
 
     let started = std::time::Instant::now();
-    let moved = save(&server, json!({ "url": url, "topic": "frames" })).await;
+    // A topic of its own: this server goes on trying the freed port, where
+    // another test's broker may come to listen.
+    let moved = save(&server, json!({ "url": url, "topic": "away" })).await;
     assert!(
         started.elapsed() < std::time::Duration::from_secs(7),
         "{:?}",
         started.elapsed()
     );
-    assert_eq!(moved["topic"], "frames");
+    assert_eq!(moved["topic"], "away");
     assert_eq!(moved["connection"], "connecting");
+}
+
+#[tokio::test]
+async fn refused_new_credentials_leave_the_displays_unavailable() {
+    // The broker knows the first password only; the second is refused.
+    let broker = Broker::start_with_users(&[("afterimage", "first"), ("observer", "observer")]).await;
+    let observer = Observer::start_as(&broker, Some(("observer", "observer")));
+    let server = start().await;
+    server.sign_up().await;
+    server.claim(&mac(1)).await;
+    let first = json!({ "url": broker.url(), "username": "afterimage", "password": "first" });
+    save(&server, first).await;
+    observer.wait(CONFIG, |_| true).await;
+    connection(&server, "connected").await;
+
+    let second = json!({ "url": broker.url(), "username": "afterimage", "password": "second" });
+    save(&server, second).await;
+    connection(&server, "refused").await;
+    // Home Assistant reads the displays as unavailable, not as still served.
+    let status = observer
+        .wait("afterimage/status", |status| status == "offline")
+        .await;
+    assert_eq!(status, "offline");
+    assert!(!observer.payloads(CONFIG).iter().any(String::is_empty));
 }
 
 #[tokio::test]

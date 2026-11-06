@@ -24,21 +24,10 @@ fn administrator(caller: &Caller) -> Result<(), error::Forbidden> {
     }
 }
 
-/// Whether two broker addresses name one broker: the same scheme, host and port,
-/// whatever their spelling.
+/// Whether two saved addresses name one broker, as telemetry tells them apart.
 fn same_broker(saved: &str, given: &str) -> bool {
     match (telemetry::broker_url(saved), telemetry::broker_url(given)) {
-        (Ok(saved), Ok(given)) => {
-            (
-                saved.scheme(),
-                saved.host_str(),
-                saved.port_or_known_default(),
-            ) == (
-                given.scheme(),
-                given.host_str(),
-                given.port_or_known_default(),
-            )
-        }
+        (Ok(saved), Ok(given)) => telemetry::same_broker(&saved, &given),
         _ => false,
     }
 }
