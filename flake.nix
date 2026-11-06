@@ -37,9 +37,11 @@
 
       # The server's build runs every Rust test; lint runs clippy and rustfmt; the
       # web UI's build type-checks it with the generated client and runs its tests;
-      # module boots the NixOS module in a VM.
+      # tokens tests the token generator's reading of the stylesheet; module boots
+      # the NixOS module in a VM.
       checks = forSystems (system: {
         inherit (scope.${system}) server lint web;
+        tokens = scope.${system}.tokensTest;
         module = scope.${system}.moduleTest;
       });
 

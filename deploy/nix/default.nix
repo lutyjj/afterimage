@@ -18,6 +18,7 @@ lib.makeScope pkgs.newScope (self: {
   moduleTest = self.callPackage ./module-test.nix { };
   lint = self.callPackage ./lint.nix { };
   tokens = self.callPackage ./tokens.nix { };
+  tokensTest = self.callPackage ./tokens-test.nix { };
 
   devShell = self.callPackage ./devshell.nix { };
 })

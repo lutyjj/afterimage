@@ -24,7 +24,6 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
 
 FRAMEWORK = "3.4.4"
 STYLESHEET = f"https://trmnl.com/css/{FRAMEWORK}/plugins.css"
@@ -149,6 +148,7 @@ PAINT_PROBE = """
   if (inverse) root.className = 'inverse';
   root.innerHTML = markup;
   screen.appendChild(root);
+  const ratio = parseFloat(getComputedStyle(screen).getPropertyValue('--dither-ratio')) || 1;
   const out = {};
   for (const [name, selector] of Object.entries(paints)) {
     const element = selector === ':scope' ? root : root.querySelector(selector);
@@ -158,8 +158,10 @@ PAINT_PROBE = """
       color: style.backgroundColor,
       image: style.backgroundImage,
       size: style.backgroundSize,
+      ratio,
       ink: style.color,
       border: style.borderTopStyle === 'none' ? '' : style.borderTopColor,
+      halo: style.textShadow,
     };
   }
   root.remove();
@@ -221,15 +223,19 @@ def split(text: str) -> list[str]:
     return parts
 
 
-def pattern(image: str, size: str):
-    """The first layer of a linear gradient as one row of pixel colours across
-    the layer's tile, `None` where it is transparent: how the stylesheet draws
-    table rules and dividers, as hard stops on few grays and one colour on many."""
+def pattern(image: str, size: str, ratio: float):
+    """The first layer of a linear gradient as a rule: one row of pixel colours,
+    `None` where it is transparent, sampled at the display's own pixels (`ratio`
+    of them to a CSS pixel, as the stylesheet sizes its rules), with the CSS width
+    the row repeats over and its thickness. Hard stops on few grays draw dotted
+    rules; one colour on many draws a plain one."""
     layer = split(image)[0]
     if not layer.startswith("linear-gradient("):
         return None
     arguments = split(layer[len("linear-gradient(") : -1])
     if arguments and re.match(r"to |-?[0-9.]+deg$", arguments[0]):
+        if arguments[0] not in ("to right", "90deg"):
+            return None
         arguments = arguments[1:]
     stops = []
     for stop in arguments:
@@ -237,31 +243,36 @@ def pattern(image: str, size: str):
         if not match:
             return None
         stops.append((typed("color", match.group(1)), match.group(2) and float(match.group(2))))
+    lengths = [re.fullmatch(r"([0-9.]+)px", part) for part in split(size)[0].split(" ")]
+    thickness = float(lengths[1].group(1)) if len(lengths) > 1 and lengths[1] else 1.0
     if len({color for color, _ in stops}) == 1:
-        return [stops[0][0]]
-    width = re.match(r"([0-9.]+)px", size)
-    if not width or any(position is None for _, position in stops):
+        return {"pixels": [stops[0][0]], "period": round(1 / ratio, 4), "thickness": thickness}
+    if not lengths[0] or any(position is None for _, position in stops):
         return None
-    pixels = round(float(width.group(1)))
+    period = float(lengths[0].group(1))
+    pixels = max(1, round(period * ratio))
     row = []
     for pixel in range(pixels):
         centre = (pixel + 0.5) * 100 / pixels
         row.append(next((color for (color, start), (_, end) in zip(stops, stops[1:]) if start <= centre < end), None))
-    return row
+    return {"pixels": row, "period": round(period, 4), "thickness": round(thickness, 4)}
 
 
 def paint(raw):
-    """What an element paints: its fill (a colour, a dither tile or a row of
-    pixels), its ink and its border colour, each present only when it has one."""
+    """What an element paints: its fill (a colour, a dither tile or a rule), its
+    ink, its border colour and the colour of its text's halo, each present only
+    when it has one."""
     if raw is None:
         return None
     tile = typed("image", raw["image"])
+    halo = re.match(r"(rgba?\([^)]*\))", raw["halo"] or "")
     found = {
         "color": typed("color", raw["color"]),
         "tile": tile,
-        "pattern": None if tile else pattern(raw["image"], raw["size"]),
+        "pattern": None if tile else pattern(raw["image"], raw["size"], raw["ratio"]),
         "ink": typed("color", raw["ink"]),
         "border": typed("color", raw["border"]) if raw["border"] else None,
+        "halo": typed("color", halo.group(1)) if halo else None,
     }
     return {key: value for key, value in found.items() if value is not None}
 
@@ -315,6 +326,9 @@ def fonts(output: Path, families: set[str]) -> None:
 
 
 def main(catalog: Path, output: Path) -> None:
+    # Imported here, so the parsing above loads without a browser for its tests.
+    from playwright.sync_api import sync_playwright
+
     stylesheet = fetch(STYLESHEET)
     digest = hashlib.sha256(stylesheet).hexdigest()
     if digest != STYLESHEET_SHA256:

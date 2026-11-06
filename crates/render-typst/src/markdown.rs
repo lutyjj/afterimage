@@ -11,6 +11,10 @@ use serde_json::{Map, Value, json};
 /// screen holds, and a bound on the layout work a data source can ask for.
 const MAX_TEXT: usize = 16 * 1024;
 
+/// Lists nest at most this deep; the items of a list deeper still are read as
+/// paragraphs of the deepest item, so no answer nests past what drawing takes.
+const MAX_DEPTH: usize = 8;
+
 /// Replaces the `text` of every `richText` in a resolved screen with its
 /// `blocks`.
 pub fn prepare(screen: &mut Value) {
@@ -44,6 +48,8 @@ struct Builder {
     lists: Vec<List>,
     /// The runs of the paragraph being built.
     runs: Option<Vec<Value>>,
+    /// Lists open past `MAX_DEPTH`, which add no structure.
+    flattened: usize,
     strong: usize,
     emphasis: usize,
     heading: bool,
@@ -113,21 +119,31 @@ pub fn blocks(markdown: &str) -> Value {
             }
             Event::Start(Tag::List(start)) => {
                 builder.paragraph();
-                builder.lists.push(List {
-                    start,
-                    items: Vec::new(),
-                });
+                if builder.lists.len() < MAX_DEPTH && builder.flattened == 0 {
+                    builder.lists.push(List {
+                        start,
+                        items: Vec::new(),
+                    });
+                } else {
+                    builder.flattened += 1;
+                }
             }
             Event::Start(Tag::Item) => {
                 builder.paragraph();
-                builder.levels.push(Vec::new());
+                if builder.flattened == 0 {
+                    builder.levels.push(Vec::new());
+                }
             }
             Event::End(TagEnd::Item) => {
                 builder.paragraph();
-                if let (Some(item), Some(list)) = (builder.levels.pop(), builder.lists.last_mut()) {
+                if builder.flattened == 0
+                    && let (Some(item), Some(list)) =
+                        (builder.levels.pop(), builder.lists.last_mut())
+                {
                     list.items.push(Value::Array(item));
                 }
             }
+            Event::End(TagEnd::List(_)) if builder.flattened > 0 => builder.flattened -= 1,
             Event::End(TagEnd::List(_)) => {
                 if let Some(list) = builder.lists.pop() {
                     let mut shape = Map::new();
@@ -212,6 +228,29 @@ mod tests {
             children[1]["richText"]["blocks"],
             json!([{ "paragraph": [run("42", false, false)] }])
         );
+    }
+
+    /// How deep the first list's last items nest.
+    fn depth(blocks: &Value) -> usize {
+        blocks
+            .as_array()
+            .and_then(|blocks| blocks.iter().find_map(|block| block.get("list")))
+            .and_then(|list| list["items"].as_array()?.last())
+            .map_or(0, |item| 1 + depth(item))
+    }
+
+    #[test]
+    fn lists_nest_at_most_eight_deep_and_keep_the_rest_as_paragraphs() {
+        let deep: String = (0..60)
+            .flat_map(|level| ["  ".repeat(level), format!("- item {level}\n")])
+            .collect();
+        let blocks = blocks(&deep);
+        assert_eq!(depth(&blocks), MAX_DEPTH);
+        let text = blocks.to_string();
+        let order: Vec<usize> = (0..60)
+            .map(|level| text.find(&format!("\"item {level}\"")).unwrap())
+            .collect();
+        assert!(order.is_sorted(), "every item, in order");
     }
 
     #[test]

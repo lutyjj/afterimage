@@ -20,6 +20,13 @@
 // TRMNL's stylesheet names Inter "Inter Variable"; the font file calls it Inter.
 #let family(name) = if name == none { "Inter" } else if name.starts-with("Inter") { "Inter" } else { name }
 
+// A line height that is a ratio of its font size; a value the tokens lack falls
+// back to 1.2.
+#let leading-of(t, component, size) = {
+  let ratio = sized(t, component, size, "-line-height")
+  if ratio == none or ratio <= 0 { 1.2 } else { ratio }
+}
+
 #let typeface(t, component, size) = (
   font: (family(sized(t, component, size, "-font-family")), "Inter"),
   size: sized(t, component, size, "-font-size") * 1pt,
@@ -35,9 +42,10 @@
   if found == none { (:) } else { found }
 }
 
-// A paint's fill: its color under its dither tile, or its row of pixels (a
-// rule), which runs down instead of across where `down` is set. Pixels the row
-// leaves transparent show what is beneath.
+// A paint's fill: its color under its dither tile, or its rule: a row of the
+// display's own pixels repeating over its CSS period, which runs down instead of
+// across where `down` is set. Pixels the row leaves transparent show what is
+// beneath.
 #let fill-of(t, p, down: false) = {
   let base = if "color" in p { rgb(p.color) } else { none }
   if "tile" in p {
@@ -48,13 +56,15 @@
     })
   }
   if "pattern" in p {
-    let row = p.pattern
-    let (across, along) = (row.len() * 1pt, 1pt)
+    let row = p.pattern.pixels
+    let pixel-size = p.pattern.period * 1pt / row.len()
+    let (across, along) = (p.pattern.period * 1pt, p.pattern.thickness * 1pt)
     return tiling(size: if down { (along, across) } else { (across, along) }, {
       for (at, pixel) in row.enumerate() {
         if pixel != none {
-          let (dx, dy) = if down { (0pt, at * 1pt) } else { (at * 1pt, 0pt) }
-          place(dx: dx, dy: dy, rect(width: 1pt, height: 1pt, fill: rgb(pixel), stroke: none))
+          let (dx, dy) = if down { (0pt, at * pixel-size) } else { (at * pixel-size, 0pt) }
+          let (width, height) = if down { (along, pixel-size) } else { (pixel-size, along) }
+          place(dx: dx, dy: dy, rect(width: width, height: height, fill: rgb(pixel), stroke: none))
         }
       }
     })
@@ -65,26 +75,31 @@
 // The ink text and lines take: black, or white inside an inverse element.
 #let ink(t) = rgb(paint(t, "canvas").at("ink", default: "#000000"))
 
-// A rule as the stylesheet draws a divider or a table's row line: one pixel
-// thick, across a column or down a row.
+// How thick a rule the stylesheet draws: one device pixel on most displays.
+#let thickness-of(t, name) = paint(t, name).at("pattern", default: (thickness: 1)).thickness * 1pt
+
+// A rule as the stylesheet draws a divider or a table's row line, across a
+// column or down a row.
 #let rule(t, name, length: 100%, down: false) = {
   let fill = fill-of(t, paint(t, name), down: down)
-  if down { rect(width: 1pt, height: length, fill: fill, stroke: none) } else { rect(width: length, height: 1pt, fill: fill, stroke: none) }
+  let thick = thickness-of(t, name)
+  if down { rect(width: thick, height: length, fill: fill, stroke: none) } else { rect(width: length, height: thick, fill: fill, stroke: none) }
 }
 
-// Gray ink for text: the gray itself where the palette has a gray, or ink, since
-// neither a mid gray nor a dither survives as small text without one. Inside an
-// inverse element, the gray the stylesheet paints gray labels with there.
-#let gray-ink(t, grays) = if not grays { ink(t) } else if t.at("@inverse", default: false) {
-  rgb(paint(t, "label-gray").at("color", default: "#AAAAAA"))
-} else { rgb(tok(t, "--gray-50", default: "#999999")) }
+// Gray ink for text: the gray the stylesheet paints gray labels with, where the
+// palette has a gray, or ink, since neither a mid gray nor a dither survives as
+// small text without one. Inside an inverse element, the inverse's gray.
+#let gray-ink(t, grays) = if not grays { ink(t) } else {
+  let gray = paint(t, "label-gray")
+  rgb(gray.at("ink", default: gray.at("color", default: "#999999")))
+}
 
-// Text kept legible over a dithered fill: a white outline under the ink, as
-// TRMNL's title bar draws it (`--title-bar-text-stroke-width`).
-#let haloed(t, body) = {
+// Text kept legible over a dithered fill: an outline of `color` under the ink,
+// as TRMNL's title bar and index digits draw it (`--title-bar-text-stroke-width`).
+#let haloed(t, body, color: white) = {
   let width = px(t, "--title-bar-text-stroke-width", default: 3.5)
   box({
-    place(text(stroke: width + white, body))
+    place(text(stroke: width + color, body))
     body
   })
 }
@@ -138,17 +153,13 @@
 #let text-component(t, component, value) = {
   let size = value.at("size", default: "base")
   let face = typeface(t, component, size)
-  let leading = sized(t, component, size, "-line-height")
-  let leading = if leading == none or leading < 0.8 { 1.2 } else { leading }
-  clamped(face, leading, shown(value.text), value.at("clamp", default: none))
+  clamped(face, leading-of(t, component, size), shown(value.text), value.at("clamp", default: none))
 }
 
 #let label(t, value, grays) = {
   let size = value.at("size", default: "base")
   let face = typeface(t, "--label", size)
-  let leading = sized(t, "--label", size, "-line-height")
-  let leading = if leading == none or leading < 0.8 { 1.2 } else { leading }
-  let body = clamped(face, leading, shown(value.text), value.at("clamp", default: none))
+  let body = clamped(face, leading-of(t, "--label", size), shown(value.text), value.at("clamp", default: none))
   let inset = (x: px(t, "--gap-xsmall", default: 5), y: 1pt)
   let radius = px(t, "--rounded-xsmall", default: 5)
   let style = value.at("style", default: "plain")
@@ -328,13 +339,13 @@
   if direction == "column" {
     let horizontal = if cross == "center" { center } else if cross == "end" { right } else { left }
     let aligned = if cross == none { (:) } else { (align: horizontal) }
-    let stroke = (paint: fill-of(t, paint(t, "divider")), thickness: 1pt)
+    let stroke = (paint: fill-of(t, paint(t, "divider")), thickness: thickness-of(t, "divider"))
     let rules = dividers.map(at => grid.hline(y: at + lead, stroke: stroke))
     grid(columns: (across,), rows: tracks, row-gutter: gutter, ..aligned, ..cells, ..rules)
   } else {
     let vertical = if cross == "center" { horizon } else if cross == "end" { bottom } else { top }
     let aligned = if cross == none { (:) } else { (align: vertical) }
-    let stroke = (paint: fill-of(t, paint(t, "divider"), down: true), thickness: 1pt)
+    let stroke = (paint: fill-of(t, paint(t, "divider"), down: true), thickness: thickness-of(t, "divider"))
     let rules = dividers.map(at => grid.vline(x: at + lead, stroke: stroke))
     grid(rows: (across,), columns: tracks, column-gutter: gutter, ..aligned, ..cells, ..rules)
   }
@@ -385,13 +396,6 @@
 // The alignment of a `TextAlign`.
 #let across(align) = if align == "center" { center } else if align == "end" { right } else { left }
 
-// A line height that is a ratio of its font size; a value the tokens lack falls
-// back to 1.2.
-#let leading-of(t, component, size) = {
-  let ratio = sized(t, component, size, "-line-height")
-  if ratio == none or ratio <= 0 { 1.2 } else { ratio }
-}
-
 // TRMNL's table: rows as tall as the size's row height or their tallest cell,
 // cells centred down the row, a rule under the heading row and between body
 // rows, and columns sharing a fixed width in proportion to their widest text,
@@ -438,10 +442,12 @@
       ..rows.enumerate().map(((at, row)) => {
         let last = at == rows.len() - 1 and more == none
         let meta = paint(t, "table-meta")
-        let index-ink = rgb(paint(t, "table-index").at("ink", default: "#000000"))
+        let index = paint(t, "table-index")
+        let index-ink = rgb(index.at("ink", default: "#000000"))
+        let halo = rgb(index.at("halo", default: "#FFFFFF"))
         let start = if not indexed { [] } else {
           place(left + top, dy: 4pt, rect(width: meta-width, height: row-height - 8pt, radius: 3pt, fill: fill-of(t, meta), stroke: none))
-          place(left + horizon, dx: meta-width / 2, box(width: 0pt, align(center, haloed(t, text(..typeface(t, "--item-index", "base"), fill: index-ink, str(at + 1))))))
+          place(left + horizon, box(width: meta-width, align(center, haloed(t, color: halo, text(..typeface(t, "--item-index", "base"), fill: index-ink, str(at + 1))))))
         }
         row-of(row-height, columns.enumerate().map(((index, column)) => cell(cell-face, cell-leading, row.at(index, default: none), column)), if last { none } else { "table-body-rule" }, start)
       }),

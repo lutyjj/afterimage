@@ -582,3 +582,73 @@ fn rich_text_sets_strong_runs_heavier_and_wraps_at_its_width() {
         "at most 640 pixels wide"
     );
 }
+
+#[test]
+fn a_scaled_display_draws_the_rule_under_the_headings() {
+    // TRMNL X draws 1.8 pixels to a layout pixel: its heading rule is black and
+    // white pixels in turn, which a rule sampled once a layout pixel loses.
+    let table = json!({ "table": {
+        "size": "small", "indexed": false, "grow": false, "more": null,
+        "columns": [{ "heading": "A", "align": "start", "clamp": 1 }],
+        "rows": [["a"]]
+    } });
+    let pixels = pixels(&render(&screen_of(&table), "v2", "bw"));
+    // Right of the text, where only rules are: the rows with ink there.
+    let width = pixels[0].len();
+    let ruled: Vec<usize> = (0..pixels.len())
+        .filter(|&y| {
+            pixels[y][width - 200..width - 20]
+                .iter()
+                .any(|pixel| *pixel != [255, 255, 255])
+        })
+        .collect();
+    assert_eq!(ruled.len(), 1, "one rule, a pixel thick: {ruled:?}");
+    let row = &pixels[ruled[0]][width - 200..width - 20];
+    let black = row.iter().filter(|pixel| **pixel == [0, 0, 0]).count();
+    assert!(
+        (80..=100).contains(&black),
+        "every other pixel black: {black} of 180"
+    );
+}
+
+#[test]
+fn an_index_in_an_inverse_table_keeps_a_dark_halo() {
+    // Inside an inverse element the stylesheet's index digit is light with a
+    // dark halo; a light halo would leave a blob.
+    let table = json!({ "table": {
+        "size": "base", "indexed": true, "grow": false, "more": null,
+        "columns": [{ "heading": "A", "align": "start", "clamp": 1 }],
+        "rows": [["a"]]
+    } });
+    let cell = json!({ "column": { "inverse": true, "padding": "none", "rounded": "none",
+        "gap": "medium", "align": "start", "justify": "start", "grow": false, "children": [table] } });
+    let pixels = pixels(&render(&screen_of(&cell), "og_png", "bw"));
+    // Around the digit, centred on the first row's 10-pixel index bar (from the
+    // margin at 10, under the 36-pixel heading row, mid 46-pixel row): the
+    // digit and its halo, 7 by 13 pixels. A light halo fills most of it; a dark
+    // one leaves the digit's strokes and the bar's dither.
+    let (x, y) = (10 + 5, 10 + 36 + 23);
+    let window: Vec<[u8; 3]> = pixels[y - 6..=y + 6]
+        .iter()
+        .flat_map(|row| row[x - 3..=x + 3].iter().copied())
+        .collect();
+    let white = window
+        .iter()
+        .filter(|pixel| **pixel == [255, 255, 255])
+        .count();
+    assert!(white > 0, "the digit is light");
+    assert!(
+        white * 2 < window.len(),
+        "{white} of {} white: a blob",
+        window.len()
+    );
+}
+
+#[test]
+fn gray_text_takes_the_stylesheets_gray() {
+    // On sixteen grays the stylesheet paints a gray label in #777777.
+    let label = json!({ "label": { "text": "WWWW", "size": "large", "style": "gray" } });
+    let pixels = pixels(&render(&screen_of(&label), "kobo_aura_one", "gray-16"));
+    let colors: std::collections::BTreeSet<[u8; 3]> = pixels.iter().flatten().copied().collect();
+    assert!(colors.contains(&[0x77, 0x77, 0x77]), "{colors:?}");
+}

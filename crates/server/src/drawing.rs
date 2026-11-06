@@ -719,7 +719,7 @@ impl Resolver {
     }
 
     /// A `table` keeps its settings and its columns' headings, and gets a row of
-    /// cell values for each element, each row counted as a component, and the
+    /// cell values for each element, each cell counted as a component, and the
     /// line saying how many were left out.
     fn table(&mut self, table: &Value, scope: &Template, path: &str) -> Value {
         let (scopes, more) = self.elements(table, scope, path);
@@ -744,7 +744,8 @@ impl Resolver {
             .collect();
         let mut rows = Vec::new();
         for scope in &scopes {
-            if !self.admit(path) {
+            // Each cell is drawn as a component is, so each counts as one.
+            if !columns.iter().all(|_| self.admit(path)) {
                 break;
             }
             let cells = columns
@@ -973,6 +974,30 @@ mod tests {
                 "rows": [["AMZN", 184.2], ["MSFT", 412.5]]
             } })
         );
+    }
+
+    #[test]
+    fn every_table_cell_counts_against_the_bound() {
+        let columns: Vec<Value> = (0..12)
+            .map(|column| json!({ "heading": "H", "text": format!("{{{{ item }}}}{column}"), "align": "start", "clamp": 1 }))
+            .collect();
+        let document = json!({ "content": { "each": {
+            "items": "{{ range(3) | list }}",
+            "content": { "table": { "items": "{{ range(100) | list }}", "columns": columns } }
+        } } });
+        let (resolved, problems) = resolve(&document, &context! {});
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].message.contains("more than 2000 components"),
+            "{problems:?}"
+        );
+        let rows: usize = resolved["content"]["column"]["children"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|table| table["table"]["rows"].as_array().map_or(0, Vec::len))
+            .sum();
+        assert!(rows * 12 <= MAX_COMPONENTS, "{rows} rows drawn");
     }
 
     #[test]
