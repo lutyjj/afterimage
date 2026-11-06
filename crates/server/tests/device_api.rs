@@ -325,6 +325,23 @@ async fn an_idle_registration_frees_its_place_after_a_week() {
 }
 
 #[tokio::test]
+async fn a_setup_without_a_model_registers_and_its_check_in_names_it() {
+    // Firmware before 1.8 sends `Model` empty at setup, and names it at check-in.
+    let server = start().await;
+    server.sign_up().await;
+    let answer = server.setup_as(&mac(1), "").await;
+    assert_eq!(answer["status"], 200, "{answer}");
+    let key = answer["api_key"].as_str().unwrap().to_owned();
+    let code = answer["friendly_id"].as_str().unwrap().to_owned();
+    server.display(&key, &READINGS).await;
+    let (status, claimed) = server
+        .call("POST", "/manage/devices", Some(json!({ "code": code })))
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{claimed}");
+    assert_eq!(claimed["device"]["firmwareModel"], MODEL);
+}
+
+#[tokio::test]
 async fn refuses_setup_it_cannot_read() {
     let server = start().await;
     let answer = server.setup("not a mac").await;

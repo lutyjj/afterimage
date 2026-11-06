@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "UPDATE registrations SET\n                 seen_at = ?,\n                 expires_at = CASE WHEN expires_at IS NULL OR reset = 1 THEN expires_at ELSE ? END,\n                 width = COALESCE(?, width),\n                 height = COALESCE(?, height),\n                 battery_voltage = COALESCE(?, battery_voltage),\n                 battery_percent = COALESCE(?, battery_percent),\n                 signal_dbm = COALESCE(?, signal_dbm),\n                 firmware_version = COALESCE(?, firmware_version)\n             WHERE key_hash = ? AND (expires_at IS NULL OR expires_at > ?)\n             RETURNING id, friendly_id, expires_at IS NULL AS \"claimed!: bool\", reset AS \"reset!: bool\"",
+  "query": "UPDATE registrations SET\n                 seen_at = ?,\n                 expires_at = CASE WHEN expires_at IS NULL OR reset = 1 THEN expires_at ELSE ? END,\n                 model = COALESCE(?, model),\n                 width = COALESCE(?, width),\n                 height = COALESCE(?, height),\n                 battery_voltage = COALESCE(?, battery_voltage),\n                 battery_percent = COALESCE(?, battery_percent),\n                 signal_dbm = COALESCE(?, signal_dbm),\n                 firmware_version = COALESCE(?, firmware_version)\n             WHERE key_hash = ? AND (expires_at IS NULL OR expires_at > ?)\n             RETURNING id, friendly_id, expires_at IS NULL AS \"claimed!: bool\", reset AS \"reset!: bool\"",
   "describe": {
     "columns": [
       {
@@ -44,7 +44,7 @@
       }
     ],
     "parameters": {
-      "Right": 10
+      "Right": 11
     },
     "nullable": [
       false,
@@ -53,5 +53,5 @@
       false
     ]
   },
-  "hash": "bede1aabe45c2fe00f144132cc2835da4aa00d6c91d557280272097d010a7618"
+  "hash": "5764bead28ed77f4bda9a952f3163fefa455ce94abc0bc22593b4d455a7dc7be"
 }

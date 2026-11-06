@@ -35,6 +35,14 @@ pub const IDLE_SECONDS: i64 = 7 * 24 * 60 * 60;
 pub const UNCLAIMED_LIMIT: i64 = 32;
 /// Longest firmware model name setup accepts.
 const MODEL_LENGTH: usize = 64;
+
+/// The `Model` a device reports, trimmed, when it is a name: at most
+/// [`MODEL_LENGTH`] visible ASCII characters.
+fn model_name(text: &str) -> Option<&str> {
+    let text = text.trim();
+    (!text.is_empty() && text.len() <= MODEL_LENGTH && text.bytes().all(|b| b.is_ascii_graphic()))
+        .then_some(text)
+}
 /// Fresh friendly IDs tried before setup gives up. Each collides with an existing
 /// one with odds of at most `UNCLAIMED_LIMIT` in 2^30.
 const FRIENDLY_ID_ATTEMPTS: usize = 8;
@@ -115,13 +123,16 @@ impl Registrations {
         let Ok(mac) = Mac::from_str(mac) else {
             return Ok(Setup::Refused(Refusal::InvalidMac));
         };
+        // Firmware before 1.8 sends `Model` empty at setup; its check-ins name it.
         let model = model.trim();
-        if model.is_empty()
-            || model.len() > MODEL_LENGTH
-            || !model.bytes().all(|b| b.is_ascii_graphic())
-        {
-            return Ok(Setup::Refused(Refusal::InvalidModel));
-        }
+        let model = if model.is_empty() {
+            ""
+        } else {
+            let Some(model) = model_name(model) else {
+                return Ok(Setup::Refused(Refusal::InvalidModel));
+            };
+            model
+        };
         let mac = mac.to_string();
         let now = self.clock.now();
         let expires_at = now + UNUSED_SECONDS;
@@ -181,15 +192,18 @@ impl Registrations {
         key: &str,
         readings: &Readings,
         panel: Option<(u32, u32)>,
+        model: Option<&str>,
     ) -> Result<CheckIn, Error> {
         let key_hash = keys::token_hash(key);
         let now = self.clock.now();
         let expires_at = now + IDLE_SECONDS;
         let (width, height) = panel.unzip();
+        let model = model.and_then(model_name);
         let row = sqlx::query!(
             r#"UPDATE registrations SET
                  seen_at = ?,
                  expires_at = CASE WHEN expires_at IS NULL OR reset = 1 THEN expires_at ELSE ? END,
+                 model = COALESCE(?, model),
                  width = COALESCE(?, width),
                  height = COALESCE(?, height),
                  battery_voltage = COALESCE(?, battery_voltage),
@@ -200,6 +214,7 @@ impl Registrations {
              RETURNING id, friendly_id, expires_at IS NULL AS "claimed!: bool", reset AS "reset!: bool""#,
             now,
             expires_at,
+            model,
             width,
             height,
             readings.battery_voltage,

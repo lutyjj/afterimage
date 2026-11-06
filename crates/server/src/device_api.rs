@@ -165,7 +165,12 @@ async fn get_display(
     let panel = panel_size(input.width.as_deref(), input.height.as_deref());
     let check_in = state
         .registrations
-        .check_in(&input.access_token, &readings, panel)
+        .check_in(
+            &input.access_token,
+            &readings,
+            panel,
+            input.model.as_deref(),
+        )
         .await
         .map_err(|error| internal_failure(&error))?;
     Ok(match check_in {

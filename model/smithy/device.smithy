@@ -45,7 +45,9 @@ operation SetupDevice {
         @httpHeader("ID")
         id: String
 
-        /// The `DEVICE_MODEL` the firmware was built for.
+        /// The `DEVICE_MODEL` the firmware was built for. Firmware before 1.8 sends it
+        /// empty here (`performApiSetup` in `src/bl.cpp` leaves it unset); its
+        /// check-ins name it.
         @required
         @httpHeader("Model")
         model: String
@@ -94,6 +96,13 @@ operation GetDisplay {
         /// firmware sends it on every check-in (`buildDisplayHeaders`).
         @httpHeader("ID")
         id: String
+
+        /// The `DEVICE_MODEL` the firmware was built for. TRMNL's document does not
+        /// list it here, but the firmware sends it on every check-in
+        /// (`buildDisplayHeaders`), where firmware before 1.8 names it for the first
+        /// time.
+        @httpHeader("Model")
+        model: String
 
         /// Volts, such as `4.12`.
         @httpHeader("Battery-Voltage")
