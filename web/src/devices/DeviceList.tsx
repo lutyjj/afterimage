@@ -140,18 +140,18 @@ function DeviceRow({
             <dd>{firmwareVersion ?? "Not reported"}</dd>
           </div>
         </dl>
-        {now && (
-          <div className={styles.today}>
-            <span className="annotation">Today</span>
-            <DayStrip
-              day={now.day}
-              now={now.minute}
-              entries={device.playlist.map((entry) => ({ entry, name: screenName(entry.screenId) }))}
-              label={`${device.name}'s playlist today`}
-            />
-          </div>
-        )}
       </div>
+      {now && (
+        <div className={styles.today}>
+          <span className="annotation">Today</span>
+          <DayStrip
+            day={now.day}
+            now={now.minute}
+            entries={device.playlist.map((entry) => ({ entry, name: screenName(entry.screenId) }))}
+            label={`${device.name}'s playlist today`}
+          />
+        </div>
+      )}
     </li>
   );
 }

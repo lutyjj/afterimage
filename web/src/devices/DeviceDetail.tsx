@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router";
 
 import { displayModelsQuery, messageOf, serverQuery } from "../app/client";
@@ -47,7 +48,10 @@ export function DeviceDetail() {
   return (
     <div className={styles.page}>
       <nav className={styles.trail} aria-label="Breadcrumb">
-        <Link to="/">Devices</Link>
+        <Link to="/">
+            <ArrowLeft size={14} aria-hidden="true" />
+            Devices
+          </Link>
       </nav>
       <header className={styles.head}>
         <h1 className={styles.name}>{data.name}</h1>

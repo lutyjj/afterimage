@@ -65,13 +65,20 @@
   display: none;
 }
 
-.branch > summary::before {
-  content: "▸ ";
-  color: var(--blue-text);
+.branch > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
 }
 
-.branch[open] > summary::before {
-  content: "▾ ";
+.branch > summary > .chevron {
+  flex: none;
+  color: var(--blue-text);
+  transition: transform 160ms var(--ease-out);
+}
+
+.branch[open] > summary > .chevron {
+  transform: rotate(90deg);
 }
 
 .branch ul {
@@ -128,7 +135,7 @@
 .value[data-type="number"],
 .value[data-type="boolean"],
 .value[data-type="null"] {
-  color: #7a3fb0;
+  color: var(--ink-soft);
 }
 
 .copied {

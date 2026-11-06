@@ -16,9 +16,9 @@
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 18.5rem;
+  grid-template-columns: minmax(0, 1fr) 17.5rem;
   grid-template-areas: "list claim";
-  gap: var(--space-6);
+  gap: var(--space-5);
   align-items: start;
 }
 
@@ -37,10 +37,17 @@
   display: grid;
 }
 
+/* Every row shares one proof track, wide enough for an 800-pixel plate at its
+   true pixels and the crop marks beside it, so every row's facts start at one
+   edge whatever its plate holds. */
 .row {
+  --proof-track: calc(800px + 1.25rem);
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(16rem, 1fr);
-  gap: var(--space-5);
+  grid-template-columns: minmax(0, var(--proof-track)) minmax(13rem, 1fr);
+  grid-template-areas:
+    "proof meta"
+    "today meta";
+  gap: var(--space-2) var(--space-5);
   align-items: start;
   padding: var(--space-4) 0 var(--space-5);
   border-top: var(--rule);
@@ -51,9 +58,9 @@
 }
 
 .proofLink {
+  grid-area: proof;
   display: block;
   min-width: 0;
-  max-width: 50rem;
   margin: -0.25rem 0 0 -1.25rem;
   color: inherit;
   text-decoration: none;
@@ -64,7 +71,9 @@
 }
 
 .meta {
+  grid-area: meta;
   display: grid;
+  align-content: start;
   gap: var(--space-4);
   min-width: 0;
   padding-top: var(--space-4);
@@ -99,7 +108,6 @@
 
 .facts {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3) var(--space-4);
 }
 
@@ -121,9 +129,12 @@
   color: var(--ink-soft);
 }
 
+/* As wide as the plate above it; the crop marks keep the track's last 1.25rem. */
 .today {
+  grid-area: today;
   display: grid;
   gap: var(--space-1);
+  margin-right: 1.25rem;
 }
 
 .first {
@@ -170,11 +181,23 @@
 @media (max-width: 72rem) {
   .row {
     grid-template-columns: minmax(0, 1fr);
-    gap: 0;
+    grid-template-areas:
+      "proof"
+      "meta"
+      "today";
+    gap: var(--space-4);
   }
 
   .meta {
     padding-top: 0;
+  }
+
+  .facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .today {
+    margin-right: 0;
   }
 }
 

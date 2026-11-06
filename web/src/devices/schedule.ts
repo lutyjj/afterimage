@@ -1,5 +1,7 @@
 import type { PlaylistEntry, Weekday } from "@afterimage/management-client";
 
+import { timeOfDay } from "../app/format";
+
 /** The server's rule, in the server's time zone: an entry is current on its days,
  * from `from` until `until`; one whose `until` comes first runs past midnight and
  * belongs to the day it starts; one whose times are equal is current all day. */
@@ -60,12 +62,17 @@ export function nowIn(timeZone: string, at: Date = new Date()): { day: Weekday; 
   return { day, minute: Number(part("hour")) * 60 + Number(part("minute")) };
 }
 
+/** Whether the entry is current all day on its days. */
+export function isAllDay(entry: PlaylistEntry): boolean {
+  const from = minuteOf(entry.from) ?? 0;
+  const until = minuteOf(entry.until) ?? DAY_MINUTES;
+  return from === until || (from === 0 && until === DAY_MINUTES);
+}
+
 /** How long the entry runs on one of its days, for a label such as "07:00–09:30". */
 export function windowLabel(entry: PlaylistEntry): string {
-  const from = entry.from ?? "00:00";
-  const until = entry.until ?? "24:00";
-  if (from === until || (from === "00:00" && until === "24:00")) return "All day";
-  return `${from}–${until}`;
+  if (isAllDay(entry)) return "All day";
+  return `${timeOfDay(minuteOf(entry.from) ?? 0)}–${timeOfDay((minuteOf(entry.until) ?? DAY_MINUTES) % DAY_MINUTES)}`;
 }
 
 const SHORT_DAYS: Record<Weekday, string> = {

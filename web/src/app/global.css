@@ -5,7 +5,6 @@
    destructive actions. */
 :root {
   --paper: #f7f6f1;
-  --paper-sunk: #efede6;
   --white: #ffffff;
   --ink: #1b1b19;
   --ink-soft: #4b4a45;
@@ -13,6 +12,8 @@
   --blue-text: #2659b8;
   --blue-wash: #e6eefb;
   --blue-rule: #c7d8f5;
+  /* Quiet blue-gray text: placeholders, comments, line numbers; 4.5:1 on paper. */
+  --blue-gray: #5f6f8f;
   --red: #e2483d;
   --red-text: #c2372d;
   --red-wash: #fbe9e7;
@@ -276,7 +277,7 @@ textarea {
 }
 
 .input::placeholder {
-  color: #6f7f9e;
+  color: var(--blue-gray);
 }
 
 .input:hover,

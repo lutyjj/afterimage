@@ -9,9 +9,10 @@
   margin-bottom: calc(-1 * var(--space-5));
 }
 
-.trail a::before {
-  content: "←";
-  margin-right: 0.4em;
+.trail a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
 }
 
 .head {

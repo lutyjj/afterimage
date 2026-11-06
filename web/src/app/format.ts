@@ -10,16 +10,34 @@ export function ago(date: Date, now: Date = new Date()): string {
   return relative.format(Math.round(seconds / 86_400), "day");
 }
 
+/** The browser's hour cycle, which its time inputs use too, so every time the UI
+ * writes reads the same way as the ones a person types. */
+const hourCycle = new Intl.DateTimeFormat(undefined, { hour: "numeric" }).resolvedOptions().hourCycle ?? "h23";
+/** "07:30" on a 24-hour clock, "7:30 am" on a 12-hour one. */
+const hour = hourCycle === "h23" || hourCycle === "h24" ? "2-digit" : "numeric";
+
 /** A moment in the server's time zone, such as "Thu 14:05" or "3 Nov 14:05". */
 export function moment(date: Date, timeZone: string, now: Date = new Date()): string {
   const sameWeek = Math.abs(now.getTime() - date.getTime()) < 6 * 86_400_000;
   return new Intl.DateTimeFormat("en-GB", {
     timeZone,
     ...(sameWeek ? { weekday: "short" } : { day: "numeric", month: "short" }),
-    hour: "2-digit",
+    hour,
     minute: "2-digit",
-    hourCycle: "h23",
+    hourCycle,
   }).format(date);
+}
+
+const timeOfDayFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  hour,
+  minute: "2-digit",
+  hourCycle,
+});
+
+/** A time of day, given as minutes after midnight, such as "07:30" or "7:30 am". */
+export function timeOfDay(minute: number): string {
+  return timeOfDayFormat.format(new Date(minute * 60_000));
 }
 
 /** A reading of signal strength in words, from RSSI in dBm. */

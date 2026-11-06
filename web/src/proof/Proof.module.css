@@ -45,12 +45,14 @@
   background: var(--white);
 }
 
+/* Clear of the bottom-right crop mark, which reaches down past the plate. */
 .caption {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-4);
   width: 100%;
+  padding-right: 1.25rem;
 }
 
 .wedge {

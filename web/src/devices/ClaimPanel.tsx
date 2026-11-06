@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 
 import { client, messageOf, queryClient } from "../app/client";
+import { CropMarks } from "../proof/CropMarks";
 import { CODE_LENGTH, CodeField } from "./CodeField";
 import styles from "./ClaimPanel.module.css";
 import { devicesQuery } from "./queries";
@@ -29,6 +30,7 @@ export function ClaimPanel() {
 
   return (
     <form className={styles.panel} onSubmit={submit} aria-labelledby={`${hintId}-title`}>
+      <CropMarks />
       <h2 id={`${hintId}-title`} className={styles.title}>
         Claim a display
       </h2>

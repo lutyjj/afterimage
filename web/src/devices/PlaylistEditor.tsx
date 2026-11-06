@@ -7,7 +7,10 @@ import { Link } from "react-router";
 import { client, messageOf, queryClient } from "../app/client";
 import { DayStrip } from "./DayStrip";
 import styles from "./PlaylistEditor.module.css";
-import { daysLabel, nowIn, shortDay, WEEK, windowLabel } from "./schedule";
+import { daysLabel, isAllDay, nowIn, shortDay, WEEK, windowLabel } from "./schedule";
+
+/** The window an entry takes when it stops being all day, as a start to edit. */
+const DAYTIME = { from: "08:00", until: "20:00" };
 
 interface Draft extends PlaylistEntry {
   key: number;
@@ -184,6 +187,7 @@ function EntryRow({
     onChange({ days: next.length === 7 ? undefined : next });
   };
   const known = screens.some((screen) => screen.id === entry.screenId);
+  const allDay = isAllDay(entry);
   // The window alone, on any one of its days, for the strip.
   const window = { ...entry, days: undefined };
 
@@ -224,30 +228,44 @@ function EntryRow({
           ))}
         </fieldset>
         <div className={styles.times}>
-          <label>
-            <span className="visually-hidden">From</span>
+          <label className={styles.allDay}>
             <input
-              id={`${id}-from`}
-              className="input"
-              type="time"
-              step={60}
-              value={entry.from ?? ""}
-              onChange={(event) => onChange({ from: event.target.value || undefined })}
+              type="checkbox"
+              checked={allDay}
+              onChange={(event) =>
+                onChange(event.target.checked ? { from: undefined, until: undefined } : DAYTIME)
+              }
             />
+            All day
           </label>
-          <span className="annotation" aria-hidden="true">
-            to
-          </span>
-          <label>
-            <span className="visually-hidden">Until</span>
-            <input
-              className="input"
-              type="time"
-              step={60}
-              value={entry.until ?? ""}
-              onChange={(event) => onChange({ until: event.target.value || undefined })}
-            />
-          </label>
+          {!allDay && (
+            <>
+              <label>
+                <span className="visually-hidden">From</span>
+                <input
+                  id={`${id}-from`}
+                  className="input"
+                  type="time"
+                  step={60}
+                  value={entry.from ?? "00:00"}
+                  onChange={(event) => onChange({ from: event.target.value || undefined })}
+                />
+              </label>
+              <span className="annotation" aria-hidden="true">
+                to
+              </span>
+              <label>
+                <span className="visually-hidden">Until</span>
+                <input
+                  className="input"
+                  type="time"
+                  step={60}
+                  value={entry.until ?? "00:00"}
+                  onChange={(event) => onChange({ until: event.target.value || undefined })}
+                />
+              </label>
+            </>
+          )}
         </div>
         <div className={styles.strip}>
           <DayStrip day="monday" entries={[{ entry: window, name: "" }]} hours={index === count - 1} label={`${daysLabel(entry.days)}, ${windowLabel(entry)}`} />

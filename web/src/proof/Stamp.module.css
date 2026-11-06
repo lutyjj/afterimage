@@ -19,7 +19,6 @@
 
 /* Cancelled: a stroke drawn through the stamp, and the stamp kept. */
 .stamp[data-cancelled] {
-  color: rgb(194 55 45 / 0.6);
   border-color: rgb(226 72 61 / 0.5);
   outline-color: rgb(226 72 61 / 0.5);
 }

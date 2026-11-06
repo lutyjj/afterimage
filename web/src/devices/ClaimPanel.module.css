@@ -1,9 +1,9 @@
 .panel {
+  position: relative;
   display: grid;
   gap: var(--space-4);
   padding: var(--space-5);
-  border: 1px solid var(--blue-rule);
-  background: var(--paper-sunk);
+  background: var(--white);
 }
 
 .title {

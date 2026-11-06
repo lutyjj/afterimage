@@ -104,6 +104,7 @@ function Node({
   return (
     <details className={styles.branch} open={depth < 2}>
       <summary>
+        <ChevronRight size={12} className={styles.chevron} aria-hidden="true" />
         <button
           type="button"
           className={styles.copyBranch}

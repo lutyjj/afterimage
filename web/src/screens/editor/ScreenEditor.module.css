@@ -21,9 +21,10 @@
   font-size: var(--text-sm);
 }
 
-.trail a::before {
-  content: "←";
-  margin-right: 0.4em;
+.trail a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
 }
 
 .name {
@@ -113,6 +114,7 @@
 
 .starter {
   display: grid;
+  align-content: start;
   gap: 0.125rem;
   width: 15rem;
   height: 100%;
@@ -213,10 +215,11 @@
     linear-gradient(to bottom, rgb(47 111 214 / 0.45) 1px, transparent 1px);
 }
 
+/* The centre lines: dashed, so they read apart from the 200-pixel guides. */
 .centerX,
 .centerY {
   position: absolute;
-  background: rgb(226 72 61 / 0.55);
+  --dash: rgb(47 111 214 / 0.7);
 }
 
 .centerX {
@@ -224,6 +227,7 @@
   bottom: 0;
   left: 50%;
   width: 1px;
+  background: repeating-linear-gradient(to bottom, var(--dash) 0 6px, transparent 6px 10px);
 }
 
 .centerY {
@@ -231,6 +235,7 @@
   right: 0;
   top: 50%;
   height: 1px;
+  background: repeating-linear-gradient(to right, var(--dash) 0 6px, transparent 6px 10px);
 }
 
 .problems ul {

@@ -1,6 +1,6 @@
 import type { Display, Screen, ScreenDocument } from "@afterimage/management-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Grid3x3 } from "lucide-react";
+import { ArrowLeft, Grid3x3 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useBlocker, useLocation, useNavigate, useParams } from "react-router";
 
@@ -155,7 +155,10 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
     <div className={styles.page}>
       <header className={styles.head}>
         <nav className={styles.trail} aria-label="Breadcrumb">
-          <Link to="/screens">Screens</Link>
+          <Link to="/screens">
+            <ArrowLeft size={14} aria-hidden="true" />
+            Screens
+          </Link>
         </nav>
         <label className={styles.name}>
           <span className="visually-hidden">Screen name</span>

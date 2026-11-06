@@ -4,6 +4,7 @@ import { EditorSelection, StateEffect, StateField } from "@codemirror/state";
 import { tags } from "@lezer/highlight";
 import { basicSetup, EditorView } from "codemirror";
 import { yamlSchema } from "codemirror-json-schema/yaml";
+import { wrappedLineIndent } from "codemirror-wrapped-line-indent";
 import { useEffect, useRef, type Ref } from "react";
 
 import { documentSchema } from "./schema";
@@ -65,9 +66,9 @@ const yamlLinter = linter((view) =>
 const highlight = HighlightStyle.define([
   { tag: [tags.propertyName, tags.definition(tags.propertyName)], color: "#2659b8", fontWeight: "560" },
   { tag: [tags.string, tags.content], color: "#1b1b19" },
-  { tag: [tags.number, tags.bool, tags.null, tags.atom], color: "#7a3fb0" },
-  { tag: [tags.comment, tags.meta], color: "#6f7f9e", fontStyle: "italic" },
-  { tag: [tags.punctuation, tags.separator, tags.squareBracket, tags.brace], color: "#6f7f9e" },
+  { tag: [tags.number, tags.bool, tags.null, tags.atom], color: "var(--ink-soft)" },
+  { tag: [tags.comment, tags.meta], color: "var(--blue-gray)", fontStyle: "italic" },
+  { tag: [tags.punctuation, tags.separator, tags.squareBracket, tags.brace], color: "var(--blue-gray)" },
 ]);
 
 const theme = EditorView.theme({
@@ -75,7 +76,7 @@ const theme = EditorView.theme({
   ".cm-scroller": { fontFamily: "var(--mono)", lineHeight: "1.6" },
   ".cm-content": { caretColor: "#2f6fd6", padding: "12px 0" },
   ".cm-cursor": { borderLeftColor: "#2f6fd6", borderLeftWidth: "2px" },
-  ".cm-gutters": { backgroundColor: "#f7f6f1", color: "#7f93bd", borderRight: "1px solid #c7d8f5" },
+  ".cm-gutters": { backgroundColor: "#f7f6f1", color: "var(--blue-gray)", borderRight: "1px solid #c7d8f5" },
   ".cm-activeLineGutter": { backgroundColor: "#e6eefb", color: "#2659b8" },
   ".cm-activeLine": { backgroundColor: "rgb(230 238 251 / 0.45)" },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": { backgroundColor: "#d3e1f8" },
@@ -122,6 +123,10 @@ export function Editor({ initial, onChange, problems, label, ref }: EditorProps)
       extensions: [
         basicSetup,
         indentUnit.of("  "),
+        // Long templates wrap under their own indentation, so the pane beside the
+        // proof never hides the end of a line.
+        EditorView.lineWrapping,
+        wrappedLineIndent,
         yamlSchema(documentSchema as Parameters<typeof yamlSchema>[0]),
         yamlLinter,
         serverProblems,

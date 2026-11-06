@@ -244,6 +244,9 @@ importers:
       codemirror-json-schema:
         specifier: ^0.8.1
         version: 0.8.1(@codemirror/language@6.13.1)(@codemirror/lint@6.9.7)(@codemirror/state@6.7.6)(@codemirror/view@6.43.15)(@lezer/common@1.5.5)
+      codemirror-wrapped-line-indent:
+        specifier: 1.0.9
+        version: 1.0.9(@codemirror/language@6.13.1)(@codemirror/state@6.7.6)(@codemirror/view@6.43.15)
       lucide-react:
         specifier: ^1.68.0
         version: 1.68.0(@types/react@19.3.0)(react@19.3.1)
@@ -814,6 +817,13 @@ packages:
 
   codemirror-json5@1.0.3:
     resolution: {integrity: sha512-HmmoYO2huQxoaoG5ARKjqQc9mz7/qmNPvMbISVfIE2Gk1+4vZQg9X3G6g49MYM5IK00Ol3aijd7OKrySuOkA7Q==}
+
+  codemirror-wrapped-line-indent@1.0.9:
+    resolution: {integrity: sha512-oc976hHLt35u6Ojbhub+IWOxEpapZSqYieLEdGhsgFZ4rtYQtdb5KjxzgjCCyVe3t0yk+a6hmaIOEsjU/tZRxQ==}
+    peerDependencies:
+      '@codemirror/language': ^6.9.0
+      '@codemirror/state': ^6.2.1
+      '@codemirror/view': ^6.17.1
 
   codemirror@6.0.2:
     resolution: {integrity: sha512-VhydHotNW5w1UGK0Qj96BwSk/Zqbp9WbnyK2W/eVMv4QyF41INRGpjUhFJY7/uDNuudSc33a/PKr4iDqRduvHw==}
@@ -1948,6 +1958,12 @@ snapshots:
       json5: 2.2.3
       lezer-json5: 2.0.2
     optional: true
+
+  codemirror-wrapped-line-indent@1.0.9(@codemirror/language@6.13.1)(@codemirror/state@6.7.6)(@codemirror/view@6.43.15):
+    dependencies:
+      '@codemirror/language': 6.13.1
+      '@codemirror/state': 6.7.6
+      '@codemirror/view': 6.43.15
 
   codemirror@6.0.2:
     dependencies:

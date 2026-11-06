@@ -92,7 +92,7 @@ export function Proof({
         <span className="annotation">
           {paletteName && <span className={styles.palette}>{paletteName}</span>}
           {shownWidth} × {shownHeight}
-          <span className={styles.scale}>{scaleLabel(scale)}</span>
+          {src && <span className={styles.scale}>{scaleLabel(scale)}</span>}
         </span>
       </figcaption>
     </figure>
