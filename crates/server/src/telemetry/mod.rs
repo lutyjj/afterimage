@@ -92,20 +92,21 @@ pub fn broker_url(text: &str) -> Result<url::Url, String> {
     if !url.username().is_empty() || url.password().is_some() {
         return Err("takes no credentials; set the MQTT username and password".to_owned());
     }
-    // One spelling for one broker, with or without a closing slash.
+    // One spelling for one broker: no closing slash, and the port the client
+    // connects to when none is given (rumqttc's 1883, or 8883 with TLS).
     url.set_path("");
+    if url.port().is_none() {
+        let port = if url.scheme() == "mqtts" { 8883 } else { 1883 };
+        url.set_port(Some(port))
+            .map_err(|()| "must name a host".to_owned())?;
+    }
     Ok(url)
 }
 
 /// Whether two addresses name one broker: the same scheme, host and port.
 #[must_use]
 pub fn same_broker(one: &url::Url, other: &url::Url) -> bool {
-    (one.scheme(), one.host_str(), one.port_or_known_default())
-        == (
-            other.scheme(),
-            other.host_str(),
-            other.port_or_known_default(),
-        )
+    (one.scheme(), one.host_str(), one.port()) == (other.scheme(), other.host_str(), other.port())
 }
 
 /// The connection to the broker.
@@ -260,5 +261,37 @@ impl Telemetry {
     fn send(&self, command: Command) {
         // The task outlives every sender but at shutdown.
         let _ = self.commands.send(command);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn one_broker_has_one_address_however_it_is_spelt() {
+        let same = |one: &str, other: &str| {
+            same_broker(&broker_url(one).unwrap(), &broker_url(other).unwrap())
+        };
+        assert!(same(
+            "mqtt://broker.example.test",
+            "mqtt://broker.example.test:1883/"
+        ));
+        assert!(same(
+            "mqtts://broker.example.test",
+            "mqtts://broker.example.test:8883"
+        ));
+        assert!(!same(
+            "mqtt://broker.example.test",
+            "mqtts://broker.example.test"
+        ));
+        assert!(!same(
+            "mqtt://broker.example.test",
+            "mqtt://broker.example.test:1884"
+        ));
+        assert_eq!(
+            broker_url("mqtt://broker.example.test/").unwrap().as_str(),
+            "mqtt://broker.example.test:1883"
+        );
     }
 }

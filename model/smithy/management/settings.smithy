@@ -23,7 +23,9 @@ operation GetMqttSettings {
 
 /// Sets the broker, or with no `url` stops publishing. Another broker or other
 /// topics first clear what the server published, when its broker can be
-/// reached; other credentials only reconnect; the same settings change nothing.
+/// reached; other credentials keep it but mark the displays unavailable until
+/// the server is connected again, and while the broker refuses them; the same
+/// settings change nothing.
 @idempotent
 @http(method: "PUT", uri: "/manage/server/mqtt")
 @optionalAuth
