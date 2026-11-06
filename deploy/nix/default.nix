@@ -17,6 +17,14 @@ lib.makeScope pkgs.newScope (self: {
   # Boots the NixOS module (module.nix) with that package.
   moduleTest = self.callPackage ./module-test.nix { };
   lint = self.callPackage ./lint.nix { };
+  # The token generator with the release pins it reads, laid out as in tools/.
+  tokensSource = lib.fileset.toSource {
+    root = ../../tools;
+    fileset = lib.fileset.unions [
+      ../../tools/tokens
+      ../../tools/trmnl-release.json
+    ];
+  };
   tokens = self.callPackage ./tokens.nix { };
   # The pinned files of TRMNL's design system release.
   trmnlRelease = self.callPackage ./trmnl-release.nix { };

@@ -20,7 +20,8 @@ afterimage:
               - content: { value: { text: "42", size: xxlarge, fit: true } }
               - content: { value: { text: 7.4°, size: large } }
               - content: { value: { text: "48,206.62", tabular: true } }
-# The share of pixels, in percent, that may differ from TRMNL's rendering.
+# The profiles it is drawn on, each with the share of pixels, in percent, that
+# may differ from TRMNL's rendering.
 limits:
   og_png/bw: 0.88
   og_plus/gray-4: 1.2

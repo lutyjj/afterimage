@@ -4,13 +4,14 @@
   python3,
   playwright-driver,
   imagemagick,
+  git,
   server,
   trmnlRelease,
 }:
 
 # tools/parity/parity.py with what it needs: the server it draws with, Firefox
 # for TRMNL's side, ImageMagick for TRMNL's reduction, and the pinned release.
-# Pictures go to build/parity, or to $PARITY_OUT.
+# Pictures go to build/parity in the checkout it runs in, or to $PARITY_OUT.
 writeShellApplication {
   name = "afterimage-parity";
   runtimeInputs = [
@@ -21,12 +22,13 @@ writeShellApplication {
       packages.pyyaml
     ]))
     imagemagick
+    git
   ];
   text = ''
     export PLAYWRIGHT_BROWSERS_PATH=${playwright-driver.browsers}
     export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
     exec python3 -I ${../../tools/parity}/parity.py ${lib.getExe' server "afterimage"} \
       ${trmnlRelease} ${../../tools/trmnl-release.json} ${../../crates/trmnl/catalog} \
-      "''${PARITY_OUT:-build/parity}" "$@"
+      "''${PARITY_OUT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)/build/parity}" "$@"
   '';
 }

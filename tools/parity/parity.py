@@ -8,11 +8,15 @@ trmnlp's image quantizer does. Afterimage's side is the image its management
 API's `PreviewScreen` answers, from a server the harness starts on an empty data
 directory, so the two meet only at the API.
 
-For every case and profile it writes OUT_DIR/<case>/<model>_<palette>.png
-(TRMNL, Afterimage, and an overlay: black where both have ink, red where only
-TRMNL has, blue where only Afterimage has) and prints the share of pixels that
-differ. It exits with 1 when a share is over the case's limit for the profile,
-which each case states in percent.
+A case names the profiles it is drawn on, as `model/palette` from TRMNL's
+catalogue, by stating each one's limit: the share of pixels, in percent, that
+may differ. For each it writes OUT_DIR/<case>/<model>_<palette>.png (TRMNL,
+Afterimage, and an overlay: black where both have ink, red where only TRMNL
+has, blue where only Afterimage has) and prints the share. It exits with 1 when
+a share is over its limit.
+
+The harness speaks the management API's published wire format as any script
+does, so it builds on nothing of the server's but that contract.
 
 Usage: parity.py SERVER RELEASE_DIR PINS CATALOG_DIR OUT_DIR [CASE...]
 
@@ -40,7 +44,6 @@ from PIL import Image
 from playwright.sync_api import sync_playwright
 
 CASES = Path(__file__).parent / "cases"
-PROFILES = ["og_png/bw", "og_plus/gray-4", "v2/bw", "v2/gray-4"]
 
 PAGE = """<!DOCTYPE html><html><head>
 <link rel="stylesheet" href="https://trmnl.test/css/plugins.css">
@@ -100,7 +103,9 @@ class Catalog:
     def screen(self, profile: str):
         """The model, the palette, and the classes and variables TRMNL gives the
         screen element of a device with them and the default font."""
-        model_name, palette_id = profile.split("/")
+        model_name, _, palette_id = profile.partition("/")
+        if model_name not in self.models or palette_id not in self.palettes:
+            raise ValueError(f"{profile} is not a model and palette of TRMNL's catalogue")
         model, palette = self.models[model_name], self.palettes[palette_id]
         css = model["css"]
         classes = " ".join(
@@ -132,6 +137,13 @@ class Server:
         self.http = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar())
         )
+        try:
+            self.start()
+        except BaseException:
+            self.stop()
+            raise
+
+    def start(self):
         deadline = time.monotonic() + 30
         while True:
             try:
@@ -139,7 +151,7 @@ class Server:
                 break
             except OSError:
                 if time.monotonic() > deadline or self.process.poll() is not None:
-                    sys.exit("the server did not start")
+                    raise RuntimeError("the server did not start")
                 time.sleep(0.1)
         self.post("/manage/auth/first-account",
                   {"name": "Parity", "username": "parity", "password": "parity-harness"})
@@ -230,23 +242,24 @@ def main(server_binary, release_dir, pins, catalog_dir, out, names):
             browser = playwright.firefox.launch()
             for name in names:
                 case = yaml.safe_load((CASES / f"{name}.yaml").read_text())
-                limits = case.get("limits", {})
-                for profile in PROFILES:
+                limits = case.get("limits") or {}
+                if not limits:
+                    over.append(f"{name}, which names no profile")
+                for profile, limit in limits.items():
                     trmnl = capture(browser, release, catalog, case["trmnl"], profile)
                     afterimage = server.draw(case["afterimage"], profile)
                     share = compare(trmnl, afterimage, out / name / f"{profile.replace('/', '_')}.png")
                     percent = share * 100
-                    limit = limits.get(profile)
-                    verdict = "no limit" if limit is None else ("over" if percent > limit else "ok")
+                    verdict = "over" if percent > limit else "ok"
                     if verdict != "ok":
                         over.append(f"{name} {profile}")
-                    print(f"{name:<12} {profile:<16} {percent:7.4f}%  limit {'-' if limit is None else f'{limit:g}%'}  {verdict}")
+                    print(f"{name:<12} {profile:<16} {percent:7.4f}%  limit {limit:g}%  {verdict}")
             browser.close()
     finally:
         server.stop()
     print(f"pictures in {out}")
     if over:
-        sys.exit(f"over or without a limit: {', '.join(over)}")
+        sys.exit(f"over its limit: {', '.join(over)}")
 
 
 if __name__ == "__main__":
