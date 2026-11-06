@@ -81,9 +81,13 @@ async fn a_claimed_device_is_a_home_assistant_device() {
     assert_eq!(state["signal"], -61);
     assert_eq!(state["seen_at"], "2027-01-15T08:00:00Z");
     assert_eq!(state["screen"], "Nothing yet");
+    // TRMNL names no board og, so there is no newest release, and Home
+    // Assistant's update entity refuses a null version.
     let firmware = observer.wait(FIRMWARE, |_| true).await;
-    assert_eq!(firmware["installed_version"], "1.8.18");
-    assert_eq!(firmware["in_progress"], false);
+    assert_eq!(
+        firmware,
+        json!({ "installed_version": "1.8.18", "in_progress": false, "title": "TRMNL firmware" })
+    );
 
     server.clock.advance(900);
     let weaker = Readings {

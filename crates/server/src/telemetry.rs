@@ -406,7 +406,8 @@ fn state(device: &Device, screen: &str) -> Value {
 
 /// The device's firmware, in the shape of Home Assistant's update entity. An
 /// install request between its request and the check-in that decides it is in
-/// progress.
+/// progress. A version the server does not know is left out: the entity refuses
+/// a null one, which it reads as a string.
 fn firmware_state(device: &Device, boards: Option<&[Board]>) -> Value {
     let latest = boards
         .and_then(|boards| Firmware::board(boards, device))
@@ -418,12 +419,16 @@ fn firmware_state(device: &Device, boards: Option<&[Board]>) -> Value {
             firmware::State::Requested | firmware::State::Sent
         )
     });
-    json!({
-        "installed_version": device.readings.firmware_version,
-        "latest_version": latest,
-        "in_progress": in_progress,
-        "title": "TRMNL firmware",
-    })
+    let mut state = json!({ "in_progress": in_progress, "title": "TRMNL firmware" });
+    if let Some(state) = state.as_object_mut() {
+        if let Some(installed) = &device.readings.firmware_version {
+            state.insert("installed_version".to_owned(), json!(installed));
+        }
+        if let Some(latest) = latest {
+            state.insert("latest_version".to_owned(), json!(latest));
+        }
+    }
+    state
 }
 
 /// The device's discovery payload: the device, the server as its origin, and
