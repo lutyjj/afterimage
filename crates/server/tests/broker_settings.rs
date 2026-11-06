@@ -255,7 +255,12 @@ async fn tokens_act_as_their_account_on_the_broker_settings() {
     let with = |secret: String, method: &'static str, body: Option<Value>| {
         let url = format!("{}{SETTINGS}", server.url);
         async move {
-            let mut request = reqwest::Client::new()
+            // No CA store: the Nix sandbox has none, and the server is plain HTTP.
+            let client = reqwest::Client::builder()
+                .tls_certs_only([])
+                .build()
+                .unwrap();
+            let mut request = client
                 .request(reqwest::Method::from_bytes(method.as_bytes()).unwrap(), url)
                 .bearer_auth(secret);
             if let Some(body) = body {
