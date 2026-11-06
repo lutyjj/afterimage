@@ -6,7 +6,8 @@ use std::sync::Arc;
 
 use std::convert::Infallible;
 
-use http::{Request, Response, StatusCode};
+use http::header::{CACHE_CONTROL, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED};
+use http::{HeaderValue, Request, Response, StatusCode};
 use hyper::body::Incoming;
 use afterimage_device_api::server::body::{BoxBody, boxed};
 use tower::steer::Steer;
@@ -121,8 +122,9 @@ pub async fn build(
 /// The whole server as one service: what `serve` runs and the tests call.
 pub type App = BoxCloneService<Request<Incoming>, Response<BoxBody>, Infallible>;
 
-/// Sends `/api/` to the device API, `/manage/` to the management API, and every
-/// other path to the web UI: a file, or its shell for a client route.
+/// Sends `/api/` to the device API, `/manage/` to the management API, `/assets/`
+/// to the web UI's built assets, and every other path to the web UI: a file, or
+/// its shell for a client route.
 fn router<D, M>(device: D, management: M, web_dir: Option<&Path>) -> App
 where
     D: Service<Request<BoxBody>, Response = Response<BoxBody>, Error = Infallible>
@@ -137,32 +139,74 @@ where
     M::Future: Send + 'static,
 {
     let boxed_request = |request: Request<Incoming>| request.map(boxed);
-    let web = match web_dir {
-        Some(directory) => {
-            let files =
-                ServeDir::new(directory).fallback(ServeFile::new(directory.join("index.html")));
-            BoxCloneService::new(ServiceExt::<Request<Incoming>>::map_response(
-                files,
-                |response| response.map(boxed),
-            ))
-        }
-        None => BoxCloneService::new(service_fn(|_: Request<Incoming>| async {
-            let mut response = Response::new(boxed(String::new()));
-            *response.status_mut() = StatusCode::NOT_FOUND;
-            Ok::<_, Infallible>(response)
-        })),
+    let (assets, shell) = match web_dir {
+        Some(directory) => (assets(directory), shell(directory)),
+        None => (not_found(), not_found()),
     };
     let services = vec![
         BoxCloneService::new(device.map_request(boxed_request)),
         BoxCloneService::new(management.map_request(boxed_request)),
-        web,
+        assets,
+        shell,
     ];
     BoxCloneService::new(Steer::new(
         services,
         |request: &Request<Incoming>, _: &[_]| match request.uri().path() {
             path if path.starts_with("/api/") => 0,
             path if path.starts_with("/manage/") => 1,
-            _ => 2,
+            path if path.starts_with("/assets/") => 2,
+            _ => 3,
         },
     ))
+}
+
+type Web = BoxCloneService<Request<Incoming>, Response<BoxBody>, Infallible>;
+
+/// The build's assets, which Vite names by a hash of their content: a name
+/// never changes what it holds, so browsers keep them, and a missing one is
+/// missing rather than the shell.
+fn assets(directory: &Path) -> Web {
+    BoxCloneService::new(ServiceExt::<Request<Incoming>>::map_response(
+        ServeDir::new(directory),
+        |mut response| {
+            if response.status().is_success() {
+                response.headers_mut().insert(
+                    CACHE_CONTROL,
+                    HeaderValue::from_static("public, max-age=31536000, immutable"),
+                );
+            }
+            response.map(boxed)
+        },
+    ))
+}
+
+/// The shell and every other unhashed file, sent whole on every request. The
+/// Nix store gives every file one modification time, from which `ServeDir`
+/// builds its validators, so a validator would call an upgraded shell
+/// unchanged and leave the browser on a shell whose assets are gone.
+fn shell(directory: &Path) -> Web {
+    let files = ServeDir::new(directory).fallback(ServeFile::new(directory.join("index.html")));
+    BoxCloneService::new(
+        files
+            .map_request(|mut request: Request<Incoming>| {
+                request.headers_mut().remove(IF_NONE_MATCH);
+                request.headers_mut().remove(IF_MODIFIED_SINCE);
+                request
+            })
+            .map_response(|mut response| {
+                let headers = response.headers_mut();
+                headers.remove(ETAG);
+                headers.remove(LAST_MODIFIED);
+                headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+                response.map(boxed)
+            }),
+    )
+}
+
+fn not_found() -> Web {
+    BoxCloneService::new(service_fn(|_: Request<Incoming>| async {
+        let mut response = Response::new(boxed(String::new()));
+        *response.status_mut() = StatusCode::NOT_FOUND;
+        Ok::<_, Infallible>(response)
+    }))
 }
