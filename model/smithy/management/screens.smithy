@@ -599,9 +599,11 @@ list ScreenSummaries {
     member: ScreenSummary
 }
 
+/// The account's screens, by name, without their documents.
 @readonly
 @http(method: "GET", uri: "/manage/screens")
 @optionalAuth
+@tags(["mcp"])
 operation ListScreens {
     output := {
         @required
@@ -609,8 +611,12 @@ operation ListScreens {
     }
 }
 
+/// Saves a new screen. A document that cannot be drawn is still saved, so draw it
+/// with `PreviewScreen` first: a device whose screen fails stays on its last
+/// image.
 @http(method: "POST", uri: "/manage/screens", code: 201)
 @optionalAuth
+@tags(["mcp"])
 operation CreateScreen {
     input := {
         @required
@@ -626,9 +632,11 @@ operation CreateScreen {
     }
 }
 
+/// The screen with its document.
 @readonly
 @http(method: "GET", uri: "/manage/screens/{screenId}")
 @optionalAuth
+@tags(["mcp"])
 operation GetScreen {
     input := {
         @required
@@ -646,9 +654,12 @@ operation GetScreen {
     ]
 }
 
+/// Replaces the screen's name and document. Every device whose playlist holds it
+/// shows the new document from its next check-in.
 @idempotent
 @http(method: "PUT", uri: "/manage/screens/{screenId}")
 @optionalAuth
+@tags(["mcp"])
 operation UpdateScreen {
     input := {
         @required
@@ -676,6 +687,7 @@ operation UpdateScreen {
 @idempotent
 @http(method: "DELETE", uri: "/manage/screens/{screenId}", code: 204)
 @optionalAuth
+@tags(["mcp"])
 operation DeleteScreen {
     input := {
         @required
@@ -692,6 +704,7 @@ operation DeleteScreen {
 /// each data source answered.
 @http(method: "POST", uri: "/manage/preview")
 @optionalAuth
+@tags(["mcp"])
 operation PreviewScreen {
     input := {
         @required

@@ -16,6 +16,7 @@ pub async fn get_server(
     let (default_model, default_palette) =
         Catalog::get().default_display("", None, Renderer::supports);
     Ok(output::GetServerOutput {
+        version: env!("CARGO_PKG_VERSION").to_owned(),
         time_zone: state.time_zone.clone(),
         secret_names: state.secret_names.clone(),
         default_display: model::Display {

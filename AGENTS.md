@@ -34,7 +34,8 @@ For API changes, update `model/smithy/` first, then regenerate and implement.
 Generated output is never edited by hand. Each project builds on its own and
 depends on the others only through code generated from the model, except that
 any Rust project may use the shared library `crates/trmnl`, and the server links
-the renderer library `crates/render-typst`, which draws in its process. The Rust projects
+the renderer library `crates/render-typst`, which draws in its process, and the
+MCP library `crates/mcp`, which reaches the management API in its process. The Rust projects
 share one Cargo workspace, so every Cargo command needs `gen/` (the contract and
 the renderer's design): run `tools/generate` first in a fresh checkout.
 

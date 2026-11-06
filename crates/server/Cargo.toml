@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 afterimage-device-api = { path = "../../gen/device-api" }
 afterimage-management-api = { path = "../../gen/management-api", features = ["serde"] }
+afterimage-mcp = { path = "../mcp" }
 afterimage-render-typst = { path = "../render-typst" }
 afterimage-trmnl = { path = "../trmnl" }
 
@@ -43,6 +44,7 @@ jiff = { version = "0.2.39", features = ["tzdb-bundle-always"] }
 minijinja = { version = "3.0.5", features = ["fuel", "json", "loop_controls", "serde", "urlencode"] }
 minijinja-contrib = { version = "3.0.5", features = ["datetime", "timezone", "pycompat"] }
 http-body = "1.0.1"
+http-body-util = "0.1.5"
 hyper = "1.12.0"
 # Device state for Home Assistant over MQTT.
 rumqttc = "0.25.1"

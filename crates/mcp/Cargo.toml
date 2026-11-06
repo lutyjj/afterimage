@@ -1,0 +1,29 @@
+[package]
+name = "afterimage-mcp"
+description = "An MCP endpoint over the management API: its tools come from the API's OpenAPI document, and the API answers each call."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+base64 = "0.23.1"
+bytes = "1.12.1"
+http = "1.5.0"
+http-body = "1.0.1"
+http-body-util = "0.1.5"
+percent-encoding = "2.3.2"
+# The official SDK, which owns protocol negotiation and the streamable HTTP
+# transport. Stateless JSON answers only: every tool is one request and one
+# answer, so there is no session to keep and nothing to stream.
+rmcp = { version = "3.9.0", default-features = false, features = ["server", "transport-streamable-http-server"] }
+serde_json.workspace = true
+thiserror = "2.0.21"
+tower = { version = "0.5.3", features = ["util"] }
+tracing = "0.1.44"
+
+[dev-dependencies]
+tokio = { version = "1.54.1", features = ["macros", "rt"] }
+
+[lints]
+workspace = true

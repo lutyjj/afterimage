@@ -1,5 +1,6 @@
 //! The server assembled from its settings: the stores over one database, the
-//! device API, the management API and the web UI behind one router.
+//! device API, the management API, its MCP endpoint and the web UI behind one
+//! router.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -7,8 +8,11 @@ use std::sync::Arc;
 use std::convert::Infallible;
 
 use afterimage_device_api::server::body::{BoxBody, boxed};
+use afterimage_mcp::{Api, Catalog, Endpoint};
+use bytes::Bytes;
 use http::header::{CACHE_CONTROL, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED};
 use http::{HeaderValue, Request, Response, StatusCode};
+use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
 use tower::steer::Steer;
 use tower::util::BoxCloneService;
@@ -43,6 +47,13 @@ pub enum Error {
     Settings(String),
 }
 
+/// The management API's contract as this build serves it, from `tools/generate`,
+/// whose operations tagged `mcp` are the MCP endpoint's tools.
+const CONTRACT: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../gen/management-api.openapi.json"
+));
+
 /// The broker to publish to: the deployment's, or else the one the
 /// administrator saved, or none until one is saved. A saved broker the server
 /// no longer reads, such as an address with a query that an earlier release
@@ -75,6 +86,11 @@ async fn broker(config: &Config, saved: &Saved) -> Result<Option<telemetry::Sett
 ///
 /// When the data directory or the database cannot be opened, or the settings
 /// contradict each other.
+///
+/// # Panics
+///
+/// When the contract this build embeds tags an operation the MCP endpoint cannot
+/// serve, which every test that builds the server catches.
 pub async fn build(
     config: &Config,
     secrets: Secrets,
@@ -169,20 +185,53 @@ pub async fn build(
         public_url: config.public_url.clone(),
         clock,
     });
+    let management = management_api::service(state);
+    let catalog = Catalog::from_openapi(CONTRACT, "GetAccount")
+        .expect("the contract this build embeds holds the MCP endpoint's tools");
+    let mcp = Endpoint::new(catalog, in_process(management.clone()));
     Ok(router(
         device_api::service(device_state),
-        management_api::service(state),
+        management,
+        mcp,
         config.web_dir.as_deref(),
     ))
+}
+
+/// The management API as the MCP endpoint reaches it: whole bodies, no socket.
+fn in_process<M>(management: M) -> Api
+where
+    M: Service<Request<BoxBody>, Response = Response<BoxBody>, Error = Infallible>
+        + Clone
+        + Send
+        + 'static,
+    M::Future: Send + 'static,
+{
+    Api::new(service_fn(move |request: Request<Bytes>| {
+        let management = management.clone();
+        async move {
+            let response = management
+                .oneshot(request.map(|body| boxed(Full::new(body))))
+                .await?;
+            let (parts, body) = response.into_parts();
+            // A body the API fails to write midway reaches the tool as an empty
+            // answer of the status it began.
+            let body = body
+                .collect()
+                .await
+                .map(http_body_util::Collected::to_bytes)
+                .unwrap_or_default();
+            Ok(Response::from_parts(parts, body))
+        }
+    }))
 }
 
 /// The whole server as one service: what `serve` runs and the tests call.
 pub type App = BoxCloneService<Request<Incoming>, Response<BoxBody>, Infallible>;
 
-/// Sends `/api/` to the device API, `/manage/` to the management API, `/assets/`
-/// to the web UI's built assets, and every other path to the web UI: a file, or
-/// its shell for a client route.
-fn router<D, M>(device: D, management: M, web_dir: Option<&Path>) -> App
+/// Sends `/api/` to the device API, `/manage/` to the management API, `/mcp` to
+/// its MCP endpoint, `/assets/` to the web UI's built assets, and every other
+/// path to the web UI: a file, or its shell for a client route.
+fn router<D, M>(device: D, management: M, mcp: Endpoint, web_dir: Option<&Path>) -> App
 where
     D: Service<Request<BoxBody>, Response = Response<BoxBody>, Error = Infallible>
         + Clone
@@ -203,6 +252,10 @@ where
     let services = vec![
         BoxCloneService::new(device.map_request(boxed_request)),
         BoxCloneService::new(management.map_request(boxed_request)),
+        BoxCloneService::new(ServiceExt::<Request<Incoming>>::map_response(
+            mcp,
+            |response| response.map(boxed),
+        )),
         assets,
         shell,
     ];
@@ -211,8 +264,9 @@ where
         |request: &Request<Incoming>, _: &[_]| match request.uri().path() {
             path if path.starts_with("/api/") => 0,
             path if path.starts_with("/manage/") => 1,
-            path if path.starts_with("/assets/") => 2,
-            _ => 3,
+            "/mcp" => 2,
+            path if path.starts_with("/assets/") => 3,
+            _ => 4,
         },
     ))
 }

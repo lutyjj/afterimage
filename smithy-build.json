@@ -53,7 +53,8 @@
         "openapi": {
           "service": "afterimage.management#Management",
           "protocol": "aws.protocols#restJson1",
-          "useIntegerType": true
+          "useIntegerType": true,
+          "tags": true
         },
         "rust-server-codegen": {
           "service": "afterimage.management#Management",

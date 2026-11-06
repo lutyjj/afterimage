@@ -12,7 +12,7 @@ React with Vite and TypeScript, on the TypeScript client generated from the Smit
 
 ## Users
 
-The person who runs a Afterimage server for a household or a small group: they set devices up, write screens and arrange what each device shows. They write screens at a desk, with the preview beside the editor, and claim devices on a phone while standing next to the display reading its code. Other people of the household sign in to glance at their devices.
+The person who runs an Afterimage server for a household or a small group: they set devices up, write screens and arrange what each device shows. They write screens at a desk, with the preview beside the editor, and claim devices on a phone while standing next to the display reading its code. Other people of the household sign in to glance at their devices.
 
 ## Product Purpose
 

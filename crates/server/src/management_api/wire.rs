@@ -60,7 +60,7 @@ pub fn device(device: Device, boards: Option<&[Board]>) -> Result<model::Device,
     Ok(model::Device {
         id: fit(device.id)?,
         name: fit(device.name)?,
-        mac: device.mac,
+        mac: fit(device.mac)?,
         firmware_model: device.firmware_model,
         display: model::Display {
             model: fit(device.display.model)?,

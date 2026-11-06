@@ -17,7 +17,7 @@ The Smithy model in `model/smithy/` is the single source of truth. One build gen
 | Service | Contract owner | Caller |
 |---|---|---|
 | Device API | TRMNL firmware | Devices |
-| Management API | Afterimage | Web UI |
+| Management API | Afterimage | Web UI, scripts, and agents through MCP |
 
 The device API mirrors the four device operations TRMNL documents: `GET /api/setup`, `GET /api/display`, `GET /api/display/current` and `POST /api/log`; firmware 1.8.18 calls all but `/api/display/current`. TRMNL publishes them in its OpenAPI document (`https://trmnl.com/api-docs/openapi.json`); `model/trmnl/device-api.json` is the excerpt that `tools/trmnl-excerpt` takes from it, and the conformance test fails on any operation, header, body field or response field that the generated document and the excerpt do not share. The model adds one operation of Afterimage's own, `GET /api/images/{name}` for the images check-ins name, which the conformance test lists as an addition.
 
@@ -25,7 +25,7 @@ Where the document and the firmware disagree, the firmware decides. Headers are 
 
 ## Components
 
-Each component builds on its own and depends on the others only through generated code, except that any Rust component may use the shared library `crates/trmnl`, and the server links the renderer library `crates/render-typst`, which draws in its process.
+Each component builds on its own and depends on the others only through generated code, except that any Rust component may use the shared library `crates/trmnl`, and the server links the renderer library `crates/render-typst`, which draws in its process, and the MCP library `crates/mcp`, which reaches the management API in its process.
 
 | Path | Owns |
 |---|---|
@@ -34,6 +34,7 @@ Each component builds on its own and depends on the others only through generate
 | `crates/trmnl/` | TRMNL firmware protocol (MAC addresses, reported readings, status values) and the snapshot of TRMNL's model and palette lists that `tools/trmnl-catalog` refreshes |
 | `crates/server/` | Device and management APIs, accounts and sessions, schedule, SQLite persistence, MQTT publishing |
 | `crates/render-typst/` | The render operation in Typst, with a component library that reads design tokens |
+| `crates/mcp/` | The MCP endpoint: the management API's tagged operations as tools |
 | `tools/tokens/` | Build-time generator of design tokens per render profile |
 | `web/` | Web UI on the generated TypeScript client |
 | `deploy/nix/` | Nix packages, the development shell and the NixOS module |
@@ -51,6 +52,12 @@ Each component builds on its own and depends on the others only through generate
 With a broker configured, the server publishes each claimed device with Home Assistant's device-based MQTT discovery: its battery (estimated as in step 3 where the firmware reports none), voltage, signal, last check-in and current screen as sensors, and its firmware as an update entity whose install command starts step 4 for the board's newest release. A device is keyed by its MAC, so it stays the same Home Assistant device across setups, and its link back leads to its page in the web UI; when accounts hold devices of one MAC, as after a device set up again is claimed elsewhere, the topics belong to the one that checked in last. Discovery, state and firmware topics are retained, and a fact the server does not know is left out, since Home Assistant drops a payload with a null where it reads text. The server publishes every device when it connects and when Home Assistant announces itself on its status topic, and one device at each check-in and change; removing a device clears its topics, and on connecting the server clears the retained topics of devices removed while the broker was out of reach. Every entity's availability follows the server's own status topic, which its last will sets offline. Whoever may publish to the broker may start an install, so the broker's access control is the boundary; a retained install command is ignored, since the broker would replay it at every connection. History belongs to whoever consumes the topics.
 
 The broker is the deployment's (`AFTERIMAGE_MQTT_URL` and the settings beside it), or else the one the administrator saves through the management API (the web UI's Server page), which takes effect at once; where the deployment sets one, the API only shows it, so a declarative deployment stays the one place it changes. A change of broker or topics first clears every topic the server published and disconnects cleanly, so the broker does not publish the last will, then connects with the new settings; where the old broker cannot be reached at that moment, what was published there stays. Other credentials keep what was published but mark the displays unavailable until the server is connected again, and for as long as the broker refuses them; the same settings change nothing. A saved password goes only to the broker and username it was given for: naming another asks for it again. The saved password stays in the database as written, since the server sends it to the broker, and no answer carries it.
+
+## MCP
+
+The server serves the Model Context Protocol at `/mcp`, so an agent writes screens, previews them and arranges playlists through the same management API as the web UI. The tools are the management operations the model tags `mcp`, read from the OpenAPI document the build embeds: a tool's name is the operation's, its description the operation's documentation, and its input the operation's input structure with every shape it refers to; the service's documentation is the endpoint's instructions. A model validator requires each tagged operation to be documented and to take a token. Operations that start or end sessions, manage tokens, change server settings or remove a device are not tagged.
+
+A call is a request to the management API in the server's own process, carrying the caller's `Authorization` and never a cookie, so a personal API token is the only credential: the API decides what the token may do, a read-only one included, and answers each call as it answers a script. Before the protocol sees a request, the endpoint asks `GetAccount` with its credential and returns the API's 401 and challenge when the API refuses it. The endpoint is stateless and answers JSON, since every tool is one request and one answer. An answer is text, except that an image the API answers, alone or as a base64 member of its JSON such as a preview's, goes to the client as an image the agent can look at.
 
 ## Screens and playlists
 

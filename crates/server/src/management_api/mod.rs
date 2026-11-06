@@ -17,6 +17,7 @@ mod wire;
 
 use std::convert::Infallible;
 use std::future::Future;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -26,10 +27,11 @@ use afterimage_management_api::server::operation::OperationShape;
 use afterimage_management_api::server::plugin::{HttpMarker, Plugin, Scoped};
 use afterimage_management_api::server::request::FromParts;
 use afterimage_management_api::server::response::IntoResponse;
+use afterimage_management_api::server::service::ServiceShape;
 use afterimage_management_api::server::{AddExtensionLayer, Extension};
 use afterimage_management_api::{Management, ManagementConfig, error, scope};
 use http::request::Parts;
-use http::{Method, Request, Response, StatusCode, header};
+use http::{HeaderValue, Method, Request, Response, StatusCode, header};
 use tower::Service;
 
 use crate::accounts::{Account, Accounts};
@@ -214,8 +216,18 @@ pub struct RequireSession {
     cookies: CookiePolicy,
 }
 
-impl<Ser, Op: OperationShape, S> Plugin<Ser, Op, S> for RequireSession {
-    type Output = Authenticate<S>;
+/// Every operation it guards lists the service's errors, so it refuses a request
+/// with the operation's own error type, as the protocol writes it.
+impl<Ser, Op, S> Plugin<Ser, Op, S> for RequireSession
+where
+    Ser: ServiceShape,
+    Op: OperationShape,
+    Op::Error: From<error::Unauthenticated>
+        + From<error::Forbidden>
+        + From<error::InternalFailure>
+        + IntoResponse<Ser::Protocol>,
+{
+    type Output = Authenticate<S, Ser::Protocol, Op::Error>;
 
     fn apply(&self, inner: S) -> Self::Output {
         Authenticate {
@@ -223,27 +235,44 @@ impl<Ser, Op: OperationShape, S> Plugin<Ser, Op, S> for RequireSession {
             sessions: Arc::clone(&self.sessions),
             tokens: Arc::clone(&self.tokens),
             cookies: self.cookies,
+            refusal: PhantomData,
         }
     }
 }
 
 impl HttpMarker for RequireSession {}
 
-#[derive(Clone)]
-pub struct Authenticate<S> {
+pub struct Authenticate<S, Protocol, Refusal> {
     inner: S,
     sessions: Arc<Sessions>,
     tokens: Arc<Tokens>,
     cookies: CookiePolicy,
+    refusal: PhantomData<fn() -> (Protocol, Refusal)>,
+}
+
+impl<S: Clone, Protocol, Refusal> Clone for Authenticate<S, Protocol, Refusal> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            sessions: Arc::clone(&self.sessions),
+            tokens: Arc::clone(&self.tokens),
+            cookies: self.cookies,
+            refusal: PhantomData,
+        }
+    }
 }
 
 type BoxFuture<E> = Pin<Box<dyn Future<Output = Result<Response<BoxBody>, E>> + Send>>;
 
-impl<S, B> Service<Request<B>> for Authenticate<S>
+impl<S, B, Protocol, Refusal> Service<Request<B>> for Authenticate<S, Protocol, Refusal>
 where
     S: Service<Request<B>, Response = Response<BoxBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
     B: Send + 'static,
+    Refusal: From<error::Unauthenticated>
+        + From<error::Forbidden>
+        + From<error::InternalFailure>
+        + IntoResponse<Protocol>,
 {
     type Response = Response<BoxBody>;
     type Error = S::Error;
@@ -277,13 +306,16 @@ where
         Box::pin(async move {
             if let Some(bearer) = authorization {
                 let Bearer::Secret(secret) = bearer else {
-                    return Ok(unauthenticated_token(
+                    return Ok(unauthenticated::<Protocol, Refusal>(
                         "Send a token as Authorization: Bearer and the token.",
+                        INVALID_TOKEN,
                     ));
                 };
                 return match tokens.grant(&secret).await {
                     Ok(Some(grant)) if grant.read_only && !reads => {
-                        Ok(forbidden("A read-only token cannot change anything."))
+                        Ok(refuse::<Protocol, Refusal>(error::Forbidden {
+                            message: "A read-only token cannot change anything.".to_owned(),
+                        }))
                     }
                     Ok(Some(grant)) => {
                         request.extensions_mut().insert(Caller {
@@ -292,17 +324,18 @@ where
                         });
                         inner.call(request).await
                     }
-                    Ok(None) => Ok(unauthenticated_token(
+                    Ok(None) => Ok(unauthenticated::<Protocol, Refusal>(
                         "This token is not one of this server's. It may have been revoked.",
+                        INVALID_TOKEN,
                     )),
-                    Err(error) => {
-                        tracing::error!(%error, "a token could not be read");
-                        Ok(failure())
-                    }
+                    Err(error) => Ok(refuse::<Protocol, Refusal>(internal(&error))),
                 };
             }
             let Some(token) = token else {
-                return Ok(unauthenticated("Sign in to use this."));
+                return Ok(unauthenticated::<Protocol, Refusal>(
+                    "Sign in to use this.",
+                    BEARER,
+                ));
             };
             match sessions.account(&token).await {
                 Ok(Some(account)) => {
@@ -312,11 +345,13 @@ where
                     });
                     inner.call(request).await
                 }
-                Ok(None) => Ok(unauthenticated("This session has ended. Sign in again.")),
-                Err(error) => {
-                    tracing::error!(%error, "a session could not be read");
-                    Ok(failure())
-                }
+                Ok(None) => Ok(unauthenticated::<Protocol, Refusal>(
+                    "This session has ended. Sign in again.",
+                    BEARER,
+                )),
+                // The session may be fine, so the caller must not take this for
+                // a sign-out.
+                Err(error) => Ok(refuse::<Protocol, Refusal>(internal(&error))),
             }
         })
     }
@@ -344,51 +379,30 @@ fn bearer(value: &str) -> Option<Bearer> {
     })
 }
 
-/// The model's `Unauthenticated` error as restJson1 writes it, with the bearer
-/// challenge RFC 6750 asks of a 401. Built here because the handler it guards
-/// never runs.
-fn unauthenticated(message: &str) -> Response<BoxBody> {
-    unauthorized(message, "Bearer")
+/// The bearer challenge RFC 6750 asks of a 401, and the one for a request whose
+/// token is not one.
+const BEARER: HeaderValue = HeaderValue::from_static("Bearer");
+const INVALID_TOKEN: HeaderValue = HeaderValue::from_static("Bearer error=\"invalid_token\"");
+
+/// The operation's answer for an error the plugin raises before its handler runs.
+fn refuse<Protocol, Refusal: IntoResponse<Protocol>>(
+    error: impl Into<Refusal>,
+) -> Response<BoxBody> {
+    error.into().into_response()
 }
 
-/// [`unauthenticated`] for a request whose token is not one.
-fn unauthenticated_token(message: &str) -> Response<BoxBody> {
-    unauthorized(message, "Bearer error=\"invalid_token\"")
-}
-
-fn unauthorized(message: &str, challenge: &'static str) -> Response<BoxBody> {
-    let body = serde_json::json!({ "message": message }).to_string();
-    Response::builder()
-        .status(StatusCode::UNAUTHORIZED)
-        .header(header::CONTENT_TYPE, "application/json")
-        .header(header::WWW_AUTHENTICATE, challenge)
-        .header("x-amzn-errortype", "Unauthenticated")
-        .body(boxed(body))
-        .expect("a status and three static headers")
-}
-
-/// The model's `Forbidden` error as restJson1 writes it, for a credential that may
-/// not make this request.
-fn forbidden(message: &str) -> Response<BoxBody> {
-    let body = serde_json::json!({ "message": message }).to_string();
-    Response::builder()
-        .status(StatusCode::FORBIDDEN)
-        .header(header::CONTENT_TYPE, "application/json")
-        .header("x-amzn-errortype", "Forbidden")
-        .body(boxed(body))
-        .expect("a status and two static headers")
-}
-
-/// The model's `InternalFailure`, for a session that could not be read: the
-/// session may be fine, so the caller must not take it for a sign-out.
-fn failure() -> Response<BoxBody> {
-    let body = serde_json::json!({ "message": "The server could not complete the request." });
-    Response::builder()
-        .status(StatusCode::INTERNAL_SERVER_ERROR)
-        .header(header::CONTENT_TYPE, "application/json")
-        .header("x-amzn-errortype", "InternalFailure")
-        .body(boxed(body.to_string()))
-        .expect("a status and two static headers")
+/// The model's `Unauthenticated`, with the challenge the bearer scheme adds to it.
+fn unauthenticated<Protocol, Refusal>(message: &str, challenge: HeaderValue) -> Response<BoxBody>
+where
+    Refusal: From<error::Unauthenticated> + IntoResponse<Protocol>,
+{
+    let mut response = refuse::<Protocol, Refusal>(error::Unauthenticated {
+        message: message.to_owned(),
+    });
+    response
+        .headers_mut()
+        .insert(header::WWW_AUTHENTICATE, challenge);
+    response
 }
 
 /// Logs a failure and answers it as the model's `InternalFailure`.

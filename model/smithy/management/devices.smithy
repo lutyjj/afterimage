@@ -9,6 +9,11 @@ string ClaimCode
 @length(min: 1, max: 64)
 string DeviceName
 
+/// A device's MAC address, as its firmware sends it: six upper-case hexadecimal
+/// octets joined by colons.
+@pattern("^[0-9A-F]{2}(:[0-9A-F]{2}){5}$")
+string MacAddress
+
 /// A model name from TRMNL's model list, such as `og_plus`.
 @length(min: 1, max: 64)
 string DisplayModelName
@@ -96,9 +101,8 @@ structure Device {
     @required
     name: DeviceName
 
-    /// The device's MAC address.
     @required
-    mac: String
+    mac: MacAddress
 
     /// The model name the device's firmware reports.
     @required
@@ -191,6 +195,7 @@ string TimeOfDay
 @readonly
 @http(method: "GET", uri: "/manage/display-models")
 @optionalAuth
+@tags(["mcp"])
 operation ListDisplayModels {
     output := {
         @required
@@ -198,9 +203,12 @@ operation ListDisplayModels {
     }
 }
 
+/// The account's devices, with their playlists, readings and the screen each
+/// shows now.
 @readonly
 @http(method: "GET", uri: "/manage/devices")
 @optionalAuth
+@tags(["mcp"])
 operation ListDevices {
     output := {
         @required
@@ -213,6 +221,7 @@ operation ListDevices {
 /// settings and playlist; its old registration ends.
 @http(method: "POST", uri: "/manage/devices", code: 201)
 @optionalAuth
+@tags(["mcp"])
 operation ClaimDevice {
     input := {
         @required
@@ -237,9 +246,11 @@ operation ClaimDevice {
     ]
 }
 
+/// One device, with its playlist, readings and the screen it shows now.
 @readonly
 @http(method: "GET", uri: "/manage/devices/{deviceId}")
 @optionalAuth
+@tags(["mcp"])
 operation GetDevice {
     input := {
         @required
@@ -260,6 +271,7 @@ operation GetDevice {
 /// Changes the given settings and leaves the others as they are.
 @http(method: "PATCH", uri: "/manage/devices/{deviceId}")
 @optionalAuth
+@tags(["mcp"])
 operation UpdateDevice {
     input := {
         @required
@@ -293,6 +305,7 @@ operation UpdateDevice {
 @idempotent
 @http(method: "PUT", uri: "/manage/devices/{deviceId}/playlist")
 @optionalAuth
+@tags(["mcp"])
 operation SetPlaylist {
     input := {
         @required
@@ -339,6 +352,7 @@ operation DeleteDevice {
 @readonly
 @http(method: "GET", uri: "/manage/devices/{deviceId}/image")
 @optionalAuth
+@tags(["mcp"])
 operation GetDeviceImage {
     input := {
         @required

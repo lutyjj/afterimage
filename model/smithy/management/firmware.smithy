@@ -100,6 +100,7 @@ enum FirmwareUpdateState {
 @readonly
 @http(method: "GET", uri: "/manage/firmware-boards")
 @optionalAuth
+@tags(["mcp"])
 operation ListFirmwareBoards {
     output := {
         @required
@@ -117,6 +118,7 @@ operation ListFirmwareBoards {
 /// device itself. The request replaces any earlier one.
 @http(method: "POST", uri: "/manage/devices/{deviceId}/firmware-update")
 @optionalAuth
+@tags(["mcp"])
 operation InstallFirmware {
     input := {
         @required
@@ -144,6 +146,7 @@ operation InstallFirmware {
 @idempotent
 @http(method: "DELETE", uri: "/manage/devices/{deviceId}/firmware-update")
 @optionalAuth
+@tags(["mcp"])
 operation CancelFirmwareUpdate {
     input := {
         @required

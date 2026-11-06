@@ -15,7 +15,12 @@ string AccountName
 
 /// A cookie the server sets. It is httpOnly, so no script reads it: the browser
 /// stores it and sends it back. A browser client never sees this member.
+@sensitive
 string SessionCookie
+
+/// The cookies a browser sends, among them the one that binds a sign-in to it.
+@sensitive
+string Cookies
 
 /// Who is signed in. Every other operation acts for this account.
 structure Account {
@@ -167,7 +172,7 @@ operation CompleteOidcSignIn {
         error: String
 
         @httpHeader("Cookie")
-        cookie: String
+        cookie: Cookies
     }
 
     output := {

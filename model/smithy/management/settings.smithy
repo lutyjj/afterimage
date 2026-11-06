@@ -21,11 +21,14 @@ operation GetMqttSettings {
     ]
 }
 
+// A PUT that replaces every setting: an absent topic or prefix is its default,
+// as an absent `url` is no broker.
 /// Sets the broker, or with no `url` stops publishing. Another broker or other
 /// topics first clear what the server published, when its broker can be
 /// reached; other credentials keep it but mark the displays unavailable until
 /// the server is connected again, and while the broker refuses them; the same
 /// settings change nothing.
+@suppress(["DefaultValueInUpdate"])
 @idempotent
 @http(method: "PUT", uri: "/manage/server/mqtt")
 @optionalAuth
@@ -101,13 +104,14 @@ enum MqttConnection {
     CONNECTED = "connected"
 }
 
-@pattern("^mqtts?://")
+@pattern("^mqtts?://.+$")
 @length(min: 8, max: 512)
 string MqttUrl
 
 @length(min: 1, max: 256)
 string MqttUsername
 
+@sensitive
 @length(max: 256)
 string MqttPassword
 

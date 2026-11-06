@@ -23,6 +23,15 @@ metadata validators = [
             selector: "service [id = afterimage.management#Management] ~> operation [trait|optionalAuth] :is([trait|http|method = GET] :not([trait|readonly]), [trait|readonly] :not([trait|http|method = GET]))"
         }
     }
+    {
+        name: "EmitEachSelector"
+        id: "ToolDescribed"
+        message: "An operation tagged `mcp` is a tool of the MCP endpoint, which a client calls with a token and knows by its documentation: it needs both @optionalAuth and a doc comment."
+        severity: "DANGER"
+        configuration: {
+            selector: "service [id = afterimage.management#Management] ~> operation [trait|tags|(values) = mcp] :is(:not([trait|documentation]), :not([trait|optionalAuth]))"
+        }
+    }
 ]
 
 namespace afterimage.management
@@ -32,6 +41,14 @@ use smithy.framework#ValidationException
 
 /// The API the web UI uses: sign-in, devices, their firmware, screens and their
 /// playlists, and the personal API tokens scripts and agents use instead.
+///
+/// A screen is a document of components that templates fill from data sources.
+/// `PreviewScreen` draws a document on a display and answers the image, what each
+/// source returned and every problem, so a document is checked before
+/// `CreateScreen` or `UpdateScreen` saves it. A device shows the screens of its
+/// playlist (`SetPlaylist`) in turn, each on its days and between its times in the
+/// server's time zone (`GetServer`, which also names the secrets source requests
+/// may read).
 ///
 /// Every operation needs a credential except those that exist to start a
 /// session (`GetSignInOptions`, `CreateFirstAccount`, `SignIn`,
@@ -146,8 +163,13 @@ list Names {
 @readonly
 @http(method: "GET", uri: "/manage/server")
 @optionalAuth
+@tags(["mcp"])
 operation GetServer {
     output := {
+        /// The server's release, such as `0.1.0`.
+        @required
+        version: String
+
         /// The IANA name of the time zone that playlist times and dates on screens
         /// follow, such as `Europe/Berlin`.
         @required
