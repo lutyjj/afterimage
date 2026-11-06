@@ -14,9 +14,9 @@ string ScreenName
 /// is a list; any other template is text. Templates read every data source by its
 /// name, `now()` (the time of the render, for filters such as `datetimeformat`)
 /// and `device` (`name`, `width`, `height`). Data source requests also read
-/// `secrets`. Besides the filters of MiniJinja and minijinja-contrib, `multiply`
-/// scales a number as in Home Assistant, so `map('multiply', 0.01)` turns amounts
-/// in minor units into a series.
+/// `secrets`. Besides the filters of MiniJinja and minijinja-contrib,
+/// `multiply(amount, default)` scales a number as in Home Assistant, so
+/// `map('multiply', 0.01)` turns amounts in minor units into a series.
 @length(max: 4096)
 string Template
 
@@ -237,6 +237,9 @@ structure Value {
 @range(min: 1, max: 20)
 integer Lines
 
+/// It fills what its parent fixes and keeps its proportions: in a row whose
+/// height follows its content, an image that grows takes its share of the width
+/// and is as tall as that width makes it.
 structure Image {
     /// An `http`, `https` or `data` URL of a PNG, JPEG, GIF, WebP or SVG image.
     @required
@@ -247,8 +250,12 @@ structure Image {
     grow: Boolean = true
 }
 
+/// A line between its neighbours, across a column or down a row, as long as the
+/// stack is broad.
 structure Divider {}
 
+/// It fills what its parent fixes; where its parent sizes it to content, it is at
+/// most 320 pixels wide and half as tall, at most 200 pixels.
 structure Chart {
     @required
     series: ChartSeries

@@ -188,6 +188,25 @@ fn clamped_text_in_a_fallback_font_keeps_what_fits() {
 }
 
 #[test]
+fn clamped_text_measures_its_tallest_characters_wherever_they_are() {
+    // Non-ASCII characters the face may hold come first; Cyrillic, from the
+    // fallback font, comes after them.
+    let long = format!(
+        "àáâäçèéêëìíîïñòóôöùúûü° {}",
+        "Сменить насадку на зубной щетке и поставить стирку. ".repeat(4)
+    );
+    let bytes = render(
+        &screen_of(&json!({ "description": { "text": long, "size": "base", "clamp": 1 } })),
+        "og_plus",
+        "gray-4",
+    );
+    let (rows, columns) = inked(&bytes);
+    let width = columns.last().unwrap() - columns.first().unwrap();
+    assert!(width > 300, "the clamped line is {width} pixels wide");
+    assert!(rows.len() < 40, "{} inked rows for one line", rows.len());
+}
+
+#[test]
 fn a_fitted_value_shrinks_into_its_box() {
     // Far wider than the first of four columns, a quarter of the 800-pixel screen.
     let screen = json!({ "content": { "grid": { "columns": 4, "gap": "medium", "grow": false, "cells": [
@@ -233,6 +252,46 @@ fn a_row_that_does_not_grow_is_as_tall_as_its_content() {
     let (rows, _) = inked(&render(&screen, "og_plus", "gray-4"));
     let last = *rows.last().unwrap();
     assert!((40..120).contains(&last), "ink ends at y={last}");
+}
+
+#[test]
+fn a_divider_or_a_chart_keeps_a_row_as_tall_as_its_content() {
+    let chart = json!({ "lineChart": { "grow": true, "series": [ { "values": [1, 3, 2, 4] } ] } });
+    for (name, inside) in [("divider", json!({ "divider": {} })), ("chart", chart)] {
+        let screen = json!({ "content": stack("column", false, &[
+            stack("row", false, &[title("Left"), inside, title("Right")]),
+            title("Below"),
+        ]) });
+        let (rows, _) = inked(&render(&screen, "og_plus", "gray-4"));
+        let last = *rows.last().unwrap();
+        // A chart on a height sized to content is at most 200 pixels tall, and
+        // "Below" follows it.
+        assert!(last < 260, "{name}: ink ends at y={last}");
+        assert!(rows.len() > 30, "{name}: {} inked rows", rows.len());
+    }
+}
+
+#[test]
+fn a_divider_in_a_row_spans_the_row() {
+    // A divider between a one-line title and a three-line description reaches
+    // as far down as the description does.
+    let screen = json!({ "content": stack("column", false, &[
+        stack("row", false, &[
+            title("Left"),
+            json!({ "divider": {} }),
+            json!({ "description": { "text": "One\nTwo\nThree", "size": "base" } }),
+        ]),
+    ]) });
+    let pixels = pixels(&render(&screen, "og_plus", "gray-4"));
+    let ink = |pixel: &[u8; 3]| *pixel != [255, 255, 255];
+    let (rows, _) = inked(&render(&screen, "og_plus", "gray-4"));
+    let bottom = *rows.last().unwrap();
+    // The divider is the one column inked on the description's last line and on
+    // the title's first.
+    let line = (0..pixels[0].len())
+        .find(|&x| ink(&pixels[bottom][x]) && ink(&pixels[rows[0] + 2][x]) && x > 20)
+        .map(|x| x < 200);
+    assert_eq!(line, Some(true), "no divider spans the row");
 }
 
 #[test]

@@ -68,11 +68,11 @@
   if lines == none or words == "" { return set-text(words) }
   layout(region => {
     let height(body) = measure(block(width: region.width, set-text(body))).height
-    // A line as tall as any line of this text: a Latin letter beside the text's
-    // own non-ASCII characters, which may come from a fallback font whose lines
-    // are taller than the face's.
-    let others = words.clusters().filter(cluster => cluster.len() > 1).dedup()
-    let line = "X" + others.slice(0, calc.min(others.len(), 6)).join()
+    // A line as tall as any line of this text: the tallest of a Latin letter and
+    // the text's own non-ASCII characters, which may come from a fallback font
+    // whose lines are taller than the face's.
+    let samples = ("X",) + words.clusters().filter(cluster => cluster.len() > 1).dedup()
+    let line = samples.fold("X", (tallest, sample) => if height(sample) > height(tallest) { sample } else { tallest })
     let limit = height(range(int(lines)).map(_ => [#line]).join(linebreak())) + 0.5pt
     if height(words) <= limit { return set-text(words) }
     let clusters = words.clusters()
@@ -155,7 +155,9 @@
   10 * magnitude
 }
 
-#let chart(t, value, kind) = layout(region => {
+// A chart fills what its parent fixes; on an axis sized to content it takes at
+// most 320 pixels of width, and half its width but at most 200 pixels of height.
+#let chart(t, value, kind, bounds) = layout(region => {
   let series = value.series
     .filter(s => type(s.values) == array)
     .map(s => (..s, values: s.values.map(number)))
@@ -175,8 +177,11 @@
   let labels = value.at("labels", default: none)
   let axis-width = 36pt
   let label-height = if labels == none { 0pt } else { small.size + 6pt }
-  let width = region.width - axis-width
-  let height = (if region.height == float.inf * 1pt { 200pt } else { region.height }) - label-height - 4pt
+  let available = if region.height == float.inf * 1pt { 200pt } else { region.height }
+  let outer-width = if bounds.w { region.width } else { calc.min(region.width, 320pt) }
+  let outer-height = if bounds.h { available } else { calc.min(available, outer-width / 2, 200pt) }
+  let width = outer-width - axis-width
+  let height = outer-height - label-height - 4pt
   let count = calc.max(..series.map(s => s.values.len()))
   let x(i) = if kind == "bar" {
     axis-width + width * (i + 0.5) / count
@@ -184,7 +189,7 @@
     axis-width + width * i / calc.max(count - 1, 1)
   }
   let y(v) = 2pt + height * (1 - (v - low) / (high - low))
-  box(width: region.width, height: height + label-height + 4pt, {
+  box(width: outer-width, height: height + label-height + 4pt, {
     let tick = low
     while tick <= high + step / 2 {
       let dash = if tick == low { none } else { "dotted" }
@@ -253,9 +258,11 @@
 
 // A column or row: children size to their content, and those that grow share
 // what is left when the stack's length is fixed. Without growing children,
-// `justify` places the free space.
+// `justify` places the free space. A divider is a line between two cells, as
+// long as the stack is broad, so it never sizes the stack itself.
 #let stack-of(t, v, direction, bounds, draw) = {
-  let children = v.children
+  let divider(child) = child.keys().first() == "divider"
+  let children = v.children.filter(child => not divider(child))
   let (length, breadth) = if direction == "column" { (bounds.h, bounds.w) } else { (bounds.w, bounds.h) }
   let tracks = children.map(child => if length and grows(child) { 1fr } else { auto })
   let spacing = gap(t, v.at("gap", default: "medium"))
@@ -263,10 +270,18 @@
   let cross = v.at("align", default: "start")
   let free = length and not tracks.contains(1fr)
   let gutter = if free and justify == "between" and children.len() > 1 { 1fr } else { spacing }
-  let cells = children.zip(tracks).map(((child, track)) => {
-    let shared = track == 1fr
-    draw(child, if direction == "column" { (w: breadth, h: shared) } else { (w: shared, h: breadth) })
-  })
+  let rule = if direction == "column" { grid.hline(stroke: 1pt + black) } else { grid.vline(stroke: 1pt + black) }
+  let cells = ()
+  let at = 0
+  for child in v.children {
+    if divider(child) {
+      cells.push(rule)
+    } else {
+      let shared = tracks.at(at) == 1fr
+      cells.push(draw(child, if direction == "column" { (w: breadth, h: shared) } else { (w: shared, h: breadth) }))
+      at += 1
+    }
+  }
   let across = if breadth { 100% } else { auto }
   let (tracks, cells) = if free and justify in ("end", "center") {
     let edge = if justify == "center" { ((1fr,), ([],)) } else { ((), ()) }
@@ -340,9 +355,9 @@
   } else if kind == "divider" {
     if direction == "row" { line(angle: 90deg, length: 100%) } else { line(length: 100%) }
   } else if kind == "lineChart" {
-    chart(t, v, "line")
+    chart(t, v, "line", bounds)
   } else if kind == "barChart" {
-    chart(t, v, "bar")
+    chart(t, v, "bar", bounds)
   } else {
     text(..typeface(t, "--label", "small"), "Unknown component " + kind)
   }

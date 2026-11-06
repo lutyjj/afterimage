@@ -36,7 +36,7 @@ Each component builds on its own and depends on the others only through generate
 | `crates/render-typst/` | The render operation in Typst, with a component library that reads design tokens |
 | `tools/tokens/` | Build-time generator of design tokens per render profile |
 | `web/` | Web UI on the generated TypeScript client |
-| `deploy/nix/` | Nix package, container image and NixOS module |
+| `deploy/nix/` | Nix packages, the development shell and the NixOS module |
 
 ## Devices
 

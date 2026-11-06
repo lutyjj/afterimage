@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use minijinja::value::{Serde, Value as Template};
+use minijinja::value::{Kwargs, Serde, Value as Template};
 use minijinja::{Environment, Error, ErrorKind, State, UndefinedBehavior, context};
 use afterimage_render_typst::{Image, Renderer};
 use afterimage_trmnl::catalog::{Catalog, Model, Palette};
@@ -114,19 +114,34 @@ fn templates() -> Environment<'static> {
     templates
 }
 
-/// Home Assistant's `multiply`: a number, or text that reads as one, times
-/// `by`, so `map('multiply', 0.01)` turns amounts in minor units into a series.
-fn multiply(value: &Template, by: f64) -> Result<f64, Error> {
-    f64::try_from(value.clone())
+/// Home Assistant's `multiply(value, amount, default)`: a number, or text that
+/// reads as one, times `by`, so `map('multiply', 0.01)` turns amounts in minor
+/// units into a series. A value that is no number gives `default`, positional
+/// or named, and without one is a problem.
+// MiniJinja hands keyword arguments to a filter by value only.
+#[allow(clippy::needless_pass_by_value)]
+fn multiply(
+    value: &Template,
+    by: f64,
+    default: Option<Template>,
+    named: Kwargs,
+) -> Result<Template, Error> {
+    let default = match default {
+        Some(default) => Some(default),
+        None => named.get::<Option<Template>>("default")?,
+    };
+    named.assert_all_used()?;
+    let number = f64::try_from(value.clone())
         .ok()
-        .or_else(|| value.as_str().and_then(|text| text.trim().parse().ok()))
-        .map(|number| number * by)
-        .ok_or_else(|| {
-            Error::new(
-                ErrorKind::InvalidOperation,
-                format!("multiply needs a number, not {value}"),
-            )
-        })
+        .or_else(|| value.as_str().and_then(|text| text.trim().parse().ok()));
+    match (number, default) {
+        (Some(number), _) => Ok(Template::from(number * by)),
+        (None, Some(default)) => Ok(default),
+        (None, None) => Err(Error::new(
+            ErrorKind::InvalidOperation,
+            format!("multiply needs a number, not {value}"),
+        )),
+    }
 }
 
 impl Drawing {
@@ -864,13 +879,18 @@ mod tests {
     fn multiply_scales_numbers_and_numeric_text_and_refuses_the_rest() {
         let document = json!({ "content": { "column": { "children": [
             { "lineChart": { "series": [ { "values": "{{ [150, '2.5'] | map('multiply', 0.01) | list }}" } ] } },
-            { "title": { "text": "{{ 'many' | multiply(2) }}" } }
+            { "title": { "text": "{{ 'many' | multiply(2) }}" } },
+            { "title": { "text": "{{ 'unavailable' | multiply(0.01, default=0) }}" } },
+            { "title": { "text": "{{ 'unavailable' | multiply(0.01, '?') }}" } }
         ] } } });
         let (resolved, problems) = resolve(&document, &context! {});
         assert_eq!(
             resolved["content"]["column"]["children"][0]["lineChart"]["series"][0]["values"],
             json!([1.5, 0.025])
         );
+        let children = &resolved["content"]["column"]["children"];
+        assert_eq!(children[2]["title"]["text"], 0);
+        assert_eq!(children[3]["title"]["text"], "?");
         assert_eq!(problems.len(), 1);
         assert_eq!(
             problems[0].path.as_deref(),
