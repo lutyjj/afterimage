@@ -265,9 +265,9 @@ async fn a_token_wins_over_a_session_cookie() {
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
 
-/// An `Authorization` header decides alone: a revoked token or another scheme is
-/// refused even beside a valid session, and the scheme's name is
-/// case-insensitive (RFC 9110, section 11.1).
+/// A bearer `Authorization` decides alone: a revoked or empty token is refused
+/// even beside a valid session, and the scheme's name is case-insensitive (RFC
+/// 9110, section 11.1). Another scheme leaves the session to decide.
 #[tokio::test]
 async fn the_authorization_header_decides_alone() {
     let server = start().await;
@@ -288,10 +288,7 @@ async fn the_authorization_header_decides_alone() {
         "a lowercase scheme is a bearer"
     );
     assert_eq!(response.headers()["x-amzn-errortype"], "Forbidden");
-    let response = creating("Basic YWRhOnNlY3JldA==".to_owned())
-        .send()
-        .await
-        .unwrap();
+    let response = creating("Bearer ".to_owned()).send().await.unwrap();
     assert_eq!(
         response.status(),
         StatusCode::UNAUTHORIZED,
@@ -300,6 +297,17 @@ async fn the_authorization_header_decides_alone() {
     assert_eq!(
         response.headers()["www-authenticate"],
         "Bearer error=\"invalid_token\""
+    );
+    // A reverse proxy's Basic credentials ride along with the browser's
+    // requests; the session decides then.
+    let response = creating("Basic YWRhOnNlY3JldA==".to_owned())
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::CREATED,
+        "another scheme leaves it to the session"
     );
 
     server

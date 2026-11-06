@@ -8,10 +8,10 @@ metadata validators = [
     {
         name: "EmitEachSelector"
         id: "CredentialDeclared"
-        message: "A management operation needs @auth([]) when it starts a session, or @optionalAuth when it takes a session or a token."
+        message: "A management operation needs @auth([]) when it starts a session, or @optionalAuth when it takes a session or a token; the server has no other mode."
         severity: "DANGER"
         configuration: {
-            selector: "service [id = afterimage.management#Management] ~> operation :not([trait|auth]) :not([trait|optionalAuth])"
+            selector: "service [id = afterimage.management#Management] ~> operation :not([trait|optionalAuth]) :not([trait|auth|(length) = 0])"
         }
     }
     {
@@ -37,7 +37,8 @@ use smithy.framework#ValidationException
 /// session (`GetSignInOptions`, `CreateFirstAccount`, `SignIn`,
 /// `StartOidcSignIn`, `CompleteOidcSignIn`): the session cookie a browser holds,
 /// or a personal API token as `Authorization: Bearer <secret>`, which wins when
-/// a request carries both. Every resource belongs to the signed-in account;
+/// a request carries both; an `Authorization` of another scheme leaves the
+/// session to decide. Every resource belongs to the signed-in account;
 /// another account's resource answers `NotFound`, as a missing one does. A
 /// read-only token may call only the operations marked `@readonly`, and no token
 /// may create or revoke a token or sign out; each answers `Forbidden`.

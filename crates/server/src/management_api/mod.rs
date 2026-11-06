@@ -247,12 +247,14 @@ where
         let sessions = Arc::clone(&self.sessions);
         let tokens = Arc::clone(&self.tokens);
         let secure = self.cookies.secure(request.headers());
-        // A request with `Authorization` is judged by it alone, so a token's
-        // limits hold even when the request carries a session cookie too.
+        // A request with a bearer `Authorization` is judged by it alone, so a
+        // token's limits hold even when the request carries a session cookie
+        // too. Another scheme, such as a reverse proxy's Basic, leaves the
+        // cookie to decide.
         let authorization = request
             .headers()
             .get(header::AUTHORIZATION)
-            .map(|value| bearer(value.to_str().unwrap_or_default()));
+            .and_then(|value| bearer(value.to_str().unwrap_or_default()));
         // The model's ReadOnlyIsGet validator ties GET to @readonly for every
         // operation a token may call.
         let reads = matches!(*request.method(), Method::GET | Method::HEAD);
@@ -262,8 +264,8 @@ where
             .and_then(|cookie| cookie.to_str().ok())
             .and_then(|cookie| CookieName::Session.read(cookie, secure));
         Box::pin(async move {
-            if let Some(secret) = authorization {
-                let Some(secret) = secret else {
+            if let Some(bearer) = authorization {
+                let Bearer::Secret(secret) = bearer else {
                     return Ok(unauthenticated_token(
                         "Send a token as Authorization: Bearer and the token.",
                     ));
@@ -309,12 +311,26 @@ where
     }
 }
 
-/// The secret of an `Authorization` value of the bearer scheme, whose name is
-/// case-insensitive (RFC 9110, section 11.1); `None` for any other value.
-fn bearer(value: &str) -> Option<String> {
-    let (scheme, secret) = value.trim().split_once(' ')?;
+/// An `Authorization` value of the bearer scheme.
+enum Bearer {
+    Secret(String),
+    /// The scheme with no secret after it.
+    Empty,
+}
+
+/// The bearer credential of an `Authorization` value, whose scheme name is
+/// case-insensitive (RFC 9110, section 11.1); `None` for another scheme.
+fn bearer(value: &str) -> Option<Bearer> {
+    let value = value.trim();
+    let (scheme, secret) = value.split_once(' ').unwrap_or((value, ""));
     let secret = secret.trim();
-    (scheme.eq_ignore_ascii_case("bearer") && !secret.is_empty()).then(|| secret.to_owned())
+    scheme.eq_ignore_ascii_case("bearer").then(|| {
+        if secret.is_empty() {
+            Bearer::Empty
+        } else {
+            Bearer::Secret(secret.to_owned())
+        }
+    })
 }
 
 /// The model's `Unauthenticated` error as restJson1 writes it, with the bearer
