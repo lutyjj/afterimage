@@ -54,11 +54,15 @@
           services.afterimage.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
         };
 
-      # The token generator, for a run outside the build.
+      # The token generator, for a run outside the build, and the parity harness.
       apps = forSystems (system: {
         tokens = {
           type = "app";
           program = lib.getExe scope.${system}.tokens;
+        };
+        parity = {
+          type = "app";
+          program = lib.getExe scope.${system}.parity;
         };
       });
 

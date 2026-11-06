@@ -1,0 +1,28 @@
+# Items with a value, a label and a description; the second indexed and emphasised.
+trmnl: |
+  <div class="layout layout--col gap" style="justify-content:flex-start;align-items:flex-start">
+  <div class="item"><div class="meta"></div><div class="content"><span class="value">7.4°</span><span class="label">Partly cloudy</span><span class="description">Feels like 5 with wind</span></div></div>
+  <div class="item item--emphasis-3"><div class="meta"><span class="index">2</span></div><div class="content"><span class="value value--small">81%</span><span class="label label--small">Humidity</span><span class="description">Dew point 4</span></div></div>
+  </div>
+afterimage:
+  content:
+    column:
+      children:
+        - item:
+            children:
+              - value: { text: 7.4° }
+              - label: { text: Partly cloudy }
+              - description: { text: Feels like 5 with wind }
+        - item:
+            index: "2"
+            emphasis: 3
+            children:
+              - value: { text: 81%, size: small }
+              - label: { text: Humidity, size: small }
+              - description: { text: Dew point 4 }
+# The share of pixels, in percent, that may differ from TRMNL's rendering.
+limits:
+  og_png/bw: 0.84
+  og_plus/gray-4: 1.1
+  v2/bw: 0.47
+  v2/gray-4: 0.59

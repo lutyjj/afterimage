@@ -18,6 +18,10 @@ lib.makeScope pkgs.newScope (self: {
   moduleTest = self.callPackage ./module-test.nix { };
   lint = self.callPackage ./lint.nix { };
   tokens = self.callPackage ./tokens.nix { };
+  # The pinned files of TRMNL's design system release.
+  trmnlRelease = self.callPackage ./trmnl-release.nix { };
+  # Afterimage's rendering against TRMNL's, case by case (tools/parity).
+  parity = self.callPackage ./parity.nix { };
   # The design tokens and fonts the renderer embeds, generated with tokens.
   design = self.callPackage ./design.nix { };
   tokensTest = self.callPackage ./tokens-test.nix { };

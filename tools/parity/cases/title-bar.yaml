@@ -1,0 +1,16 @@
+# A title bar under a column holding one title.
+trmnl: |
+  <div class="layout layout--col gap" style="justify-content:flex-start;align-items:flex-start"><span class="title">Hello</span></div>
+  <div class="title_bar"><span class="title">Weather</span><span class="instance">Home</span></div>
+afterimage:
+  titleBar: { title: Weather, instance: Home }
+  content:
+    column:
+      children:
+        - title: { text: Hello }
+# The share of pixels, in percent, that may differ from TRMNL's rendering.
+limits:
+  og_png/bw: 0.007
+  og_plus/gray-4: 0.078
+  v2/bw: 0.8
+  v2/gray-4: 2.4

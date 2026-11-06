@@ -13,8 +13,8 @@ Usage: generate.py CATALOG_DIR OUTPUT_DIR [SOURCES_DIR]
 
 CATALOG_DIR holds TRMNL's models.json and palettes.json; OUTPUT_DIR receives
 tokens.json, LICENSE (the design system's), fonts/, fonts/NOTICE.md and
-fonts/OFL.txt. SOURCES_DIR holds the pinned files (sources.json), each named by
-its SHA-256; without it they are downloaded.
+fonts/OFL.txt. SOURCES_DIR holds the files tools/trmnl-release.json pins, each
+named by its SHA-256; without it they are downloaded.
 """
 
 import hashlib
@@ -36,11 +36,11 @@ FONT_REGISTRY = f"{REPOSITORY}/db/data/framework_fonts.yml"
 FRAMEWORK_LICENSE = f"{REPOSITORY}/LICENSE"
 # The SIL Open Font License's text, as Inter v4.1 ships it.
 OFL = "https://raw.githubusercontent.com/rsms/inter/e3a3d4c57d5ecc01453a575621882a384c1995a3/LICENSE.txt"
-# Every file fetched, by URL, with its SHA-256 when it was pinned (sources.json,
+# Every file fetched, by URL, with its SHA-256 when it was pinned (tools/trmnl-release.json,
 # which the Nix build fetches from too). A file without an entry, or with
 # another digest, stops the run and prints the digest it got, to review and
 # record there after changing a pin.
-PINS = json.loads((Path(__file__).parent / "sources.json").read_text())
+PINS = json.loads((Path(__file__).parent.parent / "trmnl-release.json").read_text())
 # Internal custom properties that are not documented tokens but that drawing
 # needs: the size of a dither tile.
 FILLS = ["--dither-bg-size"]
@@ -166,7 +166,7 @@ def fetch(url: str) -> bytes:
     if SOURCES is not None:
         if url not in PINS:
             sys.exit(
-                f"{url} is not pinned in sources.json; run the generator without a sources "
+                f"{url} is not pinned in tools/trmnl-release.json; run the generator without a sources "
                 "directory to download it and print its SHA-256"
             )
         return (SOURCES / PINS[url]).read_bytes()

@@ -1,0 +1,30 @@
+# Tables, base and small.
+trmnl: |
+  <div class="layout layout--col gap" style="justify-content:flex-start;align-items:flex-start">
+  <table class="table"><thead><tr><th><span class="title">Name</span></th><th><span class="title">Role</span></th><th><span class="title">Score</span></th></tr></thead><tbody><tr><td><span class="label">Ada Morrow</span></td><td><span class="label">Reception</span></td><td><span class="label">3</span></td></tr><tr><td><span class="label">Ben Okafor</span></td><td><span class="label">Sales</span></td><td><span class="label">12</span></td></tr><tr><td><span class="label">Cleo Varga</span></td><td><span class="label">Sales</span></td><td><span class="label">27</span></td></tr></tbody></table>
+  <table class="table table--small"><thead><tr><th><span class="title title--small">Name</span></th><th><span class="title title--small">Role</span></th><th><span class="title title--small">Score</span></th></tr></thead><tbody><tr><td><span class="label label--small">Ada Morrow</span></td><td><span class="label label--small">Reception</span></td><td><span class="label label--small">3</span></td></tr><tr><td><span class="label label--small">Ben Okafor</span></td><td><span class="label label--small">Sales</span></td><td><span class="label label--small">12</span></td></tr><tr><td><span class="label label--small">Cleo Varga</span></td><td><span class="label label--small">Sales</span></td><td><span class="label label--small">27</span></td></tr></tbody></table>
+  </div>
+afterimage:
+  content:
+    column:
+      children:
+        - table:
+            size: base
+            items: '{{ [["Ada Morrow", "Reception", "3"], ["Ben Okafor", "Sales", "12"], ["Cleo Varga", "Sales", "27"]] }}'
+            columns:
+              - { heading: Name, text: "{{ item[0] }}" }
+              - { heading: Role, text: "{{ item[1] }}" }
+              - { heading: Score, text: "{{ item[2] }}" }
+        - table:
+            size: small
+            items: '{{ [["Ada Morrow", "Reception", "3"], ["Ben Okafor", "Sales", "12"], ["Cleo Varga", "Sales", "27"]] }}'
+            columns:
+              - { heading: Name, text: "{{ item[0] }}" }
+              - { heading: Role, text: "{{ item[1] }}" }
+              - { heading: Score, text: "{{ item[2] }}" }
+# The share of pixels, in percent, that may differ from TRMNL's rendering.
+limits:
+  og_png/bw: 0.56
+  og_plus/gray-4: 0.75
+  v2/bw: 0.31
+  v2/gray-4: 0.62

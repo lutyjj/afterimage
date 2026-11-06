@@ -1,0 +1,28 @@
+# Values in a quarter of the screen each: two fitted to their cell, one large,
+# one with tabular figures.
+trmnl: |
+  <div class="layout layout--col gap" style="justify-content:flex-start;align-items:flex-start">
+  <div class="grid grid--cols-4" style="width:100%">
+  <div><span class="value value--xxlarge" data-value-fit="true">1234567890</span></div>
+  <div><span class="value value--xxlarge" data-value-fit="true">42</span></div>
+  <div><span class="value value--large">7.4°</span></div>
+  <div><span class="value value--tnums">48,206.62</span></div>
+  </div>
+  </div>
+afterimage:
+  content:
+    column:
+      children:
+        - grid:
+            columns: 4
+            cells:
+              - content: { value: { text: "1234567890", size: xxlarge, fit: true } }
+              - content: { value: { text: "42", size: xxlarge, fit: true } }
+              - content: { value: { text: 7.4°, size: large } }
+              - content: { value: { text: "48,206.62", tabular: true } }
+# The share of pixels, in percent, that may differ from TRMNL's rendering.
+limits:
+  og_png/bw: 0.88
+  og_plus/gray-4: 1.2
+  v2/bw: 0.28
+  v2/gray-4: 0.42

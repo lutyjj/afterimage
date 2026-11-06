@@ -1,0 +1,34 @@
+# Small and base labels in each style, one to a line.
+trmnl: |
+  <div class="layout layout--col gap" style="justify-content:flex-start;align-items:flex-start">
+  <span class="label label--small">Small plain Mon 14:05</span>
+  <span class="label label--small label--outline">Small outline Mon 14:05</span>
+  <span class="label label--small label--underline">Small underline Mon 14:05</span>
+  <span class="label label--small label--gray">Small gray Mon 14:05</span>
+  <span class="label label--small label--filled">Small filled Mon 14:05</span>
+  <span class="label">Base plain Mon 14:05</span>
+  <span class="label label--outline">Base outline Mon 14:05</span>
+  <span class="label label--underline">Base underline Mon 14:05</span>
+  <span class="label label--gray">Base gray Mon 14:05</span>
+  <span class="label label--filled">Base filled Mon 14:05</span>
+  </div>
+afterimage:
+  content:
+    column:
+      children:
+        - label: { text: Small plain Mon 14:05, size: small, style: plain }
+        - label: { text: Small outline Mon 14:05, size: small, style: outline }
+        - label: { text: Small underline Mon 14:05, size: small, style: underline }
+        - label: { text: Small gray Mon 14:05, size: small, style: gray }
+        - label: { text: Small filled Mon 14:05, size: small, style: filled }
+        - label: { text: Base plain Mon 14:05, size: base, style: plain }
+        - label: { text: Base outline Mon 14:05, size: base, style: outline }
+        - label: { text: Base underline Mon 14:05, size: base, style: underline }
+        - label: { text: Base gray Mon 14:05, size: base, style: gray }
+        - label: { text: Base filled Mon 14:05, size: base, style: filled }
+# The share of pixels, in percent, that may differ from TRMNL's rendering.
+limits:
+  og_png/bw: 3.6
+  og_plus/gray-4: 3.8
+  v2/bw: 1.9
+  v2/gray-4: 2.1

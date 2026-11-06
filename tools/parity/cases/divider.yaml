@@ -1,0 +1,25 @@
+# Dividers between a column's children.
+trmnl: |
+  <div class="layout layout--col gap" style="justify-content:flex-start;align-items:flex-start">
+  <span class="title">Above</span><div class="divider"></div>
+  <span class="title">Middle</span><div class="divider"></div>
+  <span class="label">Below</span><div class="divider"></div>
+  <span class="label label--small">Last</span>
+  </div>
+afterimage:
+  content:
+    column:
+      children:
+        - title: { text: Above }
+        - divider: {}
+        - title: { text: Middle }
+        - divider: {}
+        - label: { text: Below }
+        - divider: {}
+        - label: { text: Last, size: small }
+# The share of pixels, in percent, that may differ from TRMNL's rendering.
+limits:
+  og_png/bw: 0.019
+  og_plus/gray-4: 0.019
+  v2/bw: 0.13
+  v2/gray-4: 0.37
