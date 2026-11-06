@@ -1,5 +1,5 @@
 import type { Device } from "@afterimage/management-client";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ago } from "../app/format";
 import { isCurrent, nowIn } from "./schedule";
@@ -48,11 +48,31 @@ export interface StampedState extends DeviceState {
   cancelled: boolean;
 }
 
+const ORDER: Array<DeviceState["key"]> = ["never-seen", "not-seen", "nothing-scheduled"];
+
+/** The states that have ended while the page was open, after the device moved
+ * from `before` to `now`: those that ended earlier and are still over, and those
+ * that just ended. */
+export function endedStates(ended: DeviceState[], before: DeviceState[], now: DeviceState[]): DeviceState[] {
+  const live = new Set(now.map((state) => state.key));
+  const over = [...ended, ...before].filter((state) => !live.has(state.key));
+  return [...new Map(over.map((state) => [state.key, state])).values()];
+}
+
 /** The device's states as stamps that cancel rather than vanish: a state that ends
  * while the page is open stays, struck through. */
 export function useStamps(states: DeviceState[]): StampedState[] {
-  const seen = useRef(new Map<string, DeviceState>());
-  for (const state of states) seen.current.set(state.key, state);
+  const [ended, setEnded] = useState<DeviceState[]>([]);
+  const before = useRef(states);
+  const key = states.map((state) => state.key).join();
+  useEffect(() => {
+    setEnded((current) => endedStates(current, before.current, states));
+    before.current = states;
+    // `key` names the states; the array is new on every render.
+  }, [key]);
   const live = new Set(states.map((state) => state.key));
-  return [...seen.current.values()].map((state) => ({ ...state, cancelled: !live.has(state.key) }));
+  return [
+    ...states.map((state) => ({ ...state, cancelled: false })),
+    ...ended.filter((state) => !live.has(state.key)).map((state) => ({ ...state, cancelled: true })),
+  ].sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key));
 }

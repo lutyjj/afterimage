@@ -46,7 +46,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   ];
 
   # Fetched once into a fixed output. After changing pnpm-lock.yaml, set
-  # `hash = "sha256-q+xhv+A650t20AA4RKSoPDGR8ISY9WYGwWQzgVrxuBg=";`, run `nix build .#web`, and copy the hash Nix reports.
+  # `hash = lib.fakeHash;`, run `nix build .#web`, and copy the hash Nix reports.
   pnpmDeps = fetchPnpmDeps {
     inherit (finalAttrs) pname version src;
     postPatch = withContract;

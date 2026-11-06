@@ -3,13 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 
 import { displayModelsQuery, messageOf, serverQuery } from "../app/client";
-import { ago, moment, signalQuality } from "../app/format";
 import { CropMarks } from "../proof/CropMarks";
 import { Proof } from "../proof/Proof";
 import { Stamp } from "../proof/Stamp";
 import { screensQuery } from "../screens/queries";
 import { ClaimPanel } from "./ClaimPanel";
 import { DayStrip } from "./DayStrip";
+import { DeviceFacts, Fact } from "./DeviceFacts";
 import styles from "./DeviceList.module.css";
 import { devicesQuery, findDisplay, imageUrl } from "./queries";
 import { nowIn } from "./schedule";
@@ -68,7 +68,6 @@ function DeviceRow({
   const stamps = useStamps(timeZone ? deviceStates(device, timeZone) : []);
   const screenName = (id: number) => screens?.find((screen) => screen.id === id)?.name ?? "A screen";
   const now = timeZone ? nowIn(timeZone) : undefined;
-  const { batteryVoltage, batteryPercent, signal, firmwareVersion } = device.readings;
 
   return (
     <li className={styles.row}>
@@ -76,8 +75,8 @@ function DeviceRow({
         <Proof
           src={imageUrl(device)}
           alt={`What ${device.name} shows`}
-          width={model?.width ?? 800}
-          height={model?.height ?? 480}
+          width={model?.width}
+          height={model?.height}
           colors={palette?.colors}
           paletteName={palette?.name}
         />
@@ -97,49 +96,9 @@ function DeviceRow({
             </div>
           )}
         </div>
-        <dl className={styles.facts}>
-          <div>
-            <dt>Showing</dt>
-            <dd>
-              {device.showing
-                ? device.showing.screenId !== undefined
-                  ? screenName(device.showing.screenId)
-                  : "Afterimage's own screen"
-                : "Nothing yet"}
-              {device.showing && timeZone && (
-                <span className={styles.aside}> since {moment(device.showing.renderedAt, timeZone)}</span>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Last seen</dt>
-            <dd>{device.seenAt ? ago(device.seenAt) : "Never"}</dd>
-          </div>
-          <div>
-            <dt>Battery</dt>
-            <dd>
-              {batteryPercent !== undefined ? `${Math.round(batteryPercent)}%` : "Not reported"}
-              {batteryVoltage !== undefined && (
-                <span className={styles.aside}> {batteryVoltage.toFixed(2)} V</span>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Signal</dt>
-            <dd>
-              {signal !== undefined ? signalQuality(signal) : "Not reported"}
-              {signal !== undefined && <span className={styles.aside}> {signal} dBm</span>}
-            </dd>
-          </div>
-          <div>
-            <dt>Display</dt>
-            <dd>{model?.label ?? device.display.model}</dd>
-          </div>
-          <div>
-            <dt>Firmware</dt>
-            <dd>{firmwareVersion ?? "Not reported"}</dd>
-          </div>
-        </dl>
+        <DeviceFacts device={device} screens={screens} timeZone={timeZone} className={styles.facts}>
+          <Fact label="Display">{model?.label ?? device.display.model}</Fact>
+        </DeviceFacts>
       </div>
       {now && (
         <div className={styles.today}>

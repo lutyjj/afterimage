@@ -1,22 +1,15 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { useQuery } from "@tanstack/react-query";
+import { Form, Link, NavLink, Outlet, useLocation, useNavigation } from "react-router";
 
-import { accountQuery, client, queryClient } from "./client";
+import { accountQuery } from "./client";
 import styles from "./Shell.module.css";
 
 /** The signed-in frame: the wordmark, the two places, and who is signed in. */
 export function Shell() {
   const account = useQuery(accountQuery).data;
-  const navigate = useNavigate();
   const { pathname } = useLocation();
+  const signingOut = useNavigation().formAction === "/sign-out";
   const onDevices = pathname === "/" || pathname.startsWith("/devices/");
-  const signOut = useMutation({
-    mutationFn: () => client.signOut({}),
-    onSettled: () => {
-      queryClient.clear();
-      void navigate("/sign-in");
-    },
-  });
 
   return (
     <div className={styles.shell}>
@@ -34,14 +27,11 @@ export function Shell() {
         </nav>
         <div className={styles.account}>
           <span className={styles.accountName}>{account?.name}</span>
-          <button
-            type="button"
-            className={styles.signOut}
-            onClick={() => signOut.mutate()}
-            disabled={signOut.isPending}
-          >
-            Sign out
-          </button>
+          <Form method="post" action="/sign-out">
+            <button type="submit" className={styles.signOut} disabled={signingOut}>
+              Sign out
+            </button>
+          </Form>
         </div>
       </header>
       <main className={styles.main}>

@@ -7,9 +7,10 @@ export interface ProofProps {
   /** The image a display shows, or absent before it has one. */
   src?: string | undefined;
   alt: string;
-  /** The display's size in pixels, for the frame before the image loads. */
-  width: number;
-  height: number;
+  /** The display's size in pixels, for the frame before the image loads; absent
+   * until its model is known, when the frame keeps no size of its own. */
+  width?: number | undefined;
+  height?: number | undefined;
   /** The palette's colors, darkest gray first; absent for full color. */
   colors?: string[] | undefined;
   paletteName?: string | undefined;
@@ -36,7 +37,7 @@ export function Proof({
   busy = false,
 }: ProofProps) {
   const image = useRef<HTMLImageElement>(null);
-  const [natural, setNatural] = useState({ width, height });
+  const [natural, setNatural] = useState({ width: width ?? 0, height: height ?? 0 });
   const [scale, setScale] = useState(1);
 
   useEffect(() => {
@@ -60,12 +61,14 @@ export function Proof({
 
   const shownWidth = src ? natural.width : width;
   const shownHeight = src ? natural.height : height;
+  const sized = shownWidth !== undefined && shownHeight !== undefined && shownWidth > 0 && shownHeight > 0;
 
   return (
     <figure className={styles.proof}>
       <div
         className={styles.plate}
-        style={{ maxWidth: `${shownWidth}px`, aspectRatio: `${shownWidth} / ${shownHeight}` }}
+        style={sized ? { maxWidth: `${shownWidth}px`, aspectRatio: `${shownWidth} / ${shownHeight}` } : undefined}
+        data-unsized={!sized || undefined}
         data-busy={busy || undefined}
       >
         <CropMarks />
@@ -75,8 +78,8 @@ export function Proof({
             className={styles.image}
             src={src}
             alt={alt}
-            width={shownWidth}
-            height={shownHeight}
+            width={sized ? shownWidth : undefined}
+            height={sized ? shownHeight : undefined}
             data-upscaled={scale >= 1 || undefined}
             draggable={false}
           />
@@ -91,7 +94,7 @@ export function Proof({
         <Wedge colors={colors} />
         <span className="annotation">
           {paletteName && <span className={styles.palette}>{paletteName}</span>}
-          {shownWidth} × {shownHeight}
+          {sized && `${shownWidth} × ${shownHeight}`}
           {src && <span className={styles.scale}>{scaleLabel(scale)}</span>}
         </span>
       </figcaption>

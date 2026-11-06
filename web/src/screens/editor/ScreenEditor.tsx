@@ -13,7 +13,7 @@ import styles from "./ScreenEditor.module.css";
 import { SourcesPanel } from "./SourcesPanel";
 import { STARTERS } from "./starters";
 import { usePreview } from "./usePreview";
-import { parseYaml, rangeOf, toYaml } from "./yamlDocument";
+import { openingText, parseYaml, rangeOf } from "./yamlDocument";
 
 /** Writing a screen: its YAML beside a proof the server draws at the display's
  * own pixels, with what each source answered and every problem in place. */
@@ -40,7 +40,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
   const written = (useLocation().state as { text?: string } | null)?.text;
   const editor = useRef<EditorHandle>(null);
   const starter = STARTERS[0];
-  const initialText = screen ? (written ?? toYaml(screen.document)) : (starter?.yaml ?? "");
+  const initialText = screen ? openingText(screen.document, written) : (starter?.yaml ?? "");
   const [text, setText] = useState(initialText);
   const [name, setName] = useState(screen?.name ?? starter?.name ?? "");
   const [baseline, setBaseline] = useState({ text: screen ? initialText : "", name: screen?.name ?? "" });
@@ -50,7 +50,8 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
   const parsed = useMemo(() => parseYaml(text), [text]);
   const devices = useQuery(devicesQuery).data;
   const models = useQuery(displayModelsQuery).data;
-  const secretNames = useQuery(serverQuery).data?.secretNames ?? [];
+  const server = useQuery(serverQuery).data;
+  const secretNames = server?.secretNames ?? [];
 
   const [target, setTarget] = useState<string>();
   const [display, setDisplay] = useState<Display>();
@@ -59,11 +60,8 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
   const chosenDevice = chosenTarget.startsWith("device:")
     ? devices?.find((device) => `device:${device.id}` === chosenTarget)
     : undefined;
-  const fallbackModel = models?.find((model) => model.name === "og_plus") ?? models?.[0];
-  const chosenDisplay: Display | undefined =
-    chosenDevice?.display ??
-    display ??
-    (fallbackModel ? { model: fallbackModel.name, palette: fallbackModel.palettes[0]?.id ?? "bw" } : undefined);
+  // Without a device, the server's default display.
+  const chosenDisplay: Display | undefined = chosenDevice?.display ?? display ?? server?.defaultDisplay;
   const model = models?.find((candidate) => candidate.name === chosenDisplay?.model);
   const palette = model?.palettes.find((candidate) => candidate.id === chosenDisplay?.palette);
 
@@ -259,7 +257,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
         <aside
           className={styles.proofColumn}
           aria-label="Proof"
-          style={{ width: `min(calc(${model?.width ?? 800}px + 2.75rem), 62vw)` }}
+          style={{ width: model ? `min(calc(${model.width}px + 2.75rem), 62vw)` : "62vw" }}
         >
           <div className={styles.toolbar}>
             <label className={styles.target}>
@@ -282,7 +280,8 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
                     value={chosenDisplay?.model}
                     onChange={(event) => {
                       const next = models?.find((candidate) => candidate.name === event.target.value);
-                      if (next) setDisplay({ model: next.name, palette: next.palettes[0]?.id ?? "bw" });
+                      const first = next?.palettes[0];
+                      if (next && first) setDisplay({ model: next.name, palette: first.id });
                     }}
                   >
                     {[...(models ?? [])]
@@ -333,8 +332,8 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
           <Proof
             src={preview.image}
             alt="The screen as the display will show it"
-            width={model?.width ?? 800}
-            height={model?.height ?? 480}
+            width={model?.width}
+            height={model?.height}
             colors={palette?.colors}
             paletteName={palette?.name}
             empty={parsed.value === undefined ? "Fix the YAML to draw" : "Drawing"}

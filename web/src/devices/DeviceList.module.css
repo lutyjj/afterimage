@@ -29,7 +29,7 @@
   grid-area: claim;
   position: sticky;
   /* Stuck under the top bar with room for its crop mark above it. */
-  top: 5.5rem;
+  top: calc(var(--bar-height) + 2rem);
   margin-top: calc(var(--space-4) - 0.25rem + 1.25rem);
 }
 
@@ -109,29 +109,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-}
-
-.facts {
-  display: grid;
-  gap: var(--space-3) var(--space-4);
-}
-
-.facts dt {
-  color: var(--blue-text);
-  font-size: var(--text-xs);
-  font-stretch: var(--narrow);
-  font-weight: 560;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.facts dd {
-  font-size: var(--text-sm);
-  overflow-wrap: anywhere;
-}
-
-.aside {
-  color: var(--ink-soft);
 }
 
 /* As wide as the plate above it; the crop marks keep the track's last 1.25rem. */

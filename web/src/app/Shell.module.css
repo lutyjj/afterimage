@@ -41,7 +41,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 3.25rem;
+  min-height: calc(var(--bar-height) - 1px);
   color: var(--blue-text);
   font-size: var(--text-sm);
   font-weight: 480;

@@ -15,7 +15,7 @@ use crate::drawing;
 use crate::screens::{Screen, Summary};
 
 /// A stored value into its constrained model shape.
-fn fit<T, V>(value: V) -> Result<T, InternalFailure>
+pub fn fit<T, V>(value: V) -> Result<T, InternalFailure>
 where
     T: TryFrom<V>,
     T::Error: std::fmt::Debug,

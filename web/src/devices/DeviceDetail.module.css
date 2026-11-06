@@ -46,27 +46,7 @@
 }
 
 .facts {
-  display: grid;
-  gap: var(--space-3);
   padding-top: 1.25rem;
-}
-
-.facts dt {
-  color: var(--blue-text);
-  font-size: var(--text-xs);
-  font-stretch: var(--narrow);
-  font-weight: 560;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.facts dd {
-  font-size: var(--text-sm);
-  overflow-wrap: anywhere;
-}
-
-.aside {
-  color: var(--ink-soft);
 }
 
 @media (max-width: 64rem) {

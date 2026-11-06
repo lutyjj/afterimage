@@ -15,6 +15,11 @@
   transition: opacity 200ms var(--ease-out);
 }
 
+/* Before its display's model is known: a frame of no particular size. */
+.plate[data-unsized] {
+  min-height: 8rem;
+}
+
 .plate[data-busy] {
   opacity: 0.55;
 }

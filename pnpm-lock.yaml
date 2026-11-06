@@ -208,9 +208,6 @@ importers:
 
   web:
     dependencies:
-      '@codemirror/autocomplete':
-        specifier: 6.20.4
-        version: 6.20.4
       '@codemirror/lang-yaml':
         specifier: ^6.1.3
         version: 6.1.3

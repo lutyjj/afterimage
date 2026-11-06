@@ -589,10 +589,17 @@ async fn the_server_names_its_time_zone_and_secrets_but_no_secret_values() {
     let text = response.text().await.unwrap();
     assert!(!text.contains("token-value"));
     let body: Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(
-        body,
-        json!({ "timeZone": "UTC", "secretNames": ["HA_TOKEN"] })
-    );
+    assert_eq!(body["timeZone"], "UTC");
+    assert_eq!(body["secretNames"], json!(["HA_TOKEN"]));
+
+    // The default display is the one a device that reported neither a known model
+    // nor its panel size starts with.
+    let (_, code) = server.register(&mac(1)).await;
+    let (status, claimed) = server
+        .call("POST", "/manage/devices", Some(json!({ "code": code })))
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{claimed}");
+    assert_eq!(body["defaultDisplay"], claimed["device"]["display"]);
 }
 
 #[tokio::test]

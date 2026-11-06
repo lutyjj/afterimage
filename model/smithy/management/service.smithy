@@ -107,5 +107,11 @@ operation GetServer {
         /// its secrets to every account it lets sign in.
         @required
         secretNames: Names
+
+        /// The display a device of unknown model and size starts with, from TRMNL's
+        /// catalogue; a client draws on it where no device names one, such as a
+        /// preview before any device is claimed.
+        @required
+        defaultDisplay: Display
     }
 }

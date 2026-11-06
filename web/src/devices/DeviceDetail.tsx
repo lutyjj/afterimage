@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
-import { Link, useLocation, useParams } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { displayModelsQuery, messageOf, serverQuery } from "../app/client";
-import { ago, moment, signalQuality } from "../app/format";
 import { Proof } from "../proof/Proof";
 import { Stamp } from "../proof/Stamp";
 import { screensQuery } from "../screens/queries";
 import styles from "./DeviceDetail.module.css";
+import { Aside, DeviceFacts, Fact } from "./DeviceFacts";
 import { DeviceSettings } from "./DeviceSettings";
 import { PlaylistEditor } from "./PlaylistEditor";
 import { deviceQuery, findDisplay, imageUrl } from "./queries";
@@ -17,7 +18,13 @@ import { deviceStates, useStamps } from "./states";
 export function DeviceDetail() {
   const deviceId = Number(useParams().deviceId);
   const location = useLocation();
-  const claimed = (location.state as { claimed?: boolean; replaced?: boolean } | null) ?? null;
+  const navigate = useNavigate();
+  // The claim's notice shows once: the history entry forgets it, so a reload or a
+  // return to this page does not claim again.
+  const [claimed] = useState(() => (location.state as { claimed?: boolean; replaced?: boolean } | null) ?? null);
+  useEffect(() => {
+    if (location.state) void navigate(".", { replace: true, state: null });
+  }, []);
   const device = useQuery(deviceQuery(deviceId));
   const models = useQuery(displayModelsQuery).data;
   const screens = useQuery(screensQuery).data;
@@ -37,13 +44,6 @@ export function DeviceDetail() {
   }
   const data = device.data;
   const { model, palette } = findDisplay(models, data);
-  const { batteryVoltage, batteryPercent, signal, firmwareVersion } = data.readings;
-  const showing = data.showing;
-  const showingName = showing
-    ? showing.screenId !== undefined
-      ? (screens?.find((screen) => screen.id === showing.screenId)?.name ?? "A screen")
-      : "Afterimage's own screen"
-    : "Nothing yet";
 
   return (
     <div className={styles.page}>
@@ -73,52 +73,17 @@ export function DeviceDetail() {
         <Proof
           src={imageUrl(data)}
           alt={`What ${data.name} shows`}
-          width={model?.width ?? 800}
-          height={model?.height ?? 480}
+          width={model?.width}
+          height={model?.height}
           colors={palette?.colors}
           paletteName={palette?.name}
         />
-        <dl className={styles.facts}>
-          <div>
-            <dt>Showing</dt>
-            <dd>
-              {showingName}
-              {showing && timeZone && <span className={styles.aside}> since {moment(showing.renderedAt, timeZone)}</span>}
-            </dd>
-          </div>
-          <div>
-            <dt>Last seen</dt>
-            <dd>
-              {data.seenAt ? ago(data.seenAt) : "Never"}
-              {data.seenAt && timeZone && <span className={styles.aside}> {moment(data.seenAt, timeZone)}</span>}
-            </dd>
-          </div>
-          <div>
-            <dt>Battery</dt>
-            <dd>
-              {batteryPercent !== undefined ? `${Math.round(batteryPercent)}%` : "Not reported"}
-              {batteryVoltage !== undefined && <span className={styles.aside}> {batteryVoltage.toFixed(2)} V</span>}
-            </dd>
-          </div>
-          <div>
-            <dt>Signal</dt>
-            <dd>
-              {signal !== undefined ? signalQuality(signal) : "Not reported"}
-              {signal !== undefined && <span className={styles.aside}> {signal} dBm</span>}
-            </dd>
-          </div>
-          <div>
-            <dt>Firmware</dt>
-            <dd>{firmwareVersion ?? "Not reported"}</dd>
-          </div>
-          <div>
-            <dt>Hardware</dt>
-            <dd>
-              {data.firmwareModel}
-              <span className={styles.aside}> {data.mac}</span>
-            </dd>
-          </div>
-        </dl>
+        <DeviceFacts device={data} screens={screens} timeZone={timeZone} className={styles.facts}>
+          <Fact label="Hardware">
+            {data.firmwareModel}
+            <Aside> {data.mac}</Aside>
+          </Fact>
+        </DeviceFacts>
       </div>
 
       <PlaylistEditor device={data} screens={screens} timeZone={timeZone} />

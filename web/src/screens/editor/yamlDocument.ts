@@ -32,6 +32,29 @@ export function toYaml(value: unknown): string {
   return stringify(ordered, { lineWidth: 0, singleQuote: false });
 }
 
+/** A value as JSON with every object's keys in order, so two documents compare
+ * by what they say. */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+      : item,
+  );
+}
+
+/** The text a stored document opens with: the text it was written as, comments
+ * and all, while that text still says what is stored; otherwise the stored
+ * document as YAML, so a save made since is never shown as an older text. */
+export function openingText(stored: unknown, written: string | undefined): string {
+  if (written !== undefined) {
+    const value = parseYaml(written).value;
+    if (value !== undefined && canonical(withoutDefaults(value)) === canonical(withoutDefaults(stored))) {
+      return written;
+    }
+  }
+  return toYaml(stored);
+}
+
 /** Where in the text a JSON Pointer points: the node it names, or the nearest
  * node above it that exists. */
 export function rangeOf(document: Document, pointer: string): [number, number] | undefined {

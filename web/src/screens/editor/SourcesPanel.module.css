@@ -147,6 +147,10 @@
   font-family: var(--mono);
 }
 
+.copied code[data-select] {
+  user-select: all;
+}
+
 .secrets {
   display: grid;
   gap: var(--space-1);

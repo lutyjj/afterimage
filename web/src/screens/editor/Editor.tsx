@@ -64,33 +64,33 @@ const yamlLinter = linter((view) =>
 /** Ink for what the document says, blue for its structure: the proofroom's two
  * voices, in the editor too. */
 const highlight = HighlightStyle.define([
-  { tag: [tags.propertyName, tags.definition(tags.propertyName)], color: "#2659b8", fontWeight: "560" },
-  { tag: [tags.string, tags.content], color: "#1b1b19" },
+  { tag: [tags.propertyName, tags.definition(tags.propertyName)], color: "var(--blue-text)", fontWeight: "560" },
+  { tag: [tags.string, tags.content], color: "var(--ink)" },
   { tag: [tags.number, tags.bool, tags.null, tags.atom], color: "var(--ink-soft)" },
   { tag: [tags.comment, tags.meta], color: "var(--blue-gray)", fontStyle: "italic" },
   { tag: [tags.punctuation, tags.separator, tags.squareBracket, tags.brace], color: "var(--blue-gray)" },
 ]);
 
 const theme = EditorView.theme({
-  "&": { height: "100%", backgroundColor: "#ffffff", color: "#1b1b19", fontSize: "13.5px" },
+  "&": { height: "100%", backgroundColor: "var(--white)", color: "var(--ink)", fontSize: "13.5px" },
   ".cm-scroller": { fontFamily: "var(--mono)", lineHeight: "1.6" },
-  ".cm-content": { caretColor: "#2f6fd6", padding: "12px 0" },
-  ".cm-cursor": { borderLeftColor: "#2f6fd6", borderLeftWidth: "2px" },
-  ".cm-gutters": { backgroundColor: "#f7f6f1", color: "var(--blue-gray)", borderRight: "1px solid #c7d8f5" },
-  ".cm-activeLineGutter": { backgroundColor: "#e6eefb", color: "#2659b8" },
-  ".cm-activeLine": { backgroundColor: "rgb(230 238 251 / 0.45)" },
+  ".cm-content": { caretColor: "var(--blue)", padding: "12px 0" },
+  ".cm-cursor": { borderLeftColor: "var(--blue)", borderLeftWidth: "2px" },
+  ".cm-gutters": { backgroundColor: "var(--paper)", color: "var(--blue-gray)", borderRight: "1px solid var(--blue-rule)" },
+  ".cm-activeLineGutter": { backgroundColor: "var(--blue-wash)", color: "var(--blue-text)" },
+  ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--blue-wash) 45%, transparent)" },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": { backgroundColor: "var(--blue-rule)" },
-  ".cm-tooltip": { border: "1px solid #c7d8f5", backgroundColor: "#ffffff", borderRadius: "2px" },
-  ".cm-tooltip-autocomplete > ul > li[aria-selected]": { backgroundColor: "#2659b8", color: "#ffffff" },
+  ".cm-tooltip": { border: "1px solid var(--blue-rule)", backgroundColor: "var(--white)", borderRadius: "2px" },
+  ".cm-tooltip-autocomplete > ul > li[aria-selected]": { backgroundColor: "var(--blue-text)", color: "var(--white)" },
   ".cm-tooltip.cm-tooltip-hover": { maxWidth: "28rem", padding: "6px 10px", fontFamily: "var(--font)" },
-  ".cm-diagnostic-error": { borderLeftColor: "#e2483d" },
+  ".cm-diagnostic-error": { borderLeftColor: "var(--red)" },
   ".cm-lintRange-error": {
     backgroundImage: "none",
-    textDecoration: "underline wavy #e2483d",
+    textDecoration: "underline wavy var(--red)",
     textUnderlineOffset: "3px",
   },
-  ".cm-panels": { backgroundColor: "#f7f6f1", color: "#1b1b19" },
-  ".cm-foldPlaceholder": { backgroundColor: "#e6eefb", border: "none", color: "#2659b8" },
+  ".cm-panels": { backgroundColor: "var(--paper)", color: "var(--ink)" },
+  ".cm-foldPlaceholder": { backgroundColor: "var(--blue-wash)", border: "none", color: "var(--blue-text)" },
 });
 
 export interface EditorHandle {

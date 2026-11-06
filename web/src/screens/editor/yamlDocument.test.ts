@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseYaml, rangeOf, toYaml } from "./yamlDocument";
+import { openingText, parseYaml, rangeOf, toYaml } from "./yamlDocument";
 
 const text = `content:
   column:
@@ -55,5 +55,39 @@ content:
           text: 7°
           size: xlarge
 `);
+  });
+});
+
+describe("openingText", () => {
+  // As the server stores it: every default filled in.
+  const stored = (text: string) => ({
+    content: {
+      column: {
+        gap: "medium",
+        align: "start",
+        justify: "start",
+        grow: false,
+        children: [{ title: { text, size: "base" } }],
+      },
+    },
+  });
+  const written = `# The greeting.
+content:
+  column:
+    children:
+      - title:
+          text: Hello
+`;
+
+  it("keeps the text a screen was written as while it says what is stored", () => {
+    expect(openingText(stored("Hello"), written)).toBe(written);
+  });
+
+  it("shows what is stored once a later save changed it", () => {
+    expect(openingText(stored("Goodbye"), written)).toBe(toYaml(stored("Goodbye")));
+  });
+
+  it("shows what is stored when nothing was written here", () => {
+    expect(openingText(stored("Hello"), undefined)).toBe(toYaml(stored("Hello")));
   });
 });

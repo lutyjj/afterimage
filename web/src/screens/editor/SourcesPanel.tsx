@@ -13,9 +13,13 @@ export function SourcesPanel({
   sources: Record<string, SourceResult> | undefined;
   secretNames: string[];
 }) {
-  const [copied, setCopied] = useState<string>();
+  // The clipboard needs a secure context; over plain HTTP, or when the browser
+  // refuses, the expression is shown to copy by hand.
+  const [copied, setCopied] = useState<{ expression: string; done: boolean }>();
   const copy = (expression: string) => {
-    void navigator.clipboard?.writeText(expression).then(() => setCopied(expression));
+    const manual = () => setCopied({ expression, done: false });
+    if (!navigator.clipboard) return manual();
+    navigator.clipboard.writeText(expression).then(() => setCopied({ expression, done: true }), manual);
   };
   const entries = Object.entries(sources ?? {});
 
@@ -48,7 +52,7 @@ export function SourcesPanel({
       ))}
       {copied && (
         <p className={styles.copied} role="status">
-          Copied <code>{copied}</code>
+          {copied.done ? "Copied" : "Copy"} <code data-select={!copied.done || undefined}>{copied.expression}</code>
         </p>
       )}
       {secretNames.length > 0 && (

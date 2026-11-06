@@ -8,6 +8,7 @@ import { SignIn } from "../sign-in/SignIn";
 import { accountQuery, client, queryClient, whenSignedOut } from "./client";
 import { NotFoundPage, RouteError } from "./RouteError";
 import { Shell } from "./Shell";
+import { signInPath } from "./signInPath";
 
 /** The signed-in account, asked of the server directly so that a missing session
  * is the loader's answer rather than an error for the whole app. */
@@ -24,11 +25,22 @@ async function account() {
   }
 }
 
-/** Signed-in pages need an account; without one the person signs in first. */
-async function requireAccount() {
+/** Signed-in pages need an account; without one the person signs in first, told
+ * why the provider refused when it did. */
+async function requireAccount({ request }: { request: Request }) {
   const signedIn = await account();
-  if (!signedIn) throw redirect("/sign-in");
+  if (!signedIn) throw redirect(signInPath(new URL(request.url)));
   return signedIn;
+}
+
+/** Signing out is a navigation, so a page with unsaved changes asks first. */
+async function signOut() {
+  try {
+    await client.signOut({});
+  } finally {
+    queryClient.clear();
+  }
+  return redirect("/sign-in");
 }
 
 async function signedOutOnly() {
@@ -44,6 +56,7 @@ const screenEditor = async () => {
 
 export const router = createBrowserRouter([
   { path: "/sign-in", loader: signedOutOnly, Component: SignIn, ErrorBoundary: RouteError },
+  { path: "/sign-out", action: signOut },
   {
     path: "/",
     loader: requireAccount,

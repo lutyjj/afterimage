@@ -6,7 +6,7 @@
   display: grid;
   grid-template-rows: auto auto auto auto 1fr;
   gap: var(--space-3);
-  height: calc(100dvh - 3.3rem);
+  height: calc(100dvh - var(--bar-height));
   padding: var(--space-4) var(--gutter) var(--space-4);
 }
 

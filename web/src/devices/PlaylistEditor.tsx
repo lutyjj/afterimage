@@ -8,18 +8,23 @@ import { client, messageOf, queryClient } from "../app/client";
 import { DayStrip } from "./DayStrip";
 import styles from "./PlaylistEditor.module.css";
 import { daysLabel, isAllDay, nowIn, shortDay, WEEK, windowLabel } from "./schedule";
+import { deviceQuery, devicesQuery } from "./queries";
 
 /** The window an entry takes when it stops being all day, as a start to edit. */
 const DAYTIME = { from: "08:00", until: "20:00" };
 
 interface Draft extends PlaylistEntry {
   key: number;
+  /** Chosen with the row's checkbox, so times typed equal on the way to another
+   * value do not make the entry all day. */
+  allDay: boolean;
 }
 
 let nextKey = 0;
 const draftOf = (entries: PlaylistEntry[]): Draft[] =>
-  entries.map((entry) => ({ ...entry, key: nextKey++ }));
-const entryOf = ({ key: _key, ...entry }: Draft): PlaylistEntry => entry;
+  entries.map((entry) => ({ ...entry, key: nextKey++, allDay: isAllDay(entry) }));
+const entryOf = ({ key: _key, allDay, ...entry }: Draft): PlaylistEntry =>
+  allDay ? { ...entry, from: undefined, until: undefined } : entry;
 const same = (a: PlaylistEntry[], b: PlaylistEntry[]) => JSON.stringify(a) === JSON.stringify(b);
 
 /** The screens a device shows, in order, each on its days and hours. Every entry
@@ -50,13 +55,13 @@ export function PlaylistEditor({
   const save = useMutation({
     mutationFn: () => client.setPlaylist({ deviceId: device.id, playlist: draft.map(entryOf) }),
     onSuccess: ({ device: updated }) => {
-      queryClient.setQueryData(["devices", updated.id], updated);
-      void queryClient.invalidateQueries({ queryKey: ["devices"] });
+      queryClient.setQueryData(deviceQuery(updated.id).queryKey, updated);
+      void queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
       setDraft(draftOf(updated.playlist));
     },
   });
 
-  const update = (key: number, change: Partial<PlaylistEntry>) =>
+  const update = (key: number, change: Partial<Draft>) =>
     setDraft((entries) => entries.map((entry) => (entry.key === key ? { ...entry, ...change } : entry)));
   const move = (index: number, by: number) =>
     setDraft((entries) => {
@@ -69,7 +74,7 @@ export function PlaylistEditor({
   const add = () => {
     const unused = screens?.find((screen) => !draft.some((entry) => entry.screenId === screen.id));
     const screen = unused ?? screens?.[0];
-    if (screen) setDraft((entries) => [...entries, { key: nextKey++, screenId: screen.id }]);
+    if (screen) setDraft((entries) => [...entries, { key: nextKey++, screenId: screen.id, allDay: true }]);
   };
 
   const name = (id: number) => screens?.find((screen) => screen.id === id)?.name ?? "A deleted screen";
@@ -176,7 +181,7 @@ function EntryRow({
   index: number;
   count: number;
   screens: ScreenSummary[];
-  onChange: (change: Partial<PlaylistEntry>) => void;
+  onChange: (change: Partial<Draft>) => void;
   onMove: (by: number) => void;
   onRemove: () => void;
 }) {
@@ -187,9 +192,9 @@ function EntryRow({
     onChange({ days: next.length === 7 ? undefined : next });
   };
   const known = screens.some((screen) => screen.id === entry.screenId);
-  const allDay = isAllDay(entry);
+  const { allDay } = entry;
   // The window alone, on any one of its days, for the strip.
-  const window = { ...entry, days: undefined };
+  const window = { ...entryOf(entry), days: undefined };
 
   return (
     <li className={styles.entry}>
@@ -233,7 +238,11 @@ function EntryRow({
               type="checkbox"
               checked={allDay}
               onChange={(event) =>
-                onChange(event.target.checked ? { from: undefined, until: undefined } : DAYTIME)
+                onChange(
+                  event.target.checked
+                    ? { allDay: true }
+                    : { allDay: false, ...(isAllDay(entry) ? DAYTIME : {}) },
+                )
               }
             />
             All day
@@ -273,10 +282,10 @@ function EntryRow({
             entries={[{ entry: window, name: "" }]}
             hours={index === count - 1}
             names={false}
-            label={`${daysLabel(entry.days)}, ${windowLabel(entry)}`}
+            label={`${daysLabel(entry.days)}, ${windowLabel(entryOf(entry))}`}
           />
           <span className="annotation">
-            {daysLabel(entry.days)} · {windowLabel(entry)}
+            {daysLabel(entry.days)} · {windowLabel(entryOf(entry))}
           </span>
         </div>
       </div>

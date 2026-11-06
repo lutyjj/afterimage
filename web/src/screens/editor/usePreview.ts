@@ -71,6 +71,7 @@ export function usePreview(document: unknown, display: Display | undefined, devi
     return () => {
       window.clearTimeout(timer);
       abort.abort();
+      setPreview((current) => (current.drawing ? { ...current, drawing: false } : current));
     };
     // `key` carries every input; the objects themselves are new on every render.
   }, [key]);

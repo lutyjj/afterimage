@@ -1,10 +1,11 @@
 import type { Device, DisplayModel } from "@afterimage/management-client";
 import { useMutation } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
 import { minutesLabel } from "../app/format";
 import styles from "./DeviceSettings.module.css";
+import { deviceQuery, devicesQuery } from "./queries";
 
 const REFRESH_CHOICES = [5, 10, 15, 30, 60, 120, 240, 720, 1440];
 
@@ -15,6 +16,20 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
   const [palette, setPalette] = useState(device.display.palette);
   const [refresh, setRefresh] = useState(device.refreshMinutes);
   const [saved, setSaved] = useState(false);
+
+  // Settings saved elsewhere replace the fields this form has not touched, as the
+  // playlist does.
+  const stored = { name: device.name, model: device.display.model, palette: device.display.palette, refresh: device.refreshMinutes };
+  const previous = useRef(stored);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = stored;
+    setName((current) => (current.trim() === before.name ? stored.name : current));
+    setModel((current) => (current === before.model ? stored.model : current));
+    setPalette((current) => (current === before.palette ? stored.palette : current));
+    setRefresh((current) => (current === before.refresh ? stored.refresh : current));
+    // The stored values are what change; the object is new on every render.
+  }, [JSON.stringify(stored)]);
 
   const sorted = [...(models ?? [])].sort((a, b) => a.label.localeCompare(b.label));
   const chosen = sorted.find((candidate) => candidate.name === model);
@@ -34,8 +49,8 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
         refreshMinutes: refresh !== device.refreshMinutes ? refresh : undefined,
       }),
     onSuccess: ({ device: updated }) => {
-      queryClient.setQueryData(["devices", updated.id], updated);
-      void queryClient.invalidateQueries({ queryKey: ["devices"] });
+      queryClient.setQueryData(deviceQuery(updated.id).queryKey, updated);
+      void queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
       setSaved(true);
     },
   });

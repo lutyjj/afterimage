@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 
 import { client, messageOf, queryClient } from "../app/client";
 import styles from "./RemoveDevice.module.css";
+import { deviceQuery, devicesQuery } from "./queries";
 
 type Choice = "release" | "reset";
 
@@ -17,8 +18,8 @@ export function RemoveDevice({ device }: { device: Device }) {
   const remove = useMutation({
     mutationFn: () => client.deleteDevice({ deviceId: device.id, reset: choice === "reset" }),
     onSuccess: async () => {
-      queryClient.removeQueries({ queryKey: ["devices", device.id] });
-      await queryClient.invalidateQueries({ queryKey: ["devices"] });
+      queryClient.removeQueries({ queryKey: deviceQuery(device.id).queryKey });
+      await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
       void navigate("/");
     },
   });

@@ -46,6 +46,8 @@
 
   --rule: 1px solid var(--blue-rule);
   --gutter: clamp(1rem, 3vw, 2.5rem);
+  /* The top bar's height, rule included; what sits under it measures from here. */
+  --bar-height: calc(3.25rem + 1px);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
   color-scheme: light;
