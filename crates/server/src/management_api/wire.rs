@@ -33,6 +33,7 @@ pub fn account(account: Account) -> Result<model::Account, InternalFailure> {
         id: fit(account.id)?,
         name: fit(account.name)?,
         username: account.username.map(fit).transpose()?,
+        administrator: account.administrator,
     })
 }
 

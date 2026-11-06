@@ -10,6 +10,7 @@ mod accounts;
 mod deployment;
 mod devices;
 mod firmware;
+mod mqtt;
 mod screens;
 mod tokens;
 mod wire;
@@ -40,7 +41,7 @@ use crate::images::Images;
 use crate::oidc::Oidc;
 use crate::screens::Screens;
 use crate::sessions::{CookieName, CookiePolicy, Sessions};
-use crate::telemetry::Telemetry;
+use crate::telemetry::{self, Saved, Telemetry};
 use crate::tokens::Tokens;
 
 /// What the handlers act on.
@@ -62,8 +63,14 @@ pub struct State {
     pub drawing: Arc<Drawing>,
     pub images: Arc<Images>,
     pub firmware: Arc<Firmware>,
-    /// Told of every change to a device, for MQTT.
+    /// Told of every change to a device, for MQTT, and of the broker's settings.
     pub telemetry: Telemetry,
+    /// The broker the deployment sets, which the web UI cannot change.
+    pub deployment_broker: Option<telemetry::Settings>,
+    /// The broker the administrator saved, used where the deployment sets none.
+    pub saved_broker: Saved,
+    /// The web UI's address, for each MQTT device's link back to its page.
+    pub public_url: Option<String>,
     pub clock: Arc<dyn Clock>,
 }
 
@@ -120,6 +127,8 @@ pub fn service(
         .delete_screen(screens::delete_screen)
         .preview_screen(screens::preview_screen)
         .get_server(deployment::get_server)
+        .get_mqtt_settings(mqtt::get_mqtt_settings)
+        .update_mqtt_settings(mqtt::update_mqtt_settings)
         .create_access_token(tokens::create_access_token)
         .list_access_tokens(tokens::list_access_tokens)
         .revoke_access_token(tokens::revoke_access_token)

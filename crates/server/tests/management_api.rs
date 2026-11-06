@@ -383,7 +383,7 @@ fn clone_server(server: &common::Server) -> common::Server {
     common::Server {
         url: server.url.clone(),
         clock: server.clock.clone(),
-        data: tempfile::TempDir::new().unwrap(),
+        data: std::sync::Arc::new(tempfile::TempDir::new().unwrap()),
         http: reqwest::Client::builder()
             .tls_certs_only([])
             .build()

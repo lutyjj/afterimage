@@ -113,6 +113,7 @@ async fn a_sign_in_through_the_provider_starts_a_session_for_its_account() {
     assert_eq!(grace.sign_in(&server).await, LANDING);
     let account = grace.account(&server).await.expect("a session");
     assert_eq!(account["name"], "Grace");
+    assert_eq!(account["administrator"], true, "the first account");
     assert!(account.get("username").is_none(), "{account}");
 
     let again = Browser::new();
@@ -125,6 +126,7 @@ async fn a_sign_in_through_the_provider_starts_a_session_for_its_account() {
     let other = ada.account(&server).await.unwrap();
     assert_ne!(other["id"], account["id"]);
     assert_eq!(other["name"], "Ada");
+    assert_eq!(other["administrator"], false);
     assert_eq!(accounts(&server).await, 2);
 }
 

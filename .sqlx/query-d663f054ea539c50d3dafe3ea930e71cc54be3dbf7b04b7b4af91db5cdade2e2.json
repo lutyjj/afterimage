@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO accounts (name, oidc_issuer, oidc_subject, created_at, administrator)\n             VALUES (?, ?, ?, ?, NOT EXISTS (SELECT 1 FROM accounts))\n             ON CONFLICT (oidc_issuer, oidc_subject) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "d663f054ea539c50d3dafe3ea930e71cc54be3dbf7b04b7b4af91db5cdade2e2"
+}

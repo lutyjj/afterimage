@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, password_hash AS \"password_hash!\" FROM accounts\n               WHERE username = ? AND password_hash IS NOT NULL",
+  "query": "SELECT accounts.id, accounts.name, accounts.username,\n                 accounts.administrator AS \"administrator: bool\"\n             FROM sessions JOIN accounts ON accounts.id = sessions.account_id\n             WHERE sessions.token_hash = ? AND sessions.expires_at > ?",
   "describe": {
     "columns": [
       {
@@ -26,25 +26,37 @@
         }
       },
       {
-        "name": "password_hash!",
+        "name": "username",
         "ordinal": 2,
         "type_info": "Text",
         "origin": {
           "Table": {
             "table": "accounts",
-            "name": "password_hash"
+            "name": "username"
+          }
+        }
+      },
+      {
+        "name": "administrator: bool",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "administrator"
           }
         }
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "01fdd2f7e88249c47a9e524feed053cf9f37b74f65df3cbf38fc7d1f957099ee"
+  "hash": "47b7ebffc7b96c6af112ef1925be04e64dd4e8b3bc65bc075cbb6a2e541cccea"
 }

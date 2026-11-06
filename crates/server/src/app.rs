@@ -28,7 +28,7 @@ use crate::registrations::Registrations;
 use crate::screens::Screens;
 use crate::secrets::Secrets;
 use crate::sessions::{CookiePolicy, Sessions};
-use crate::telemetry::Telemetry;
+use crate::telemetry::{self, Saved, Telemetry};
 use crate::time_zone::TimeZone;
 use crate::tokens::Tokens;
 use crate::{database, device_api, management_api};
@@ -41,6 +41,23 @@ pub enum Error {
     DataDir(std::io::Error),
     #[error("{0}")]
     Settings(String),
+}
+
+/// The broker to publish to: the deployment's, or else the one the
+/// administrator saved, or none until one is saved.
+async fn broker(config: &Config, saved: &Saved) -> Result<Option<telemetry::Settings>, Error> {
+    if let Some(settings) = config.mqtt() {
+        return Ok(Some(settings));
+    }
+    let failed =
+        |error: &dyn std::fmt::Display| Error::Settings(format!("the saved MQTT broker: {error}"));
+    saved
+        .get()
+        .await
+        .map_err(|error| failed(&error))?
+        .map(|saved| saved.settings(config.public_url.clone()))
+        .transpose()
+        .map_err(|error| failed(&error))
 }
 
 /// Opens the database under the data directory and builds the router.
@@ -94,17 +111,15 @@ pub async fn build(
         pool.clone(),
         Arc::clone(&clock),
     ));
-    // Device state over MQTT, when a broker is configured.
-    let telemetry = match config.mqtt() {
-        Some(settings) => Telemetry::start(
-            settings,
-            Devices::new(pool.clone(), Arc::clone(&clock)),
-            Screens::new(pool.clone(), Arc::clone(&clock)),
-            Arc::clone(&firmware),
-        )
-        .map_err(|error| Error::Settings(format!("the MQTT broker: {error}")))?,
-        None => Telemetry::default(),
-    };
+    // Device state over MQTT.
+    let saved_broker = Saved::new(pool.clone());
+    let telemetry = Telemetry::start(
+        broker(config, &saved_broker).await?,
+        Devices::new(pool.clone(), Arc::clone(&clock)),
+        Screens::new(pool.clone(), Arc::clone(&clock)),
+        Arc::clone(&firmware),
+    )
+    .map_err(|error| Error::Settings(format!("the MQTT broker: {error}")))?;
     let device_state = Arc::new(device_api::State {
         registrations: Registrations::new(pool.clone(), Arc::clone(&clock), Arc::clone(&entropy)),
         devices: Devices::new(pool.clone(), Arc::clone(&clock)),
@@ -139,6 +154,9 @@ pub async fn build(
         images,
         firmware,
         telemetry,
+        deployment_broker: config.mqtt(),
+        saved_broker,
+        public_url: config.public_url.clone(),
         clock,
     });
     Ok(router(

@@ -5,6 +5,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use crate::{oidc, telemetry};
+use afterimage_management_api::model::{MqttDiscoveryPrefix, MqttTopic};
 
 #[derive(Debug, Clone, clap::Parser)]
 #[command(
@@ -77,7 +78,7 @@ pub struct Config {
     /// The MQTT broker to publish device state to, with Home Assistant's
     /// discovery, such as `mqtt://broker.example:1883` or `mqtts://` with TLS;
     /// nothing is published without it.
-    #[arg(long, env = "AFTERIMAGE_MQTT_URL", value_parser = parse_mqtt_url)]
+    #[arg(long, env = "AFTERIMAGE_MQTT_URL", value_parser = telemetry::broker_url)]
     pub mqtt_url: Option<url::Url>,
 
     #[arg(long, env = "AFTERIMAGE_MQTT_USERNAME", requires = "mqtt_url")]
@@ -158,47 +159,20 @@ impl Config {
     }
 }
 
-fn parse_mqtt_url(text: &str) -> Result<url::Url, String> {
-    let url = url::Url::parse(text).map_err(|error| error.to_string())?;
-    if !matches!(url.scheme(), "mqtt" | "mqtts") {
-        return Err("must start with mqtt:// or mqtts://".to_owned());
-    }
-    if url.host_str().is_none_or(str::is_empty) || !matches!(url.path(), "" | "/") {
-        return Err("must be a scheme, a host and a port, with no path".to_owned());
-    }
-    if !url.username().is_empty() || url.password().is_some() {
-        return Err("takes no credentials; set the MQTT username and password".to_owned());
-    }
-    Ok(url)
-}
-
-/// One topic level of letters, digits, `_` and `-`: Home Assistant's discovery
-/// takes no other characters in a discovery ID.
+/// The base topic, as the management API's model constrains it: one level of
+/// letters, digits, `_` and `-`, which Home Assistant's discovery IDs take.
 fn parse_base_topic(text: &str) -> Result<String, String> {
-    if !text.is_empty()
-        && text
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
-    {
-        Ok(text.to_owned())
-    } else {
-        Err("must be letters, digits, _ and - only".to_owned())
-    }
+    MqttTopic::try_from(text.to_owned())
+        .map(MqttTopic::into_inner)
+        .map_err(|violation| violation.to_string())
 }
 
-/// A topic of one or more levels, without wildcards or empty levels.
+/// The discovery prefix, as the management API's model constrains it: topic
+/// levels without wildcards or empty levels.
 fn parse_topic(text: &str) -> Result<String, String> {
-    let valid = !text.is_empty()
-        && text.split('/').all(|level| {
-            !level.is_empty()
-                && !level.contains(['+', '#'])
-                && level.chars().all(|c| c.is_ascii_graphic())
-        });
-    if valid {
-        Ok(text.to_owned())
-    } else {
-        Err("must be topic levels of visible ASCII, without + or # or empty levels".to_owned())
-    }
+    MqttDiscoveryPrefix::try_from(text.to_owned())
+        .map(MqttDiscoveryPrefix::into_inner)
+        .map_err(|violation| violation.to_string())
 }
 
 fn parse_origin(text: &str) -> Result<String, String> {

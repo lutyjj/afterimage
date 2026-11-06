@@ -73,6 +73,8 @@ service Management {
         DeleteScreen
         PreviewScreen
         GetServer
+        GetMqttSettings
+        UpdateMqttSettings
         CreateAccessToken
         ListAccessTokens
         RevokeAccessToken
@@ -105,6 +107,16 @@ structure NotFound {
 @error("client")
 @httpError(409)
 structure Conflict {
+    @required
+    message: String
+}
+
+/// The credential may not do this: a token creating or revoking tokens or
+/// signing out, a read-only token changing anything, or an account that does not
+/// administer the server reading or changing its settings.
+@error("client")
+@httpError(403)
+structure Forbidden {
     @required
     message: String
 }

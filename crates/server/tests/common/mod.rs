@@ -63,7 +63,8 @@ impl Entropy for ScriptedIds {
 pub struct Server {
     pub url: String,
     pub clock: Arc<ManualClock>,
-    pub data: TempDir,
+    /// Shared by another server on the same data, as after a restart.
+    pub data: Arc<TempDir>,
     /// Keeps cookies, as a browser does.
     pub http: reqwest::Client,
     pub trmnl: Trmnl,
@@ -201,13 +202,44 @@ async fn start_full(entropy: Arc<dyn Entropy>, settings: &[&str], secrets: Secre
     start_at(new_clock(), entropy, settings, secrets).await
 }
 
+impl Server {
+    /// Another server on this one's data and clock, as the server is after a
+    /// restart, with these settings.
+    pub async fn again(&self, settings: &[&str]) -> Server {
+        start_on(
+            Arc::clone(&self.data),
+            Arc::clone(&self.clock),
+            Arc::new(OsEntropy),
+            settings,
+            Secrets::default(),
+        )
+        .await
+    }
+}
+
 async fn start_at(
     clock: Arc<ManualClock>,
     entropy: Arc<dyn Entropy>,
     settings: &[&str],
     secrets: Secrets,
 ) -> Server {
-    let data = TempDir::new().unwrap();
+    start_on(
+        Arc::new(TempDir::new().unwrap()),
+        clock,
+        entropy,
+        settings,
+        secrets,
+    )
+    .await
+}
+
+async fn start_on(
+    data: Arc<TempDir>,
+    clock: Arc<ManualClock>,
+    entropy: Arc<dyn Entropy>,
+    settings: &[&str],
+    secrets: Secrets,
+) -> Server {
     let data_dir = data.path().to_str().unwrap().to_owned();
     let trmnl = Trmnl::start().await;
     let arguments = [
@@ -667,6 +699,18 @@ impl Observer {
                     .unwrap()
                     .get(topic)
                     .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+    }
+
+    /// Waits until `topic` holds nothing, as after the server cleared it.
+    pub async fn wait_gone(&self, topic: &str) {
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        while self.messages.lock().unwrap().contains_key(topic) {
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "{topic} was never cleared"
             );
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }

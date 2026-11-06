@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO mqtt_settings\n                         (id, url, username, password, topic, discovery_prefix, updated_at)\n                     VALUES (1, ?, ?, ?, ?, ?, ?)\n                     ON CONFLICT (id) DO UPDATE SET\n                         url = excluded.url,\n                         username = excluded.username,\n                         password = excluded.password,\n                         topic = excluded.topic,\n                         discovery_prefix = excluded.discovery_prefix,\n                         updated_at = excluded.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "6fb9d1b97af8e272fde5045f7a965819c0afe47906d3ded6190253d1a50e0d89"
+}

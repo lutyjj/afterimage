@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, username FROM accounts WHERE id = ?",
+  "query": "SELECT id, name, password_hash AS \"password_hash!\", administrator AS \"administrator: bool\"\n               FROM accounts WHERE username = ? AND password_hash IS NOT NULL",
   "describe": {
     "columns": [
       {
@@ -26,13 +26,24 @@
         }
       },
       {
-        "name": "username",
+        "name": "password_hash!",
         "ordinal": 2,
         "type_info": "Text",
         "origin": {
           "Table": {
             "table": "accounts",
-            "name": "username"
+            "name": "password_hash"
+          }
+        }
+      },
+      {
+        "name": "administrator: bool",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "administrator"
           }
         }
       }
@@ -43,8 +54,9 @@
     "nullable": [
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "68fd998c2b2ea712e39e0aa272c3eb817b3118c2fed2ac367c5e2e6f0bd756c9"
+  "hash": "dfd61ed08cc552ffa90a069fcd512005770b6631505c6cd194019431fbcd6ad3"
 }

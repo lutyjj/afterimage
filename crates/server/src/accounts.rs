@@ -16,6 +16,8 @@ pub struct Account {
     pub name: String,
     /// Set for an account that can sign in with a password.
     pub username: Option<String>,
+    /// The account administers the server: the first account does.
+    pub administrator: bool,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -77,8 +79,8 @@ impl Accounts {
             return Ok(None);
         }
         let id = sqlx::query_scalar!(
-            "INSERT INTO accounts (name, username, password_hash, created_at)
-             VALUES (?, ?, ?, ?) RETURNING id",
+            "INSERT INTO accounts (name, username, password_hash, created_at, administrator)
+             VALUES (?, ?, ?, ?, 1) RETURNING id",
             name,
             username,
             password_hash,
@@ -91,6 +93,7 @@ impl Accounts {
             id,
             name: name.to_owned(),
             username: Some(username.to_owned()),
+            administrator: true,
         }))
     }
 
@@ -108,8 +111,8 @@ impl Accounts {
         password: String,
     ) -> Result<Option<Account>, Error> {
         let row = sqlx::query!(
-            r#"SELECT id, name, password_hash AS "password_hash!" FROM accounts
-               WHERE username = ? AND password_hash IS NOT NULL"#,
+            r#"SELECT id, name, password_hash AS "password_hash!", administrator AS "administrator: bool"
+               FROM accounts WHERE username = ? AND password_hash IS NOT NULL"#,
             username
         )
         .fetch_optional(&self.pool)
@@ -122,11 +125,13 @@ impl Accounts {
             id: row.id,
             name: row.name,
             username: Some(username.to_owned()),
+            administrator: row.administrator,
         }))
     }
 
     /// The account the provider's `issuer` and `subject` identify, created on first
-    /// sign-in with `name`.
+    /// sign-in with `name`; the server's administrator when no account exists yet,
+    /// as one statement decides.
     ///
     /// # Errors
     ///
@@ -139,7 +144,8 @@ impl Accounts {
     ) -> Result<Account, Error> {
         let now = self.clock.now();
         sqlx::query!(
-            "INSERT INTO accounts (name, oidc_issuer, oidc_subject, created_at) VALUES (?, ?, ?, ?)
+            "INSERT INTO accounts (name, oidc_issuer, oidc_subject, created_at, administrator)
+             VALUES (?, ?, ?, ?, NOT EXISTS (SELECT 1 FROM accounts))
              ON CONFLICT (oidc_issuer, oidc_subject) DO NOTHING",
             name,
             issuer,
@@ -149,7 +155,8 @@ impl Accounts {
         .execute(&self.pool)
         .await?;
         let row = sqlx::query!(
-            "SELECT id, name, username FROM accounts WHERE oidc_issuer = ? AND oidc_subject = ?",
+            r#"SELECT id, name, username, administrator AS "administrator: bool"
+               FROM accounts WHERE oidc_issuer = ? AND oidc_subject = ?"#,
             issuer,
             subject
         )
@@ -159,6 +166,7 @@ impl Accounts {
             id: row.id,
             name: row.name,
             username: row.username,
+            administrator: row.administrator,
         })
     }
 
@@ -166,13 +174,18 @@ impl Accounts {
     ///
     /// When storage fails.
     pub async fn get(&self, id: i64) -> Result<Option<Account>, Error> {
-        let row = sqlx::query!("SELECT id, name, username FROM accounts WHERE id = ?", id)
-            .fetch_optional(&self.pool)
-            .await?;
+        let row = sqlx::query!(
+            r#"SELECT id, name, username, administrator AS "administrator: bool"
+               FROM accounts WHERE id = ?"#,
+            id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
         Ok(row.map(|row| Account {
             id: row.id,
             name: row.name,
             username: row.username,
+            administrator: row.administrator,
         }))
     }
 }

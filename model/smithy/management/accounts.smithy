@@ -28,6 +28,11 @@ structure Account {
     /// The name the account signs in with a password; absent for an account that
     /// signs in only through the OIDC provider.
     username: Username
+
+    /// The account administers the server and changes its settings, such as the
+    /// MQTT broker. The first account does.
+    @required
+    administrator: Boolean
 }
 
 /// How a person without a session can sign in here.

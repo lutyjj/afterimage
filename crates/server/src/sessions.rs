@@ -67,9 +67,10 @@ impl Sessions {
         let token_hash = keys::token_hash(token);
         let now = self.clock.now();
         let row = sqlx::query!(
-            "SELECT accounts.id, accounts.name, accounts.username
+            r#"SELECT accounts.id, accounts.name, accounts.username,
+                 accounts.administrator AS "administrator: bool"
              FROM sessions JOIN accounts ON accounts.id = sessions.account_id
-             WHERE sessions.token_hash = ? AND sessions.expires_at > ?",
+             WHERE sessions.token_hash = ? AND sessions.expires_at > ?"#,
             token_hash,
             now
         )
@@ -79,6 +80,7 @@ impl Sessions {
             id: row.id,
             name: row.name,
             username: row.username,
+            administrator: row.administrator,
         }))
     }
 

@@ -1,0 +1,230 @@
+//! Device state over MQTT, with Home Assistant's MQTT discovery. Each claimed
+//! device becomes a Home Assistant device: its battery, voltage, signal, last
+//! check-in and current screen are sensors, and its firmware is an update entity
+//! whose install asks the device to install its board's newest release (step 4 of
+//! the design's Devices).
+//!
+//! Topics, under the base topic (`afterimage` unless configured), where `<device>`
+//! is the device's MAC in lowercase hexadecimal:
+//!
+//! - `<base>/status`: `online` while the server is connected, and `offline`, its
+//!   last will. Every entity's availability follows it.
+//! - `<base>/<device>/state`: the readings and the screen, as JSON.
+//! - `<base>/<device>/firmware`: the installed and newest release, as Home
+//!   Assistant's update entity reads them.
+//! - `<base>/<device>/firmware/install`: `install` asks for the newest release.
+//! - `<prefix>/device/<base>_<device>/config`: the device's discovery payload.
+//!
+//! Everything but the install command is retained, so a subscriber that joins
+//! later reads the last state. The server publishes every device again when it
+//! connects and when Home Assistant announces itself on `<prefix>/status`, and
+//! one device whenever it checks in or changes. On connecting it also reads the
+//! retained state topics back and clears those of devices that are gone, so a
+//! device removed while the broker was out of reach does not linger. History
+//! belongs to whoever subscribes.
+//!
+//! Accounts may hold devices of one MAC, as when a device set up again is claimed
+//! by another account; its topics belong to the one that checked in last.
+//!
+//! Whoever may publish to the broker may ask any device to install firmware: the
+//! broker's access control is the boundary. A retained install command is
+//! ignored, since the broker would replay it at every connection.
+//!
+//! The broker is the deployment's, or else the one the administrator saved in
+//! the web UI ([`Saved`]). A change of broker or topics takes effect at once: the
+//! connection that ends clears every topic it published and says goodbye, so its
+//! last will stays unsent, and the next one connects with the new settings.
+
+mod connection;
+mod payloads;
+mod saved;
+
+use std::sync::Arc;
+
+use tokio::sync::{mpsc, oneshot, watch};
+
+pub use saved::{Saved, SavedBroker};
+
+use crate::devices::Devices;
+use crate::firmware::Firmware;
+use crate::screens::Screens;
+
+/// Where and how to publish.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Settings {
+    /// `mqtt://` or `mqtts://`, host and port.
+    pub url: url::Url,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    /// The base topic, which is also the client's ID at the broker.
+    pub topic: String,
+    /// Home Assistant's discovery prefix.
+    pub discovery_prefix: String,
+    /// The web UI's address, for each device's link back to its page.
+    pub public_url: Option<String>,
+}
+
+impl Settings {
+    /// Whether the client takes these settings.
+    ///
+    /// # Errors
+    ///
+    /// What it refuses, such as a URL it cannot connect to.
+    pub fn check(&self) -> Result<(), String> {
+        connection::options(self).map(drop)
+    }
+}
+
+/// A broker's address: `mqtt://` or `mqtts://`, a host and a port, without a
+/// path or credentials, which the username and password carry.
+///
+/// # Errors
+///
+/// What the address lacks or has too much of.
+pub fn broker_url(text: &str) -> Result<url::Url, String> {
+    let url = url::Url::parse(text).map_err(|error| error.to_string())?;
+    if !matches!(url.scheme(), "mqtt" | "mqtts") {
+        return Err("must start with mqtt:// or mqtts://".to_owned());
+    }
+    if url.host_str().is_none_or(str::is_empty) || !matches!(url.path(), "" | "/") {
+        return Err("must be a scheme, a host and a port, with no path".to_owned());
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err("takes no credentials; set the MQTT username and password".to_owned());
+    }
+    Ok(url)
+}
+
+/// The connection to the broker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Connection {
+    /// No broker is set.
+    Off,
+    /// Connecting, or trying again after the broker could not be reached.
+    Connecting,
+    Connected,
+}
+
+/// What changed, for the publisher.
+#[derive(Debug)]
+enum Change {
+    Device(i64),
+    /// A removed device, by its MAC.
+    Removed(String),
+}
+
+enum Command {
+    Change(Change),
+    /// New settings, or none to stop publishing; answered once they hold.
+    Configure(Option<Settings>, oneshot::Sender<Result<(), String>>),
+}
+
+/// What every connection publishes from.
+struct Parts {
+    devices: Arc<Devices>,
+    screens: Arc<Screens>,
+    firmware: Arc<Firmware>,
+}
+
+/// The way in for everything that changes a device, and for the broker's
+/// settings. One task owns the connection and hands each change to it; with no
+/// broker it drops them.
+#[derive(Debug, Clone)]
+pub struct Telemetry {
+    commands: mpsc::UnboundedSender<Command>,
+    connection: watch::Receiver<Connection>,
+}
+
+impl Telemetry {
+    /// Starts publishing with `settings`, connecting to the broker and
+    /// reconnecting after any failure, or waits for settings when there are none.
+    ///
+    /// # Errors
+    ///
+    /// When the client does not take the settings.
+    pub fn start(
+        settings: Option<Settings>,
+        devices: Devices,
+        screens: Screens,
+        firmware: Arc<Firmware>,
+    ) -> Result<Self, String> {
+        let parts = Parts {
+            devices: Arc::new(devices),
+            screens: Arc::new(screens),
+            firmware,
+        };
+        let (state, connection) = watch::channel(Connection::Off);
+        let (commands, mut received) = mpsc::unbounded_channel();
+        let telemetry = Self {
+            commands,
+            connection,
+        };
+        let open = |settings: Settings| {
+            connection::Open::new(settings, &parts, telemetry.clone(), state.clone())
+        };
+        let mut current = settings.map(open).transpose()?;
+        let telemetry_of_task = telemetry.clone();
+        tokio::spawn(async move {
+            let open = |settings: Settings| {
+                connection::Open::new(settings, &parts, telemetry_of_task.clone(), state.clone())
+            };
+            while let Some(command) = received.recv().await {
+                match command {
+                    Command::Change(change) => {
+                        if let Some(current) = &current {
+                            current.change(change);
+                        }
+                    }
+                    Command::Configure(settings, done) => {
+                        if let Some(retiring) = current.take() {
+                            retiring.retire().await;
+                        }
+                        state.send_replace(Connection::Off);
+                        let opened = settings.map(open).transpose();
+                        let answer = opened.map(|opened| current = opened);
+                        // The caller may have stopped waiting; the settings hold
+                        // all the same.
+                        let _ = done.send(answer);
+                    }
+                }
+            }
+        });
+        Ok(telemetry)
+    }
+
+    /// Publishes the device's discovery payload and state.
+    pub fn device(&self, id: i64) {
+        self.send(Command::Change(Change::Device(id)));
+    }
+
+    /// Takes a removed device out of Home Assistant.
+    pub fn removed(&self, mac: &str) {
+        self.send(Command::Change(Change::Removed(mac.to_owned())));
+    }
+
+    /// The connection to the broker now.
+    #[must_use]
+    pub fn connection(&self) -> Connection {
+        *self.connection.borrow()
+    }
+
+    /// Publishes with `settings` from now on, or stops publishing with none:
+    /// what the current connection published is cleared first.
+    ///
+    /// # Errors
+    ///
+    /// When the client does not take the settings, which leaves the server
+    /// publishing nowhere.
+    pub async fn configure(&self, settings: Option<Settings>) -> Result<(), String> {
+        let (done, answer) = oneshot::channel();
+        self.send(Command::Configure(settings, done));
+        answer
+            .await
+            .unwrap_or_else(|_| Err("the publisher has stopped".to_owned()))
+    }
+
+    fn send(&self, command: Command) {
+        // The task outlives every sender but at shutdown.
+        let _ = self.commands.send(command);
+    }
+}

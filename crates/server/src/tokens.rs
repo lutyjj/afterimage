@@ -142,7 +142,8 @@ impl Tokens {
             return Ok(None);
         };
         let account = sqlx::query!(
-            "SELECT id, name, username FROM accounts WHERE id = ?",
+            r#"SELECT id, name, username, administrator AS "administrator: bool"
+               FROM accounts WHERE id = ?"#,
             row.account_id
         )
         .fetch_one(&self.pool)
@@ -152,6 +153,7 @@ impl Tokens {
                 id: account.id,
                 name: account.name,
                 username: account.username,
+                administrator: account.administrator,
             },
             read_only: row.read_only,
         }))

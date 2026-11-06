@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT accounts.id, accounts.name, accounts.username\n             FROM sessions JOIN accounts ON accounts.id = sessions.account_id\n             WHERE sessions.token_hash = ? AND sessions.expires_at > ?",
+  "query": "SELECT id, name, username, administrator AS \"administrator: bool\"\n               FROM accounts WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -35,16 +35,28 @@
             "name": "username"
           }
         }
+      },
+      {
+        "name": "administrator: bool",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "administrator"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "3789df7580792228c143401f64e620b6ec93c1a5cda9c9b9daec02344de45293"
+  "hash": "4edc650f400602a4943a8575f0ef6559820fa7c10c2c6afb46a667dac14cf65c"
 }

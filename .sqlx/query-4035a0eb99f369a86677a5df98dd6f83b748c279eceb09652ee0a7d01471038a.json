@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, username FROM accounts WHERE oidc_issuer = ? AND oidc_subject = ?",
+  "query": "SELECT id, name, username, administrator AS \"administrator: bool\"\n               FROM accounts WHERE oidc_issuer = ? AND oidc_subject = ?",
   "describe": {
     "columns": [
       {
@@ -35,6 +35,17 @@
             "name": "username"
           }
         }
+      },
+      {
+        "name": "administrator: bool",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "administrator"
+          }
+        }
       }
     ],
     "parameters": {
@@ -43,8 +54,9 @@
     "nullable": [
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "decff2139a11d55666f5917280f784bdc6df7c45881709ba96ac1a4de44d01e9"
+  "hash": "4035a0eb99f369a86677a5df98dd6f83b748c279eceb09652ee0a7d01471038a"
 }
