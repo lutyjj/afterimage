@@ -79,7 +79,7 @@ const theme = EditorView.theme({
   ".cm-gutters": { backgroundColor: "#f7f6f1", color: "var(--blue-gray)", borderRight: "1px solid #c7d8f5" },
   ".cm-activeLineGutter": { backgroundColor: "#e6eefb", color: "#2659b8" },
   ".cm-activeLine": { backgroundColor: "rgb(230 238 251 / 0.45)" },
-  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": { backgroundColor: "#d3e1f8" },
+  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": { backgroundColor: "var(--blue-rule)" },
   ".cm-tooltip": { border: "1px solid #c7d8f5", backgroundColor: "#ffffff", borderRadius: "2px" },
   ".cm-tooltip-autocomplete > ul > li[aria-selected]": { backgroundColor: "#2659b8", color: "#ffffff" },
   ".cm-tooltip.cm-tooltip-hover": { maxWidth: "28rem", padding: "6px 10px", fontFamily: "var(--font)" },

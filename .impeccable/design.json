@@ -1,0 +1,453 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-06T06:39:30+00:00",
+  "title": "Design System: Afterimage",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Proofing Paper",
+        "canonical": "#f7f6f1",
+        "tonalRamp": [
+          "oklch(15% 0.001 97)",
+          "oklch(26% 0.003 97)",
+          "oklch(38% 0.006 97)",
+          "oklch(49% 0.007 97)",
+          "oklch(61% 0.007 97)",
+          "oklch(72% 0.006 97)",
+          "oklch(84% 0.003 97)",
+          "oklch(95% 0.001 97)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "Sheet White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.000 90)",
+          "oklch(26% 0.000 90)",
+          "oklch(38% 0.000 90)",
+          "oklch(49% 0.000 90)",
+          "oklch(61% 0.000 90)",
+          "oklch(72% 0.000 90)",
+          "oklch(84% 0.000 90)",
+          "oklch(95% 0.000 90)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "True Ink",
+        "canonical": "#1b1b19",
+        "tonalRamp": [
+          "oklch(15% 0.001 107)",
+          "oklch(26% 0.002 107)",
+          "oklch(38% 0.003 107)",
+          "oklch(49% 0.004 107)",
+          "oklch(61% 0.004 107)",
+          "oklch(72% 0.003 107)",
+          "oklch(84% 0.002 107)",
+          "oklch(95% 0.001 107)"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Soft Ink",
+        "canonical": "#4b4a45",
+        "tonalRamp": [
+          "oklch(15% 0.001 98)",
+          "oklch(26% 0.004 98)",
+          "oklch(38% 0.007 98)",
+          "oklch(49% 0.008 98)",
+          "oklch(61% 0.008 98)",
+          "oklch(72% 0.007 98)",
+          "oklch(84% 0.004 98)",
+          "oklch(95% 0.001 98)"
+        ]
+      },
+      "blue": {
+        "role": "primary",
+        "displayName": "Non-repro Blue",
+        "canonical": "#2f6fd6",
+        "tonalRamp": [
+          "oklch(15% 0.027 260)",
+          "oklch(26% 0.088 260)",
+          "oklch(38% 0.149 260)",
+          "oklch(49% 0.172 260)",
+          "oklch(61% 0.172 260)",
+          "oklch(72% 0.149 260)",
+          "oklch(84% 0.088 260)",
+          "oklch(95% 0.027 260)"
+        ]
+      },
+      "blue-text": {
+        "role": "primary",
+        "displayName": "Pencil Blue",
+        "canonical": "#2659b8",
+        "tonalRamp": [
+          "oklch(15% 0.025 261)",
+          "oklch(26% 0.082 261)",
+          "oklch(38% 0.139 261)",
+          "oklch(49% 0.160 261)",
+          "oklch(61% 0.160 261)",
+          "oklch(72% 0.139 261)",
+          "oklch(84% 0.082 261)",
+          "oklch(95% 0.025 261)"
+        ]
+      },
+      "blue-deep": {
+        "role": "primary",
+        "displayName": "Deep Pencil Blue",
+        "canonical": "#1f4d9f",
+        "tonalRamp": [
+          "oklch(15% 0.022 261)",
+          "oklch(26% 0.073 261)",
+          "oklch(38% 0.124 261)",
+          "oklch(49% 0.143 261)",
+          "oklch(61% 0.143 261)",
+          "oklch(72% 0.124 261)",
+          "oklch(84% 0.073 261)",
+          "oklch(95% 0.022 261)"
+        ]
+      },
+      "blue-wash": {
+        "role": "primary",
+        "displayName": "Blue Wash",
+        "canonical": "#e6eefb",
+        "tonalRamp": [
+          "oklch(15% 0.003 260)",
+          "oklch(26% 0.010 260)",
+          "oklch(38% 0.017 260)",
+          "oklch(49% 0.020 260)",
+          "oklch(61% 0.020 260)",
+          "oklch(72% 0.017 260)",
+          "oklch(84% 0.010 260)",
+          "oklch(95% 0.003 260)"
+        ]
+      },
+      "blue-rule": {
+        "role": "primary",
+        "displayName": "Hairline Blue",
+        "canonical": "#c7d8f5",
+        "tonalRamp": [
+          "oklch(15% 0.007 261)",
+          "oklch(26% 0.023 261)",
+          "oklch(38% 0.038 261)",
+          "oklch(49% 0.044 261)",
+          "oklch(61% 0.044 261)",
+          "oklch(72% 0.038 261)",
+          "oklch(84% 0.023 261)",
+          "oklch(95% 0.007 261)"
+        ]
+      },
+      "blue-edge": {
+        "role": "primary",
+        "displayName": "Edge Blue",
+        "canonical": "#9bb8eb",
+        "tonalRamp": [
+          "oklch(15% 0.012 262)",
+          "oklch(26% 0.041 262)",
+          "oklch(38% 0.069 262)",
+          "oklch(49% 0.080 262)",
+          "oklch(61% 0.080 262)",
+          "oklch(72% 0.069 262)",
+          "oklch(84% 0.041 262)",
+          "oklch(95% 0.012 262)"
+        ]
+      },
+      "blue-gray": {
+        "role": "primary",
+        "displayName": "Blue Gray",
+        "canonical": "#5f6f8f",
+        "tonalRamp": [
+          "oklch(15% 0.008 264)",
+          "oklch(26% 0.028 264)",
+          "oklch(38% 0.047 264)",
+          "oklch(49% 0.054 264)",
+          "oklch(61% 0.054 264)",
+          "oklch(72% 0.047 264)",
+          "oklch(84% 0.028 264)",
+          "oklch(95% 0.008 264)"
+        ]
+      },
+      "red": {
+        "role": "secondary",
+        "displayName": "Proofer's Red",
+        "canonical": "#e2483d",
+        "tonalRamp": [
+          "oklch(15% 0.030 28)",
+          "oklch(26% 0.098 28)",
+          "oklch(38% 0.167 28)",
+          "oklch(49% 0.192 28)",
+          "oklch(61% 0.192 28)",
+          "oklch(72% 0.167 28)",
+          "oklch(84% 0.098 28)",
+          "oklch(95% 0.030 28)"
+        ]
+      },
+      "red-text": {
+        "role": "secondary",
+        "displayName": "Red Pencil",
+        "canonical": "#c2372d",
+        "tonalRamp": [
+          "oklch(15% 0.028 29)",
+          "oklch(26% 0.091 29)",
+          "oklch(38% 0.154 29)",
+          "oklch(49% 0.177 29)",
+          "oklch(61% 0.177 29)",
+          "oklch(72% 0.154 29)",
+          "oklch(84% 0.091 29)",
+          "oklch(95% 0.028 29)"
+        ]
+      },
+      "red-wash": {
+        "role": "secondary",
+        "displayName": "Red Wash",
+        "canonical": "#fbe9e7",
+        "tonalRamp": [
+          "oklch(15% 0.003 25)",
+          "oklch(26% 0.010 25)",
+          "oklch(38% 0.017 25)",
+          "oklch(49% 0.020 25)",
+          "oklch(61% 0.020 25)",
+          "oklch(72% 0.017 25)",
+          "oklch(84% 0.010 25)",
+          "oklch(95% 0.003 25)"
+        ]
+      },
+      "red-deep": {
+        "role": "secondary",
+        "displayName": "Deep Red Pencil",
+        "canonical": "#a82d24",
+        "tonalRamp": [
+          "oklch(15% 0.025 29)",
+          "oklch(26% 0.082 29)",
+          "oklch(38% 0.140 29)",
+          "oklch(49% 0.161 29)",
+          "oklch(61% 0.161 29)",
+          "oklch(72% 0.140 29)",
+          "oklch(84% 0.082 29)",
+          "oklch(95% 0.025 29)"
+        ]
+      },
+      "blue-faint": {
+        "role": "primary",
+        "displayName": "Faint Blue",
+        "canonical": "#8aa6d9",
+        "tonalRamp": [
+          "oklch(15% 0.013 262)",
+          "oklch(26% 0.041 262)",
+          "oklch(38% 0.070 262)",
+          "oklch(49% 0.081 262)",
+          "oklch(61% 0.081 262)",
+          "oklch(72% 0.070 262)",
+          "oklch(84% 0.041 262)",
+          "oklch(95% 0.013 262)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "\"Afterimage\" in the top bar and on the sign-in sheet."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "A page's name; a device's own page sets its name at 2rem."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "A device's name in the list and section headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Reading text and form values, with tabular figures."
+      },
+      "body-small": {
+        "displayName": "Body small",
+        "purpose": "Facts, hints, buttons and error text."
+      },
+      "annotation": {
+        "displayName": "Annotation",
+        "purpose": "Everything written about a thing: labels, sizes, scale, time zone."
+      },
+      "stamp": {
+        "displayName": "Stamp",
+        "purpose": "Device states only."
+      },
+      "code-cell": {
+        "displayName": "Code cell",
+        "purpose": "The six characters of a claim code."
+      },
+      "axis": {
+        "displayName": "Axis",
+        "purpose": "The hour figures under a day strip."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "The YAML editor."
+      },
+      "code-small": {
+        "displayName": "Code small",
+        "purpose": "The sources tree and the secrets' names beside it."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Every transition: controls' fills, a busy plate's fade, a stamp's cancel stroke."
+      },
+      {
+        "name": "control",
+        "value": "150ms",
+        "purpose": "Background, text and border colour of buttons."
+      },
+      {
+        "name": "plate-busy",
+        "value": "200ms",
+        "purpose": "A plate fades to 55% while its next proof draws."
+      },
+      {
+        "name": "stamp-cancel",
+        "value": "320ms",
+        "purpose": "The stroke drawn through a stamp whose state ended."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "playlist-stack",
+        "value": "80rem"
+      },
+      {
+        "name": "row-stack",
+        "value": "72rem"
+      },
+      {
+        "name": "device-detail-stack",
+        "value": "64rem"
+      },
+      {
+        "name": "claim-above",
+        "value": "52rem"
+      },
+      {
+        "name": "phone",
+        "value": "40rem"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one action that saves a form.",
+      "html": "<button class=\"ds-btn-primary\">Save playlist</button>",
+      "css": ".ds-btn-primary { font-family: var(--font, 'Archivo Variable', Archivo, system-ui, sans-serif); display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0 1rem; border: 1px solid var(--blue-text, #2659b8); border-radius: 2px; background: var(--blue-text, #2659b8); color: #fff; font-size: 0.8125rem; font-weight: 580; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:hover { background: var(--blue-deep, #1f4d9f); } .ds-btn-primary:focus-visible { outline: 2px solid var(--blue, #2f6fd6); outline-offset: 2px; }"
+    },
+    {
+      "name": "Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Every other action: a hairline frame in pencil blue.",
+      "html": "<button class=\"ds-btn\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"M12 5v14\"/></svg>Add a screen</button>",
+      "css": ".ds-btn { font-family: var(--font, 'Archivo Variable', Archivo, system-ui, sans-serif); display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2.25rem; padding: 0 1rem; border: 1px solid var(--blue-text, #2659b8); border-radius: 2px; background: #fff; color: var(--blue-text, #2659b8); font-size: 0.8125rem; font-weight: 580; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn:hover { background: var(--blue-wash, #e6eefb); } .ds-btn:active { background: var(--blue-rule, #c7d8f5); } .ds-btn:focus-visible { outline: 2px solid var(--blue, #2f6fd6); outline-offset: 2px; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "An action that changes a device or deletes a screen.",
+      "html": "<button class=\"ds-btn-danger\">Remove Living room…</button>",
+      "css": ".ds-btn-danger { font-family: var(--font, 'Archivo Variable', Archivo, system-ui, sans-serif); display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0 1rem; border: 1px solid var(--red-text, #c2372d); border-radius: 2px; background: #fff; color: var(--red-text, #c2372d); font-size: 0.8125rem; font-weight: 580; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-danger:hover { background: var(--red-wash, #fbe9e7); } .ds-btn-danger:focus-visible { outline: 2px solid var(--blue, #2f6fd6); outline-offset: 2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A labelled input: the label in the narrow blue annotation style above a white box.",
+      "html": "<label class=\"ds-field\"><span>Name, optional</span><input class=\"ds-input\" placeholder=\"Kitchen\"></label>",
+      "css": ".ds-field { font-family: var(--font, 'Archivo Variable', Archivo, system-ui, sans-serif); display: grid; gap: 0.25rem; } .ds-field > span { color: var(--blue-text, #2659b8); font-size: 0.6875rem; font-stretch: 72%; font-weight: 560; letter-spacing: 0.06em; text-transform: uppercase; } .ds-input { font: inherit; min-height: 2.25rem; padding: 0 0.75rem; border: 1px solid var(--blue-rule, #c7d8f5); border-radius: 2px; background: #fff; color: var(--ink, #1b1b19); font-size: 0.9375rem; } .ds-input::placeholder { color: var(--blue-gray, #5f6f8f); } .ds-input:hover { border-color: var(--blue-edge, #9bb8eb); } .ds-input:focus-visible { outline: 2px solid var(--blue, #2f6fd6); outline-offset: -1px; border-color: var(--blue, #2f6fd6); }"
+    },
+    {
+      "name": "Top bar",
+      "kind": "nav",
+      "description": "Wordmark, two tabs and the account, in blue on paper above a hairline rule.",
+      "html": "<nav class=\"ds-bar\"><a class=\"ds-wordmark\" href=\"#\">Afterimage</a><a class=\"ds-place\" aria-current=\"page\" href=\"#\">Devices</a><a class=\"ds-place\" href=\"#\">Screens</a><span class=\"ds-account\">Alex Example <a href=\"#\">Sign out</a></span></nav>",
+      "css": ".ds-bar { font-family: var(--font, 'Archivo Variable', Archivo, system-ui, sans-serif); display: flex; align-items: stretch; gap: 2rem; padding: 0 2.5rem; border-bottom: 1px solid var(--blue-rule, #c7d8f5); background: var(--paper, #f7f6f1); } .ds-wordmark { display: flex; align-items: center; color: var(--blue-text, #2659b8); font-size: 1.25rem; font-stretch: 118%; font-weight: 640; letter-spacing: -0.015em; text-decoration: none; } .ds-place { position: relative; display: flex; align-items: center; min-height: 3.25rem; color: var(--blue-text, #2659b8); font-size: 0.8125rem; font-weight: 480; text-decoration: none; } .ds-place:hover { color: var(--blue-deep, #1f4d9f); } .ds-place[aria-current=\"page\"] { font-weight: 640; } .ds-place[aria-current=\"page\"]::after { content: \"\"; position: absolute; inset: auto 0 -1px; height: 2px; background: var(--blue, #2f6fd6); } .ds-account { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; color: var(--ink-soft, #4b4a45); font-size: 0.8125rem; } .ds-account a { color: var(--blue-text, #2659b8); }"
+    },
+    {
+      "name": "Stamp",
+      "kind": "chip",
+      "refersTo": "stamp",
+      "description": "A device state in proofer's red; an ended state is struck through and kept.",
+      "html": "<span class=\"ds-stamp\" data-cancelled>Not checked in</span> <span class=\"ds-stamp\">Nothing scheduled</span>",
+      "css": ".ds-stamp { font-family: var(--font, 'Archivo Variable', Archivo, system-ui, sans-serif); position: relative; display: inline-flex; align-items: center; padding: 0.125rem 0.4375rem; border: 1.5px solid var(--red, #e2483d); outline: 1px solid var(--red, #e2483d); outline-offset: 1.5px; color: var(--red-text, #c2372d); font-size: 0.6875rem; font-stretch: 68%; font-weight: 720; letter-spacing: 0.08em; line-height: 1.3; text-transform: uppercase; white-space: nowrap; } .ds-stamp[data-cancelled] { border-color: rgb(226 72 61 / 0.5); outline-color: rgb(226 72 61 / 0.5); } .ds-stamp[data-cancelled]::after { content: \"\"; position: absolute; left: -0.25rem; right: -0.25rem; top: 50%; height: 1.5px; background: var(--red-text, #c2372d); transform: rotate(-8deg); }"
+    },
+    {
+      "name": "Proof plate",
+      "kind": "custom",
+      "refersTo": "proof-plate",
+      "description": "A display's image at its true pixels, with crop marks and the palette's step wedge.",
+      "html": "<figure class=\"ds-proof\"><div class=\"ds-plate\"><span class=\"ds-mark ds-mark-tl\"></span><span class=\"ds-mark ds-mark-br\"></span><span class=\"ds-empty\">No image yet</span></div><figcaption class=\"ds-caption\"><span class=\"ds-wedge\"><i style=\"background:#000\"></i><i style=\"background:#555\"></i><i style=\"background:#aaa\"></i><i style=\"background:#fff\"></i></span><span>4 grays (2-bit) · 800 × 480</span><span class=\"ds-scale\">1:1</span></figcaption></figure>",
+      "css": ".ds-proof { font-family: var(--font, 'Archivo Variable', Archivo, system-ui, sans-serif); display: grid; gap: 0.75rem; margin: 0; padding: 1.25rem; } .ds-plate { position: relative; width: 320px; aspect-ratio: 5 / 3; background: #fff; outline: 1px solid rgb(27 27 25 / 0.08); display: grid; place-items: center; } .ds-empty { color: var(--blue-text, #2659b8); font-size: 0.6875rem; font-stretch: 72%; font-weight: 560; letter-spacing: 0.06em; text-transform: uppercase; } .ds-mark { position: absolute; inset: 0; pointer-events: none; } .ds-mark::before, .ds-mark::after { content: \"\"; position: absolute; background: var(--blue, #2f6fd6); } .ds-mark::before { width: 1px; height: 0.875rem; } .ds-mark::after { width: 0.875rem; height: 1px; } .ds-mark-tl::before { left: 0; top: -1.25rem; } .ds-mark-tl::after { top: 0; left: -1.25rem; } .ds-mark-br::before { left: calc(100% - 1px); top: calc(100% + 0.375rem); } .ds-mark-br::after { top: calc(100% - 1px); left: calc(100% + 0.375rem); } .ds-caption { display: flex; align-items: center; gap: 1rem; color: var(--blue-text, #2659b8); font-size: 0.6875rem; font-stretch: 72%; font-weight: 560; letter-spacing: 0.06em; text-transform: uppercase; } .ds-wedge { display: inline-flex; outline: 1px solid var(--blue-rule, #c7d8f5); } .ds-wedge i { width: 0.875rem; height: 0.875rem; } .ds-scale { padding-left: 0.75rem; border-left: 1px solid var(--blue-rule, #c7d8f5); }"
+    },
+    {
+      "name": "Day strip",
+      "kind": "custom",
+      "description": "A day of a playlist: each entry a named lane whose bars last as long as the entry is current.",
+      "html": "<div class=\"ds-strip\"><ol class=\"ds-names\"><li>Date and time</li><li>Weather</li></ol><div class=\"ds-track\"><div class=\"ds-lane\"><i style=\"left:0;width:100%\"></i></div><div class=\"ds-lane\"><i style=\"left:0;width:29%\"></i><i style=\"left:92%;width:8%\"></i></div><b style=\"left:31%\"></b></div></div>",
+      "css": ".ds-strip { font-family: var(--font, 'Archivo Variable', Archivo, system-ui, sans-serif); display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0 0.75rem; width: 420px; } .ds-names { display: grid; gap: 3px; margin: 0; padding: 5px 0; list-style: none; color: var(--blue-text, #2659b8); font-size: 0.6875rem; font-stretch: 72%; font-weight: 560; line-height: 0.8125rem; } .ds-track { position: relative; display: grid; gap: 3px; padding: 4px 0; border-block: 1px solid var(--blue-rule, #c7d8f5); } .ds-lane { position: relative; height: 0.8125rem; } .ds-lane i { position: absolute; top: 3px; bottom: 3px; background: var(--ink, #1b1b19); } .ds-track b { position: absolute; top: -5px; bottom: -5px; width: 1.5px; background: var(--blue, #2f6fd6); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Proofroom",
+    "overview": "Every screen a display shows is a proof before it goes to ink, and the web UI is the room where those proofs are checked. Two voices share the room and never mix. Everything a display will show is true ink on white, at its real pixels. Everything Afterimage itself says (navigation, labels, measurements, annotations) is drawn in non-repro blue, the pencil colour that a print camera does not see. A third voice, proofer's red, appears only to stamp a state or to mark an action that changes a device.",
+    "keyCharacteristics": [
+      "Warm paper ground, white sheets for anything a person fills in or a display shows.",
+      "Ink only for display content and primary text; blue for everything Afterimage says.",
+      "Red reserved for stamps and destructive actions.",
+      "One variable grotesk (Archivo), with its narrow cut for annotations, stamps and codes.",
+      "Display images at 1:1 wherever the viewport can hold them, framed with crop marks and the palette's step wedge.",
+      "Flat: no shadows, no rounded cards."
+    ],
+    "rules": [
+      {
+        "name": "The Two Voices Rule",
+        "body": "Ink belongs to what a display shows and to the primary text a person reads; blue belongs to what Afterimage says about it. A label, a measurement or a navigation item is never ink; a screen's content is never blue.",
+        "section": "colors"
+      },
+      {
+        "name": "The Red Is Earned Rule",
+        "body": "Red appears only on a stamp or on an action that changes a device or deletes a screen. No red for emphasis, decoration or validation hints.",
+        "section": "colors"
+      },
+      {
+        "name": "The Narrow Margin Rule",
+        "body": "Anything written about a thing (its label, size, scale, time zone) uses the narrow annotation style in blue; anything that is the thing uses the normal width.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Table Rule",
+        "body": "Proofs lie on the table; nothing floats above it. Use a white sheet, a rule or a wash, never a shadow, to separate one thing from another.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do show a display's image at 1:1 wherever the viewport holds it, and label the scale honestly where it does not.",
+      "Do write labels, sizes, times and other annotations in the narrow blue style (0.6875rem, 560, width 72%, uppercase).",
+      "Do separate sections with a 1px Hairline Blue (#c7d8f5) rule and whitespace.",
+      "Do keep text at 4.5:1 or better: Blue Gray (#5f6f8f) is the lightest text colour on paper.",
+      "Do spell out what a destructive action does to the device before it happens, and put that action in red.",
+      "Do use lucide icons at one stroke weight; never a Unicode glyph standing in for one."
+    ],
+    "donts": [
+      "Don't add shadows, rounded cards or a card grid of equal tiles.",
+      "Don't use red for anything but stamps and destructive actions (The Red Is Earned Rule).",
+      "Don't set Afterimage's own labels in ink or a display's content in blue (The Two Voices Rule).",
+      "Don't introduce a second paper or a gray surface; a thing is either paper or a white sheet.",
+      "Don't add mascots, illustrations or playful copy."
+    ]
+  }
+}

@@ -128,7 +128,7 @@
 }
 
 .starter:hover {
-  border-color: #9bb8eb;
+  border-color: var(--blue-edge);
 }
 
 .starter[aria-pressed="true"] {

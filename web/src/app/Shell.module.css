@@ -50,7 +50,7 @@
 
 .place:hover {
   text-decoration: none;
-  color: #1f4d9f;
+  color: var(--blue-deep);
 }
 
 .place[aria-current="page"] {

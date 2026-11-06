@@ -10,12 +10,17 @@
   --ink-soft: #4b4a45;
   --blue: #2f6fd6;
   --blue-text: #2659b8;
+  --blue-deep: #1f4d9f;
   --blue-wash: #e6eefb;
   --blue-rule: #c7d8f5;
+  --blue-edge: #9bb8eb;
+  /* Text of a disabled control. */
+  --blue-faint: #8aa6d9;
   /* Quiet blue-gray text: placeholders, comments, line numbers; 4.5:1 on paper. */
   --blue-gray: #5f6f8f;
   --red: #e2483d;
   --red-text: #c2372d;
+  --red-deep: #a82d24;
   --red-wash: #fbe9e7;
 
   --font: "Archivo Variable", "Archivo", system-ui, sans-serif;
@@ -187,7 +192,7 @@ textarea {
 }
 
 .button[data-variant="primary"]:hover {
-  background: #1f4d9f;
+  background: var(--blue-deep);
 }
 
 .button[data-variant="danger"] {
@@ -206,7 +211,7 @@ textarea {
 }
 
 .button[data-variant="danger-solid"]:hover {
-  background: #a82d24;
+  background: var(--red-deep);
 }
 
 .button[data-variant="quiet"] {
@@ -222,7 +227,7 @@ textarea {
 .button[aria-disabled="true"] {
   border-color: var(--blue-rule);
   background: var(--paper);
-  color: #8aa6d9;
+  color: var(--blue-faint);
   cursor: not-allowed;
 }
 
@@ -282,7 +287,7 @@ textarea {
 
 .input:hover,
 .select:hover {
-  border-color: #9bb8eb;
+  border-color: var(--blue-edge);
 }
 
 .input:focus-visible,
