@@ -7,7 +7,8 @@
 pub struct Readings {
     /// Volts, from `Battery-Voltage`.
     pub battery_voltage: Option<f64>,
-    /// 0 to 100, from `Percent-Charged`.
+    /// 0 to 100, from `Percent-Charged`, or else estimated from the voltage by
+    /// [`percent_charged`].
     pub battery_percent: Option<f64>,
     /// dBm, from `RSSI`.
     pub signal_dbm: Option<i32>,
@@ -19,7 +20,9 @@ pub struct Readings {
 const VERSION_LENGTH: usize = 32;
 
 impl Readings {
-    /// Reads each header's text when it is present.
+    /// Reads each header's text when it is present. Only TRMNL X sends
+    /// `Percent-Charged` (`buildDisplayHeaders`), and it sends -1 when its gauge
+    /// fails, so every other reading of the charge comes from the voltage.
     #[must_use]
     pub fn parse(
         battery_voltage: Option<&str>,
@@ -27,14 +30,37 @@ impl Readings {
         signal_dbm: Option<&str>,
         firmware_version: Option<&str>,
     ) -> Self {
+        let battery_voltage = battery_voltage.and_then(|text| number(text, 0.0, 10.0));
         Self {
-            battery_voltage: battery_voltage.and_then(|text| number(text, 0.0, 10.0)),
-            battery_percent: battery_percent.and_then(|text| number(text, 0.0, 100.0)),
+            battery_voltage,
+            battery_percent: battery_percent
+                .and_then(|text| number(text, 0.0, 100.0))
+                .or_else(|| battery_voltage.map(percent_charged)),
             signal_dbm: signal_dbm
                 .and_then(|text| text.trim().parse::<i32>().ok())
                 .filter(|dbm| (-150..=0).contains(dbm)),
             firmware_version: firmware_version.and_then(version),
         }
+    }
+}
+
+/// TRMNL's estimate of a battery's charge from its voltage: 3.0 V is empty and
+/// every 0.012 V above it a percent, with steps near the top, where a full charge
+/// settles around 4.08 V, and a floor of 1%. Firmware 1.8.18 applies it as the
+/// server's `percent_charged_calculation` when its gauge is bypassed
+/// (`src/battery/bq27427_battery.cpp`).
+fn percent_charged(volts: f64) -> f64 {
+    let percent = (volts - 3.0) / 0.012;
+    if percent >= 88.0 {
+        100.0
+    } else if percent >= 85.0 {
+        95.0
+    } else if percent >= 83.0 {
+        90.0
+    } else if percent >= 10.0 {
+        percent.round()
+    } else {
+        1.0
     }
 }
 
@@ -90,6 +116,40 @@ mod tests {
         let readings =
             Readings::parse(Some("-1"), Some("101"), Some("-200"), Some(&"9".repeat(33)));
         assert_eq!(readings, Readings::default());
+    }
+
+    /// Firmware 1.6.10 sends no `Percent-Charged`, nor does 1.8.18 on any board
+    /// but TRMNL X, whose gauge sends -1 when it fails.
+    #[test]
+    fn estimates_the_charge_from_the_voltage_when_none_is_reported() {
+        let percent = |volts: &str, reported: Option<&str>| {
+            Readings::parse(Some(volts), reported, None, None).battery_percent
+        };
+        assert_eq!(percent("3.9", None), Some(75.0));
+        assert_eq!(percent("3.9", Some("-1")), Some(75.0));
+        assert_eq!(percent("3.9", Some("52")), Some(52.0));
+        assert_eq!(
+            Readings::parse(None, None, None, None).battery_percent,
+            None
+        );
+    }
+
+    /// Worked through TRMNL's formula: (volts - 3.0) / 0.012.
+    #[test]
+    fn follows_trmnls_steps_near_full_and_its_floor() {
+        for (volts, percent) in [
+            (4.2, 100.0),
+            (4.06, 100.0), // 88.3
+            (4.03, 95.0),  // 85.8
+            (4.0, 90.0),   // 83.3
+            (3.98, 82.0),  // 81.7
+            (3.5, 42.0),   // 41.7
+            (3.13, 11.0),  // 10.8
+            (3.11, 1.0),   // 9.2
+            (0.0, 1.0),
+        ] {
+            assert_eq!(percent_charged(volts), percent, "{volts} V");
+        }
     }
 
     #[test]

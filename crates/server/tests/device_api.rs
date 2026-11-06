@@ -232,6 +232,24 @@ async fn records_readings_and_keeps_the_last_known_value() {
     );
 }
 
+/// Firmware on every board but TRMNL X reports a voltage and no charge.
+#[tokio::test]
+async fn estimates_the_charge_from_the_voltage() {
+    let server = start().await;
+    let (key, _) = server.register(&mac(1)).await;
+    let voltage_only = Readings {
+        voltage: "3.5",
+        percent: "",
+        rssi: "-58",
+    };
+    server.display(&key, &voltage_only).await;
+    let row = &server
+        .stored("SELECT battery_percent FROM registrations")
+        .await[0];
+    // (3.5 V - 3.0 V) / 0.012 V per percent, TRMNL's formula.
+    assert_eq!(row.get::<Option<f64>, _>(0), Some(42.0));
+}
+
 #[tokio::test]
 async fn stores_only_a_hash_of_the_key() {
     let server = start().await;

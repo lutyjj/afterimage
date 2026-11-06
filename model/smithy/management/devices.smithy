@@ -79,7 +79,8 @@ structure Readings {
     /// Volts.
     batteryVoltage: Double
 
-    /// 0 to 100.
+    /// 0 to 100: what the device reports, or else TRMNL's estimate from the
+    /// voltage, since only TRMNL X reports a charge.
     batteryPercent: Double
 
     /// dBm.
