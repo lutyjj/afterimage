@@ -1,5 +1,30 @@
 $version: "2"
 
+// A management operation states how it authenticates, and an operation a token
+// may call reads with GET exactly when it is @readonly: the server lets a
+// read-only token make GET requests only. DANGER fails the build unless an
+// operation suppresses these ids by name, which HttpMethodSemantics does not.
+metadata validators = [
+    {
+        name: "EmitEachSelector"
+        id: "CredentialDeclared"
+        message: "A management operation needs @auth([]) when it starts a session, or @optionalAuth when it takes a session or a token."
+        severity: "DANGER"
+        configuration: {
+            selector: "service [id = afterimage.management#Management] ~> operation :not([trait|auth]) :not([trait|optionalAuth])"
+        }
+    }
+    {
+        name: "EmitEachSelector"
+        id: "ReadOnlyIsGet"
+        message: "An operation a token may call uses GET exactly when it is @readonly, since a read-only token may make GET requests only."
+        severity: "DANGER"
+        configuration: {
+            selector: "service [id = afterimage.management#Management] ~> operation [trait|optionalAuth] :is([trait|http|method = GET] :not([trait|readonly]), [trait|readonly] :not([trait|http|method = GET]))"
+        }
+    }
+]
+
 namespace afterimage.management
 
 use aws.protocols#restJson1
@@ -15,7 +40,7 @@ use smithy.framework#ValidationException
 /// a request carries both. Every resource belongs to the signed-in account;
 /// another account's resource answers `NotFound`, as a missing one does. A
 /// read-only token may call only the operations marked `@readonly`, and no token
-/// may create or revoke a token; either answers `Forbidden`.
+/// may create or revoke a token or sign out; each answers `Forbidden`.
 @restJson1
 @httpBearerAuth
 @title("Afterimage management API")

@@ -14,7 +14,7 @@ use crate::tokens::Token;
 fn by_session(caller: &Caller, action: &str) -> Result<(), error::Forbidden> {
     match caller.credential {
         Credential::Session(_) => Ok(()),
-        Credential::Token { .. } => Err(error::Forbidden {
+        Credential::Token => Err(error::Forbidden {
             message: format!("A token cannot {action} tokens. Sign in to do that."),
         }),
     }

@@ -1,22 +1,11 @@
 {
   "db_name": "SQLite",
-  "query": "UPDATE access_tokens SET last_used_at = ? WHERE token_hash = ?\n               RETURNING id, account_id, read_only AS \"read_only: bool\"",
+  "query": "UPDATE access_tokens SET last_used_at = ? WHERE token_hash = ?\n               RETURNING account_id, read_only AS \"read_only: bool\"",
   "describe": {
     "columns": [
       {
-        "name": "id",
-        "ordinal": 0,
-        "type_info": "Integer",
-        "origin": {
-          "Table": {
-            "table": "access_tokens",
-            "name": "id"
-          }
-        }
-      },
-      {
         "name": "account_id",
-        "ordinal": 1,
+        "ordinal": 0,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -27,7 +16,7 @@
       },
       {
         "name": "read_only: bool",
-        "ordinal": 2,
+        "ordinal": 1,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -42,9 +31,8 @@
     },
     "nullable": [
       false,
-      false,
       false
     ]
   },
-  "hash": "c35cb7ad46ffb33d056597f7242a8f5b4972284c4e2885fadfdf87483c0bc295"
+  "hash": "36668737cc0d2ffd37b11234aae95fc931359a497a9e6082519d0fb837d7c9f1"
 }

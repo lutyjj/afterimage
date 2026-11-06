@@ -22,11 +22,10 @@ pub struct Token {
     pub last_used_at: Option<i64>,
 }
 
-/// The token a request presented, and the account it acts as.
+/// The account a token acts as, and whether it may only read.
 #[derive(Debug, Clone)]
 pub struct Grant {
     pub account: Account,
-    pub token_id: i64,
     pub read_only: bool,
 }
 
@@ -133,7 +132,7 @@ impl Tokens {
         let now = self.clock.now();
         let row = sqlx::query!(
             r#"UPDATE access_tokens SET last_used_at = ? WHERE token_hash = ?
-               RETURNING id, account_id, read_only AS "read_only: bool""#,
+               RETURNING account_id, read_only AS "read_only: bool""#,
             now,
             token_hash
         )
@@ -154,7 +153,6 @@ impl Tokens {
                 name: account.name,
                 username: account.username,
             },
-            token_id: row.id,
             read_only: row.read_only,
         }))
     }

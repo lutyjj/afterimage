@@ -10,9 +10,11 @@
     "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    // Not verbatimModuleSyntax: the generated client's auth files import types
-    // without `import type`, which it refuses and would keep at run time.
-    // isolatedModules still keeps every file compilable alone, as Vite needs.
+    // A workaround: verbatimModuleSyntax would refuse the generated client's auth
+    // files, which smithy-typescript writes with value imports of types such as
+    // TokenIdentity, and would keep those imports at run time. Restore it once
+    // smithy-typescript writes `import type` there. isolatedModules still keeps
+    // every file compilable alone, as Vite needs.
     "isolatedModules": true,
     "types": ["vite/client"],
     "paths": {

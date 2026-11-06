@@ -92,8 +92,8 @@ operation RevokeAccessToken {
     ]
 }
 
-/// The credential may not do this: a token creating or revoking tokens, or a
-/// read-only token changing anything.
+/// The credential may not do this: a token creating or revoking tokens or
+/// signing out, or a read-only token changing anything.
 @error("client")
 @httpError(403)
 structure Forbidden {

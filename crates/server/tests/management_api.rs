@@ -19,8 +19,9 @@ const SIGNED_OUT: [&str; 5] = [
     "GET /manage/auth/oidc/callback",
 ];
 
-/// Every operation, from the `OpenAPI` document generated from the model.
-fn operations() -> Vec<(String, String)> {
+/// Every operation, from the `OpenAPI` document generated from the model, with
+/// whether the document says it takes no credential (`security: []`).
+fn operations() -> Vec<(String, String, bool)> {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../gen/management-api.openapi.json"
@@ -28,8 +29,9 @@ fn operations() -> Vec<(String, String)> {
     let document: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let mut operations = Vec::new();
     for (path, item) in document["paths"].as_object().unwrap() {
-        for method in item.as_object().unwrap().keys() {
-            operations.push((method.to_uppercase(), path.clone()));
+        for (method, operation) in item.as_object().unwrap() {
+            let open = operation.get("security") == Some(&json!([]));
+            operations.push((method.to_uppercase(), path.clone(), open));
         }
     }
     operations
@@ -40,12 +42,17 @@ async fn every_operation_but_signing_in_needs_a_session() {
     let server = start().await;
     let operations = operations();
     assert!(operations.len() > SIGNED_OUT.len());
-    for (method, path) in operations {
+    for (method, path, open) in operations {
         let key = format!("{method} {path}");
-        if SIGNED_OUT.contains(&key.as_str()) {
+        // The model's `@auth([])` and the server's `NeedsSession` agree.
+        assert_eq!(open, SIGNED_OUT.contains(&key.as_str()), "{key}");
+        if open {
             continue;
         }
-        let concrete = path.replace("{deviceId}", "1").replace("{screenId}", "1");
+        let concrete = path
+            .replace("{deviceId}", "1")
+            .replace("{screenId}", "1")
+            .replace("{tokenId}", "1");
         let response = server
             .http
             .request(
@@ -58,12 +65,14 @@ async fn every_operation_but_signing_in_needs_a_session() {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{key}");
-        // restJson1's error form, which the generated client decodes.
+        // restJson1's error form, which the generated client decodes, and the
+        // bearer challenge RFC 6750 asks of a 401.
         assert_eq!(
             response.headers()["x-amzn-errortype"],
             "Unauthenticated",
             "{key}"
         );
+        assert_eq!(response.headers()["www-authenticate"], "Bearer", "{key}");
         let body: Value = response.json().await.unwrap();
         assert!(body["message"].is_string(), "{key}: {body}");
     }

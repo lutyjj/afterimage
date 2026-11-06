@@ -165,6 +165,17 @@ async fn a_token_reaches_only_its_owners_resources() {
     server.sign_up().await;
     let (device, _) = server.claim(&mac(1)).await;
     let device = device["id"].as_i64().unwrap();
+    let (status, created) = server
+        .call(
+            "POST",
+            "/manage/screens",
+            Some(json!({ "name": "Private", "document": {
+                "titleBar": { "title": "Private" },
+                "content": { "column": { "children": [{ "title": { "text": "Hi" } }] } } } })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    let screen = created["screen"]["id"].as_i64().unwrap();
 
     // A second account with a token, written directly: only the OIDC provider
     // creates further accounts.
@@ -198,6 +209,15 @@ async fn a_token_reaches_only_its_owners_resources() {
     )
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = with_token(
+        &server,
+        secret,
+        "GET",
+        &format!("/manage/screens/{screen}"),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "another account's screen");
     let (_, body) = with_token(&server, secret, "GET", "/manage/devices", None).await;
     assert_eq!(body["devices"], json!([]));
     let (status, _) = with_token(&server, secret, "GET", "/manage/account/tokens", None).await;
@@ -243,4 +263,59 @@ async fn a_token_wins_over_a_session_cookie() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+/// An `Authorization` header decides alone: a revoked token or another scheme is
+/// refused even beside a valid session, and the scheme's name is
+/// case-insensitive (RFC 9110, section 11.1).
+#[tokio::test]
+async fn the_authorization_header_decides_alone() {
+    let server = start().await;
+    server.sign_up().await;
+    let (id, secret) = create(&server, json!({ "name": "Reader", "scope": "read_only" })).await;
+    let creating = |authorization: String| {
+        server
+            .http
+            .post(format!("{}/manage/account/tokens", server.url))
+            .header("Authorization", authorization)
+            .header("Content-Type", "application/json")
+            .body(json!({ "name": "Escalated" }).to_string())
+    };
+    let response = creating(format!("bearer {secret}")).send().await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::FORBIDDEN,
+        "a lowercase scheme is a bearer"
+    );
+    assert_eq!(response.headers()["x-amzn-errortype"], "Forbidden");
+    let response = creating("Basic YWRhOnNlY3JldA==".to_owned())
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "no fallback to the cookie"
+    );
+    assert_eq!(
+        response.headers()["www-authenticate"],
+        "Bearer error=\"invalid_token\""
+    );
+
+    server
+        .call("DELETE", &format!("/manage/account/tokens/{id}"), None)
+        .await;
+    let response = server
+        .http
+        .get(format!("{}/manage/devices", server.url))
+        .bearer_auth(&secret)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "a revoked token beside a session"
+    );
+    assert_eq!(response.headers()["x-amzn-errortype"], "Unauthenticated");
 }

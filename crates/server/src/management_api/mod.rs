@@ -147,8 +147,8 @@ pub struct Caller {
 pub enum Credential {
     /// A browser's session, by its token, so that signing out can end it.
     Session(String),
-    /// A personal API token.
-    Token { id: i64, read_only: bool },
+    /// A personal API token, whose read-only limit [`RequireSession`] applies.
+    Token,
 }
 
 impl<Protocol> FromParts<Protocol> for Caller {
@@ -247,14 +247,14 @@ where
         let sessions = Arc::clone(&self.sessions);
         let tokens = Arc::clone(&self.tokens);
         let secure = self.cookies.secure(request.headers());
-        let bearer = request
+        // A request with `Authorization` is judged by it alone, so a token's
+        // limits hold even when the request carries a session cookie too.
+        let authorization = request
             .headers()
             .get(header::AUTHORIZATION)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.strip_prefix("Bearer "))
-            .map(|secret| secret.trim().to_owned());
-        // The model marks exactly its GET operations @readonly: Smithy's
-        // HttpMethodSemantics validation refuses one without the other.
+            .map(|value| bearer(value.to_str().unwrap_or_default()));
+        // The model's ReadOnlyIsGet validator ties GET to @readonly for every
+        // operation a token may call.
         let reads = matches!(*request.method(), Method::GET | Method::HEAD);
         let token = request
             .headers()
@@ -262,7 +262,12 @@ where
             .and_then(|cookie| cookie.to_str().ok())
             .and_then(|cookie| CookieName::Session.read(cookie, secure));
         Box::pin(async move {
-            if let Some(secret) = bearer {
+            if let Some(secret) = authorization {
+                let Some(secret) = secret else {
+                    return Ok(unauthenticated_token(
+                        "Send a token as Authorization: Bearer and the token.",
+                    ));
+                };
                 return match tokens.grant(&secret).await {
                     Ok(Some(grant)) if grant.read_only && !reads => {
                         Ok(forbidden("A read-only token cannot change anything."))
@@ -270,14 +275,11 @@ where
                     Ok(Some(grant)) => {
                         request.extensions_mut().insert(Caller {
                             account: grant.account,
-                            credential: Credential::Token {
-                                id: grant.token_id,
-                                read_only: grant.read_only,
-                            },
+                            credential: Credential::Token,
                         });
                         inner.call(request).await
                     }
-                    Ok(None) => Ok(unauthenticated(
+                    Ok(None) => Ok(unauthenticated_token(
                         "This token is not one of this server's. It may have been revoked.",
                     )),
                     Err(error) => {
@@ -307,16 +309,35 @@ where
     }
 }
 
-/// The model's `Unauthenticated` error as restJson1 writes it. Built here because
-/// the handler it guards never runs.
+/// The secret of an `Authorization` value of the bearer scheme, whose name is
+/// case-insensitive (RFC 9110, section 11.1); `None` for any other value.
+fn bearer(value: &str) -> Option<String> {
+    let (scheme, secret) = value.trim().split_once(' ')?;
+    let secret = secret.trim();
+    (scheme.eq_ignore_ascii_case("bearer") && !secret.is_empty()).then(|| secret.to_owned())
+}
+
+/// The model's `Unauthenticated` error as restJson1 writes it, with the bearer
+/// challenge RFC 6750 asks of a 401. Built here because the handler it guards
+/// never runs.
 fn unauthenticated(message: &str) -> Response<BoxBody> {
+    unauthorized(message, "Bearer")
+}
+
+/// [`unauthenticated`] for a request whose token is not one.
+fn unauthenticated_token(message: &str) -> Response<BoxBody> {
+    unauthorized(message, "Bearer error=\"invalid_token\"")
+}
+
+fn unauthorized(message: &str, challenge: &'static str) -> Response<BoxBody> {
     let body = serde_json::json!({ "message": message }).to_string();
     Response::builder()
         .status(StatusCode::UNAUTHORIZED)
         .header(header::CONTENT_TYPE, "application/json")
+        .header(header::WWW_AUTHENTICATE, challenge)
         .header("x-amzn-errortype", "Unauthenticated")
         .body(boxed(body))
-        .expect("a status and two static headers")
+        .expect("a status and three static headers")
 }
 
 /// The model's `Forbidden` error as restJson1 writes it, for a credential that may
