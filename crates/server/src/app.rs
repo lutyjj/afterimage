@@ -30,6 +30,7 @@ use crate::secrets::Secrets;
 use crate::sessions::{CookiePolicy, Sessions};
 use crate::telemetry::Telemetry;
 use crate::time_zone::TimeZone;
+use crate::tokens::Tokens;
 use crate::{database, device_api, management_api};
 
 #[derive(Debug, thiserror::Error)]
@@ -117,6 +118,11 @@ pub async fn build(
     let state = Arc::new(management_api::State {
         accounts: Accounts::new(pool.clone(), Arc::clone(&clock)),
         sessions: Arc::new(Sessions::new(
+            pool.clone(),
+            Arc::clone(&clock),
+            Arc::clone(&entropy),
+        )),
+        tokens: Arc::new(Tokens::new(
             pool.clone(),
             Arc::clone(&clock),
             Arc::clone(&entropy),

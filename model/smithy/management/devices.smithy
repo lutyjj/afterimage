@@ -190,6 +190,7 @@ string TimeOfDay
 /// TRMNL's display models and their palettes, for choosing a device's display.
 @readonly
 @http(method: "GET", uri: "/manage/display-models")
+@optionalAuth
 operation ListDisplayModels {
     output := {
         @required
@@ -199,6 +200,7 @@ operation ListDisplayModels {
 
 @readonly
 @http(method: "GET", uri: "/manage/devices")
+@optionalAuth
 operation ListDevices {
     output := {
         @required
@@ -210,6 +212,7 @@ operation ListDevices {
 /// the same MAC, that device takes the new registration and keeps its name,
 /// settings and playlist; its old registration ends.
 @http(method: "POST", uri: "/manage/devices", code: 201)
+@optionalAuth
 operation ClaimDevice {
     input := {
         @required
@@ -236,6 +239,7 @@ operation ClaimDevice {
 
 @readonly
 @http(method: "GET", uri: "/manage/devices/{deviceId}")
+@optionalAuth
 operation GetDevice {
     input := {
         @required
@@ -255,6 +259,7 @@ operation GetDevice {
 
 /// Changes the given settings and leaves the others as they are.
 @http(method: "PATCH", uri: "/manage/devices/{deviceId}")
+@optionalAuth
 operation UpdateDevice {
     input := {
         @required
@@ -287,6 +292,7 @@ operation UpdateDevice {
 /// Replaces the device's playlist.
 @idempotent
 @http(method: "PUT", uri: "/manage/devices/{deviceId}/playlist")
+@optionalAuth
 operation SetPlaylist {
     input := {
         @required
@@ -313,6 +319,7 @@ operation SetPlaylist {
 /// portal.
 @idempotent
 @http(method: "DELETE", uri: "/manage/devices/{deviceId}", code: 204)
+@optionalAuth
 operation DeleteDevice {
     input := {
         @required
@@ -331,6 +338,7 @@ operation DeleteDevice {
 /// The image the device shows now.
 @readonly
 @http(method: "GET", uri: "/manage/devices/{deviceId}/image")
+@optionalAuth
 operation GetDeviceImage {
     input := {
         @required

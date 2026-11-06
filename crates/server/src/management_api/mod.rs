@@ -1,14 +1,17 @@
 //! The generated management API, served over the stores.
 //!
 //! Every operation in [`NeedsSession`] passes through [`RequireSession`]: all of
-//! them but the five that start a session. Handlers read the account from
-//! [`Caller`], which only that plugin provides.
+//! them but the five that start a session. It takes a personal API token from
+//! `Authorization: Bearer`, or else the session cookie, and refuses a read-only
+//! token any request but a read. Handlers read the account from [`Caller`], which
+//! only that plugin provides.
 
 mod accounts;
 mod deployment;
 mod devices;
 mod firmware;
 mod screens;
+mod tokens;
 mod wire;
 
 use std::convert::Infallible;
@@ -18,7 +21,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use http::request::Parts;
-use http::{Request, Response, StatusCode, header};
+use http::{Method, Request, Response, StatusCode, header};
 use afterimage_management_api::server::body::{BoxBody, boxed};
 use afterimage_management_api::server::operation::OperationShape;
 use afterimage_management_api::server::plugin::{HttpMarker, Plugin, Scoped};
@@ -38,11 +41,13 @@ use crate::oidc::Oidc;
 use crate::screens::Screens;
 use crate::sessions::{CookieName, CookiePolicy, Sessions};
 use crate::telemetry::Telemetry;
+use crate::tokens::Tokens;
 
 /// What the handlers act on.
 pub struct State {
     pub accounts: Accounts,
     pub sessions: Arc<Sessions>,
+    pub tokens: Arc<Tokens>,
     pub devices: Devices,
     pub screens: Screens,
     pub oidc: Option<Oidc>,
@@ -81,6 +86,7 @@ pub fn service(
 + 'static {
     let require = RequireSession {
         sessions: Arc::clone(&state.sessions),
+        tokens: Arc::clone(&state.tokens),
         cookies: state.cookies,
     };
     let config = ManagementConfig::builder()
@@ -114,6 +120,9 @@ pub fn service(
         .delete_screen(screens::delete_screen)
         .preview_screen(screens::preview_screen)
         .get_server(deployment::get_server)
+        .create_access_token(tokens::create_access_token)
+        .list_access_tokens(tokens::list_access_tokens)
+        .revoke_access_token(tokens::revoke_access_token)
         .build()
         .expect("every management API operation has a handler")
 }
@@ -130,8 +139,16 @@ scope! {
 #[derive(Debug, Clone)]
 pub struct Caller {
     pub account: Account,
-    /// The session's token, so that signing out can end it.
-    pub token: String,
+    pub credential: Credential,
+}
+
+/// What the request signed in with.
+#[derive(Debug, Clone)]
+pub enum Credential {
+    /// A browser's session, by its token, so that signing out can end it.
+    Session(String),
+    /// A personal API token.
+    Token { id: i64, read_only: bool },
 }
 
 impl<Protocol> FromParts<Protocol> for Caller {
@@ -182,6 +199,7 @@ impl<Protocol> FromParts<Protocol> for OverTls {
 #[derive(Clone)]
 pub struct RequireSession {
     sessions: Arc<Sessions>,
+    tokens: Arc<Tokens>,
     cookies: CookiePolicy,
 }
 
@@ -192,6 +210,7 @@ impl<Ser, Op: OperationShape, S> Plugin<Ser, Op, S> for RequireSession {
         Authenticate {
             inner,
             sessions: Arc::clone(&self.sessions),
+            tokens: Arc::clone(&self.tokens),
             cookies: self.cookies,
         }
     }
@@ -203,6 +222,7 @@ impl HttpMarker for RequireSession {}
 pub struct Authenticate<S> {
     inner: S,
     sessions: Arc<Sessions>,
+    tokens: Arc<Tokens>,
     cookies: CookiePolicy,
 }
 
@@ -225,19 +245,56 @@ where
     fn call(&mut self, mut request: Request<B>) -> Self::Future {
         let mut inner = self.inner.clone();
         let sessions = Arc::clone(&self.sessions);
+        let tokens = Arc::clone(&self.tokens);
         let secure = self.cookies.secure(request.headers());
+        let bearer = request
+            .headers()
+            .get(header::AUTHORIZATION)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.strip_prefix("Bearer "))
+            .map(|secret| secret.trim().to_owned());
+        // The model marks exactly its GET operations @readonly: Smithy's
+        // HttpMethodSemantics validation refuses one without the other.
+        let reads = matches!(*request.method(), Method::GET | Method::HEAD);
         let token = request
             .headers()
             .get(header::COOKIE)
             .and_then(|cookie| cookie.to_str().ok())
             .and_then(|cookie| CookieName::Session.read(cookie, secure));
         Box::pin(async move {
+            if let Some(secret) = bearer {
+                return match tokens.grant(&secret).await {
+                    Ok(Some(grant)) if grant.read_only && !reads => {
+                        Ok(forbidden("A read-only token cannot change anything."))
+                    }
+                    Ok(Some(grant)) => {
+                        request.extensions_mut().insert(Caller {
+                            account: grant.account,
+                            credential: Credential::Token {
+                                id: grant.token_id,
+                                read_only: grant.read_only,
+                            },
+                        });
+                        inner.call(request).await
+                    }
+                    Ok(None) => Ok(unauthenticated(
+                        "This token is not one of this server's. It may have been revoked.",
+                    )),
+                    Err(error) => {
+                        tracing::error!(%error, "a token could not be read");
+                        Ok(failure())
+                    }
+                };
+            }
             let Some(token) = token else {
                 return Ok(unauthenticated("Sign in to use this."));
             };
             match sessions.account(&token).await {
                 Ok(Some(account)) => {
-                    request.extensions_mut().insert(Caller { account, token });
+                    request.extensions_mut().insert(Caller {
+                        account,
+                        credential: Credential::Session(token),
+                    });
                     inner.call(request).await
                 }
                 Ok(None) => Ok(unauthenticated("This session has ended. Sign in again.")),
@@ -258,6 +315,18 @@ fn unauthenticated(message: &str) -> Response<BoxBody> {
         .status(StatusCode::UNAUTHORIZED)
         .header(header::CONTENT_TYPE, "application/json")
         .header("x-amzn-errortype", "Unauthenticated")
+        .body(boxed(body))
+        .expect("a status and two static headers")
+}
+
+/// The model's `Forbidden` error as restJson1 writes it, for a credential that may
+/// not make this request.
+fn forbidden(message: &str) -> Response<BoxBody> {
+    let body = serde_json::json!({ "message": message }).to_string();
+    Response::builder()
+        .status(StatusCode::FORBIDDEN)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("x-amzn-errortype", "Forbidden")
         .body(boxed(body))
         .expect("a status and two static headers")
 }

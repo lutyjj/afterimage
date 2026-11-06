@@ -10,7 +10,10 @@
     "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "verbatimModuleSyntax": true,
+    // Not verbatimModuleSyntax: the generated client's auth files import types
+    // without `import type`, which it refuses and would keep at run time.
+    // isolatedModules still keeps every file compilable alone, as Vite needs.
+    "isolatedModules": true,
     "types": ["vite/client"],
     "paths": {
       "@afterimage/management-client": ["../gen/management-client/src/index.ts"]

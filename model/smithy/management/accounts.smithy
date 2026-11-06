@@ -33,6 +33,7 @@ structure Account {
 /// How a person without a session can sign in here.
 @readonly
 @http(method: "GET", uri: "/manage/auth")
+@auth([])
 operation GetSignInOptions {
     output := {
         /// No account exists yet: the first person to sign up or sign in through
@@ -58,6 +59,7 @@ structure OidcProvider {
 /// Creates the first account with a password and signs it in. Later accounts come
 /// from the OIDC provider.
 @http(method: "POST", uri: "/manage/auth/first-account", code: 201)
+@auth([])
 operation CreateFirstAccount {
     input := {
         @required
@@ -85,6 +87,7 @@ operation CreateFirstAccount {
 
 /// Signs in with a password.
 @http(method: "POST", uri: "/manage/auth/password")
+@auth([])
 operation SignIn {
     input := {
         @required
@@ -121,6 +124,7 @@ structure SignInRefused {
 /// A browser redirect that sets a cookie: a 3xx code on a GET that writes state.
 @suppress(["HttpResponseCodeSemantics", "HttpMethodSemantics"])
 @http(method: "GET", uri: "/manage/auth/oidc", code: 302)
+@auth([])
 operation StartOidcSignIn {
     output := {
         @required
@@ -144,6 +148,7 @@ operation StartOidcSignIn {
 /// A browser redirect that sets a cookie: a 3xx code on a GET that writes state.
 @suppress(["HttpResponseCodeSemantics", "HttpMethodSemantics"])
 @http(method: "GET", uri: "/manage/auth/oidc/callback", code: 302)
+@auth([])
 operation CompleteOidcSignIn {
     input := {
         @httpQuery("code")
@@ -172,6 +177,7 @@ operation CompleteOidcSignIn {
 
 /// Ends the session.
 @http(method: "POST", uri: "/manage/auth/sign-out", code: 204)
+@optionalAuth
 operation SignOut {
     output := {
         /// Expires the session cookie.
@@ -182,6 +188,7 @@ operation SignOut {
 
 @readonly
 @http(method: "GET", uri: "/manage/account")
+@optionalAuth
 operation GetAccount {
     output := {
         @required

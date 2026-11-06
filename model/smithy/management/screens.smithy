@@ -409,6 +409,7 @@ list ScreenSummaries {
 
 @readonly
 @http(method: "GET", uri: "/manage/screens")
+@optionalAuth
 operation ListScreens {
     output := {
         @required
@@ -417,6 +418,7 @@ operation ListScreens {
 }
 
 @http(method: "POST", uri: "/manage/screens", code: 201)
+@optionalAuth
 operation CreateScreen {
     input := {
         @required
@@ -434,6 +436,7 @@ operation CreateScreen {
 
 @readonly
 @http(method: "GET", uri: "/manage/screens/{screenId}")
+@optionalAuth
 operation GetScreen {
     input := {
         @required
@@ -453,6 +456,7 @@ operation GetScreen {
 
 @idempotent
 @http(method: "PUT", uri: "/manage/screens/{screenId}")
+@optionalAuth
 operation UpdateScreen {
     input := {
         @required
@@ -479,6 +483,7 @@ operation UpdateScreen {
 /// Deletes the screen and takes it out of every playlist.
 @idempotent
 @http(method: "DELETE", uri: "/manage/screens/{screenId}", code: 204)
+@optionalAuth
 operation DeleteScreen {
     input := {
         @required
@@ -494,6 +499,7 @@ operation DeleteScreen {
 /// Draws a screen document as a device with `display` would show it, with what
 /// each data source answered.
 @http(method: "POST", uri: "/manage/preview")
+@optionalAuth
 operation PreviewScreen {
     input := {
         @required

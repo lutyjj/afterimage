@@ -6,13 +6,18 @@ use aws.protocols#restJson1
 use smithy.framework#ValidationException
 
 /// The API the web UI uses: sign-in, devices, their firmware, screens and their
-/// playlists.
+/// playlists, and the personal API tokens scripts and agents use instead.
 ///
-/// Every operation needs a session except those that exist to start one
-/// (`GetSignInOptions`, `CreateFirstAccount`, `SignIn`, `StartOidcSignIn`,
-/// `CompleteOidcSignIn`). Every resource belongs to the signed-in account; another
-/// account's resource answers `NotFound`, as a missing one does.
+/// Every operation needs a credential except those that exist to start a
+/// session (`GetSignInOptions`, `CreateFirstAccount`, `SignIn`,
+/// `StartOidcSignIn`, `CompleteOidcSignIn`): the session cookie a browser holds,
+/// or a personal API token as `Authorization: Bearer <secret>`, which wins when
+/// a request carries both. Every resource belongs to the signed-in account;
+/// another account's resource answers `NotFound`, as a missing one does. A
+/// read-only token may call only the operations marked `@readonly`, and no token
+/// may create or revoke a token; either answers `Forbidden`.
 @restJson1
+@httpBearerAuth
 @title("Afterimage management API")
 service Management {
     version: "1"
@@ -42,10 +47,14 @@ service Management {
         DeleteScreen
         PreviewScreen
         GetServer
+        CreateAccessToken
+        ListAccessTokens
+        RevokeAccessToken
     ]
     errors: [
         ValidationException
         Unauthenticated
+        Forbidden
         InternalFailure
     ]
 }
@@ -98,6 +107,7 @@ list Names {
 /// and the secrets data source requests may read.
 @readonly
 @http(method: "GET", uri: "/manage/server")
+@optionalAuth
 operation GetServer {
     output := {
         /// The IANA name of the time zone that playlist times and dates on screens

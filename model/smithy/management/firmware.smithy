@@ -99,6 +99,7 @@ enum FirmwareUpdateState {
 /// device's board.
 @readonly
 @http(method: "GET", uri: "/manage/firmware-boards")
+@optionalAuth
 operation ListFirmwareBoards {
     output := {
         @required
@@ -115,6 +116,7 @@ operation ListFirmwareBoards {
 /// app out of it and checks its checksum and SHA-256, then serves it to the
 /// device itself. The request replaces any earlier one.
 @http(method: "POST", uri: "/manage/devices/{deviceId}/firmware-update")
+@optionalAuth
 operation InstallFirmware {
     input := {
         @required
@@ -141,6 +143,7 @@ operation InstallFirmware {
 /// may still install the release.
 @idempotent
 @http(method: "DELETE", uri: "/manage/devices/{deviceId}/firmware-update")
+@optionalAuth
 operation CancelFirmwareUpdate {
     input := {
         @required

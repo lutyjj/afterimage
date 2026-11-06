@@ -3,7 +3,7 @@
 use afterimage_management_api::server::Extension;
 use afterimage_management_api::{error, input, model, output};
 
-use super::{Caller, OverTls, Shared, internal, wire};
+use super::{Caller, Credential, OverTls, Shared, internal, wire};
 use crate::oidc;
 use crate::sessions::{CookieName, SESSION_SECONDS};
 
@@ -170,9 +170,15 @@ pub async fn sign_out(
     caller: Caller,
     OverTls(secure): OverTls,
 ) -> Result<output::SignOutOutput, error::SignOutError> {
+    let Credential::Session(token) = &caller.credential else {
+        return Err(error::Forbidden {
+            message: "A token has no session to end. Revoke the token instead.".to_owned(),
+        }
+        .into());
+    };
     state
         .sessions
-        .end(&caller.token)
+        .end(token)
         .await
         .map_err(|error| internal(&error))?;
     Ok(output::SignOutOutput {
