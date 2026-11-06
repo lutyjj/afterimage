@@ -186,6 +186,52 @@ fn a_fitted_value_shrinks_into_its_box() {
     assert!(rightmost < 200, "the value reaches x={rightmost}");
 }
 
+/// Rows and columns, top to bottom and left to right, that hold anything but white.
+fn inked(bytes: &[u8]) -> (Vec<usize>, Vec<usize>) {
+    let pixels = pixels(bytes);
+    let ink = |pixel: &[u8; 3]| *pixel != [255, 255, 255];
+    let rows = (0..pixels.len())
+        .filter(|&y| pixels[y].iter().any(ink))
+        .collect();
+    let columns = (0..pixels[0].len())
+        .filter(|&x| pixels.iter().any(|row| ink(&row[x])))
+        .collect();
+    (rows, columns)
+}
+
+fn title(text: &str) -> Value {
+    json!({ "title": { "text": text, "size": "base" } })
+}
+
+fn stack(direction: &str, grow: bool, children: &[Value]) -> Value {
+    json!({ direction: { "gap": "medium", "align": "start", "justify": "start", "grow": grow, "children": children } })
+}
+
+#[test]
+fn a_row_that_does_not_grow_is_as_tall_as_its_content() {
+    // A row above a title: the title stays on the screen, a line or two below.
+    let screen = json!({ "content": stack("column", false, &[
+        stack("row", false, &[title("Left"), title("Right")]),
+        title("Below"),
+    ]) });
+    let (rows, _) = inked(&render(&screen, "og_plus", "gray-4"));
+    let last = *rows.last().unwrap();
+    assert!((40..120).contains(&last), "ink ends at y={last}");
+}
+
+#[test]
+fn a_column_that_does_not_grow_is_as_wide_as_its_content() {
+    // Beside a column that grows, a column of one short title ends at the right edge.
+    let screen = json!({ "content": stack("row", false, &[
+        stack("column", true, &[title("Grows")]),
+        stack("column", false, &[title("Right")]),
+    ]) });
+    let (_, columns) = inked(&render(&screen, "og_plus", "gray-4"));
+    let first = *columns.first().unwrap();
+    let last = *columns.last().unwrap();
+    assert!(first < 40 && last > 700, "ink spans x={first}..{last}");
+}
+
 #[test]
 fn a_missing_image_or_value_leaves_the_rest_of_the_screen() {
     let screen = json!({ "content": { "column": { "gap": "medium", "align": "start", "justify": "start", "grow": false, "children": [

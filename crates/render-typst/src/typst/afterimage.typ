@@ -239,17 +239,30 @@
   })
 })
 
+// Each component knows whether its parent fixes its width and its height (`w`
+// and `h` of `bounds`): the page fixes both, and a stack fixes the length of a
+// child that grows along it and, when its own is fixed, the breadth of every
+// child. An axis that is not fixed follows the content, so a component fills
+// only what is fixed: a stack that fills an axis its parent sizes to content
+// would take the whole page.
+
 // A column or row: children size to their content, and those that grow share
-// what is left. Without growing children, `justify` places the free space.
-#let stack-of(t, v, direction, draw) = {
+// what is left when the stack's length is fixed. Without growing children,
+// `justify` places the free space.
+#let stack-of(t, v, direction, bounds, draw) = {
   let children = v.children
-  let tracks = children.map(child => if grows(child) { 1fr } else { auto })
+  let (length, breadth) = if direction == "column" { (bounds.h, bounds.w) } else { (bounds.w, bounds.h) }
+  let tracks = children.map(child => if length and grows(child) { 1fr } else { auto })
   let spacing = gap(t, v.at("gap", default: "medium"))
   let justify = v.at("justify", default: "start")
   let cross = v.at("align", default: "start")
-  let free = not tracks.contains(1fr)
+  let free = length and not tracks.contains(1fr)
   let gutter = if free and justify == "between" and children.len() > 1 { 1fr } else { spacing }
-  let cells = children.map(draw)
+  let cells = children.zip(tracks).map(((child, track)) => {
+    let shared = track == 1fr
+    draw(child, if direction == "column" { (w: breadth, h: shared) } else { (w: shared, h: breadth) })
+  })
+  let across = if breadth { 100% } else { auto }
   let (tracks, cells) = if free and justify in ("end", "center") {
     let edge = if justify == "center" { ((1fr,), ([],)) } else { ((), ()) }
     ((1fr,) + tracks + edge.at(0), ([],) + cells + edge.at(1))
@@ -260,23 +273,24 @@
   }
   if direction == "column" {
     let horizontal = if cross == "center" { center } else if cross == "end" { right } else { left }
-    grid(columns: (100%,), rows: tracks, row-gutter: gutter, align: horizontal, ..cells)
+    grid(columns: (across,), rows: tracks, row-gutter: gutter, align: horizontal, ..cells)
   } else {
     let vertical = if cross == "center" { horizon } else if cross == "end" { bottom } else { top }
-    grid(rows: (100%,), columns: tracks, column-gutter: gutter, align: vertical, ..cells)
+    grid(rows: (across,), columns: tracks, column-gutter: gutter, align: vertical, ..cells)
   }
 }
 
-#let item(t, v, draw) = {
+#let item(t, v, bounds, draw) = {
   let emphasis = int(v.at("emphasis", default: 1))
   let slot = if emphasis == 1 { "--framework-slot-item-meta" } else { "--framework-slot-item-meta-emphasis-" + str(emphasis) }
   let meta = fill(t, slot + "-bg-color", image: slot + "-bg-image")
-  let content = stack(spacing: px(t, "--gap-small", default: 7), ..v.children.map(draw))
+  let children = (w: bounds.w, h: false)
+  let content = stack(spacing: px(t, "--gap-small", default: 7), ..v.children.map(child => draw(child, children)))
   if v.at("plain", default: false) { return content }
   let index = v.at("index", default: none)
   let face = typeface(t, "--item-index", "base")
   grid(
-    columns: (if index == none { px(t, "--item-meta-width", default: 10) } else { auto }, 1fr),
+    columns: (if index == none { px(t, "--item-meta-width", default: 10) } else { auto }, if bounds.w { 1fr } else { auto }),
     column-gutter: px(t, "--gap-small", default: 7),
     grid.cell(fill: meta, inset: if index == none { 0pt } else { (x: 4pt, y: 2pt) },
       if index == none { [] } else { align(center + horizon, text(..face, shown(index))) }),
@@ -287,20 +301,22 @@
 // The bytes of the image a resolved `url` names, or `none`.
 #let image-of(images, key) = if type(key) == str { images.at(key, default: none) } else { none }
 
-#let node(t, images, grays, n, direction: "column") = {
+#let node(t, images, grays, n, direction: "column", bounds: (w: true, h: true)) = {
   let kind = n.keys().first()
   let v = n.at(kind)
   if kind == "column" or kind == "row" {
-    stack-of(t, v, kind, child => node(t, images, grays, child, direction: kind))
+    stack-of(t, v, kind, bounds, (child, bounds) => node(t, images, grays, child, direction: kind, bounds: bounds))
   } else if kind == "grid" {
+    // Equal columns across a fixed width; rows as tall as their cells.
     let columns = int(v.columns)
+    let cells = (w: bounds.w, h: false)
     grid(
-      columns: (1fr,) * columns,
+      columns: (if bounds.w { 1fr } else { auto },) * columns,
       gutter: gap(t, v.at("gap", default: "medium")),
-      ..v.cells.map(cell => grid.cell(colspan: calc.min(int(cell.at("span", default: 1)), columns), node(t, images, grays, cell.content)))
+      ..v.cells.map(cell => grid.cell(colspan: calc.min(int(cell.at("span", default: 1)), columns), node(t, images, grays, cell.content, bounds: cells)))
     )
   } else if kind == "item" {
-    item(t, v, child => node(t, images, grays, child))
+    item(t, v, bounds, (child, bounds) => node(t, images, grays, child, bounds: bounds))
   } else if kind == "title" {
     text-component(t, "--title", v)
   } else if kind == "description" {
@@ -312,7 +328,9 @@
   } else if kind == "image" {
     let source = image-of(images, v.at("url", default: none))
     if source == none { text(..typeface(t, "--label", "small"), "Image unavailable") } else {
-      std.image(source, width: 100%, height: 100%, fit: v.at("fit", default: "contain"))
+      // Fills what its parent fixes; along an axis sized to content it keeps its
+      // proportions.
+      std.image(source, width: if bounds.w { 100% } else { auto }, height: if bounds.h { 100% } else { auto }, fit: v.at("fit", default: "contain"))
     }
   } else if kind == "divider" {
     if direction == "row" { line(angle: 90deg, length: 100%) } else { line(length: 100%) }
