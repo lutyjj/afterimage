@@ -32,6 +32,11 @@ pub(crate) struct Tools {
     pub(crate) api: Api,
 }
 
+/// A tool with the hints its method vouches for: whether it only reads, and
+/// whether repeating it changes nothing more. Whether a write only adds and
+/// whether a call reaches outside the server (a preview runs its data sources)
+/// the method does not say, so those keep the protocol's cautious defaults and a
+/// client asks before any write.
 fn descriptor(tool: &Tool) -> Descriptor {
     let mut descriptor = Descriptor::new(
         tool.name.clone(),
@@ -42,9 +47,7 @@ fn descriptor(tool: &Tool) -> Descriptor {
     descriptor.annotations = Some(
         ToolAnnotations::new()
             .read_only(method == Method::GET)
-            .destructive(method == Method::DELETE)
-            .idempotent(method.is_idempotent())
-            .open_world(false),
+            .idempotent(method.is_idempotent()),
     );
     descriptor
 }
@@ -138,6 +141,14 @@ fn answer(tool: &Tool, response: Response<Bytes>) -> CallToolResponse {
         text = Bytes::from(serde_json::to_vec(&members).expect("a JSON object serialises"));
     }
     if text.len() > MAX_TEXT_BYTES {
+        // A write has happened by now, so it is reported as done; only a read
+        // can be asked again for less.
+        if tool.method != Method::GET {
+            return CallToolResult::success(vec![ContentBlock::text(format!(
+                "Done. The answer is over {MAX_TEXT_BYTES} bytes and is left out."
+            ))])
+            .into();
+        }
         return failure(format!(
             "the answer is over {MAX_TEXT_BYTES} bytes; ask for less"
         ));

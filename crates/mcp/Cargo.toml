@@ -22,8 +22,5 @@ thiserror = "2.0.21"
 tower = { version = "0.5.3", features = ["util"] }
 tracing = "0.1.44"
 
-[dev-dependencies]
-tokio = { version = "1.54.1", features = ["macros", "rt"] }
-
 [lints]
 workspace = true

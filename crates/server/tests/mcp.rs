@@ -5,7 +5,7 @@ mod common;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use common::{Server, mac, start};
+use common::{READINGS, Server, mac, start};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
@@ -130,10 +130,13 @@ async fn the_tools_are_the_operations_the_model_tags() {
         named("ListDevices").unwrap()["annotations"]["readOnlyHint"],
         true
     );
-    assert_eq!(
-        named("DeleteScreen").unwrap()["annotations"]["destructiveHint"],
-        true
-    );
+    // A write claims nothing the method cannot vouch for, so a client keeps
+    // the protocol's cautious default and asks before it runs.
+    let update = &named("UpdateScreen").unwrap()["annotations"];
+    assert_eq!(update["readOnlyHint"], false);
+    assert_eq!(update["idempotentHint"], true);
+    assert!(update.get("destructiveHint").is_none(), "{update}");
+    assert!(update.get("openWorldHint").is_none(), "{update}");
     for untagged in [
         "SignOut",
         "CreateAccessToken",
@@ -239,4 +242,91 @@ async fn a_read_only_token_reads_and_is_refused_a_change() {
             .starts_with("HTTP 403"),
         "{result}"
     );
+}
+
+#[tokio::test]
+async fn an_image_answer_and_an_empty_one_reach_the_client() {
+    let server = start().await;
+    server.sign_up().await;
+    let (device, key) = server.claim(&mac(1)).await;
+    // The check-in after the claim draws the device's first image.
+    server.display(&key, &READINGS).await;
+    let secret = token(&server, json!({ "name": "Agent" })).await;
+
+    let result = call(
+        &server,
+        &secret,
+        "GetDeviceImage",
+        json!({ "deviceId": device["id"] }),
+    )
+    .await;
+    assert_eq!(result["isError"], false, "{result}");
+    assert_eq!(result["content"][0]["type"], "image");
+    assert_eq!(result["content"][0]["mimeType"], "image/png");
+
+    let (_, created) = server
+        .call(
+            "POST",
+            "/manage/screens",
+            Some(json!({ "name": "Clock", "document": { "content": { "title": { "text": "Now" } } } })),
+        )
+        .await;
+    let result = call(
+        &server,
+        &secret,
+        "DeleteScreen",
+        json!({ "screenId": created["screen"]["id"] }),
+    )
+    .await;
+    assert_eq!(result["isError"], false, "{result}");
+    assert_eq!(result["content"][0]["text"], "Done.");
+}
+
+#[tokio::test]
+async fn a_client_that_shakes_hands_first_is_served_too() {
+    let server = start().await;
+    server.sign_up().await;
+    let secret = token(&server, json!({ "name": "Agent" })).await;
+    let post = |body: Value| {
+        plain()
+            .post(format!("{}/mcp", server.url))
+            .bearer_auth(&secret)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", "2025-06-18")
+            .body(body.to_string())
+            .send()
+    };
+
+    let initialized: Value = post(json!({
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": { "name": "test", "version": "1" }
+        }
+    }))
+    .await
+    .unwrap()
+    .json()
+    .await
+    .unwrap();
+    assert_eq!(initialized["result"]["serverInfo"]["name"], "afterimage");
+    assert!(
+        initialized["result"]["instructions"]
+            .as_str()
+            .unwrap()
+            .contains("PreviewScreen"),
+        "the service's documentation instructs the client"
+    );
+
+    // Stateless: the next request needs no session from the first.
+    let listed: Value =
+        post(json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {} }))
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+    assert!(listed["result"]["tools"].as_array().unwrap().len() > 1);
 }

@@ -369,3 +369,87 @@ fn point_at_definitions(value: &mut Value, reached: &mut BTreeSet<String>) {
         _ => {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    /// A document of one tagged operation with these parameters and body, and
+    /// the check operation.
+    fn document(parameters: &Value, body: Option<&Value>) -> String {
+        let mut operation = json!({
+            "operationId": "PutThing",
+            "description": "Puts a thing.",
+            "tags": ["mcp"],
+            "parameters": parameters,
+        });
+        if let Some(body) = body {
+            operation["requestBody"] =
+                json!({ "content": { "application/json": { "schema": body } } });
+        }
+        json!({
+            "info": { "description": "Things." },
+            "paths": {
+                "/things/{name}": { "put": operation },
+                "/me": { "get": { "operationId": "WhoAmI", "description": "Who." } }
+            }
+        })
+        .to_string()
+    }
+
+    fn label() -> Value {
+        json!([{ "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }])
+    }
+
+    #[test]
+    fn a_call_puts_labels_in_the_path_and_the_rest_in_the_body() {
+        let body = json!({ "type": "object", "properties": { "size": { "type": "integer" } } });
+        let catalog = Catalog::from_openapi(&document(&label(), Some(&body)), "WhoAmI").unwrap();
+        let tool = catalog.get("PutThing").unwrap();
+        let arguments = json!({ "name": "a b/c", "size": 3 });
+
+        let request = tool
+            .request(
+                arguments.as_object().unwrap(),
+                HeaderValue::from_static("Bearer t"),
+            )
+            .unwrap();
+
+        assert_eq!(request.method(), Method::PUT);
+        assert_eq!(request.uri(), "/things/a%20b%2Fc");
+        assert_eq!(request.headers()[header::AUTHORIZATION], "Bearer t");
+        assert_eq!(request.body().as_ref(), br#"{"size":3}"#);
+        assert_eq!(catalog.check, "/me");
+        assert_eq!(catalog.instructions.as_deref(), Some("Things."));
+    }
+
+    #[test]
+    fn a_call_refuses_an_argument_the_tool_does_not_take() {
+        let catalog = Catalog::from_openapi(&document(&label(), None), "WhoAmI").unwrap();
+        let arguments = json!({ "name": "a", "colour": "red" });
+        let refusal = catalog
+            .get("PutThing")
+            .unwrap()
+            .request(
+                arguments.as_object().unwrap(),
+                HeaderValue::from_static("Bearer t"),
+            )
+            .unwrap_err();
+        assert_eq!(refusal, "`colour` is not an input of PutThing");
+    }
+
+    #[test]
+    fn an_input_a_tool_cannot_carry_refuses_the_catalog() {
+        let query = json!([{ "name": "reset", "in": "query", "schema": { "type": "boolean" } }]);
+        assert!(matches!(
+            Catalog::from_openapi(&document(&query, None), "WhoAmI"),
+            Err(CatalogError::Unsupported { .. })
+        ));
+        assert!(matches!(
+            Catalog::from_openapi(&document(&label(), None), "Missing"),
+            Err(CatalogError::NoCheck(_))
+        ));
+    }
+}

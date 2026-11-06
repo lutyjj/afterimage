@@ -32,15 +32,16 @@ pub use catalog::{Catalog, CatalogError, TAG, Tool};
 use handler::Tools;
 
 /// The largest request the endpoint reads. A tool call that writes a screen is
-/// a few kilobytes; the API's own limit for one is 256 KiB.
+/// a few kilobytes; the management API's own body limit, which its generated
+/// server enforces, is 256 KiB (`smithy-build.json`).
 const MAX_REQUEST_BYTES: usize = 512 * 1024;
 
-type Buffered = BoxCloneService<Request<Bytes>, Response<Bytes>, Infallible>;
+type Boxed = BoxCloneService<Request<Bytes>, Response<Bytes>, Infallible>;
 
 /// The API, reached without a socket: a request with its whole body, answered
 /// with its whole body.
 #[derive(Clone)]
-pub struct Api(Arc<Mutex<Buffered>>);
+pub struct Api(Arc<Mutex<Boxed>>);
 
 impl Api {
     pub fn new<S>(service: S) -> Self
@@ -55,8 +56,10 @@ impl Api {
     }
 
     async fn call(&self, request: Request<Bytes>) -> Response<Bytes> {
-        // A mutex only because the handler must be `Sync` and a boxed service
-        // is not: each call clones the service out and drops the lock first.
+        // The handler must be `Sync`, and a smithy-rs service is not: its router
+        // boxes each operation as `Send` alone, so tower's `BoxCloneSyncService`
+        // cannot hold it. Each call clones the service out under the lock and
+        // drops the lock before it awaits.
         let service = self
             .0
             .lock()
@@ -139,7 +142,9 @@ where
         Box::pin(async move {
             // A credential the API refuses goes no further, with the API's own
             // answer and challenge: a client learns at connecting, not at
-            // every tool.
+            // every tool. A tool call is then judged again by the request it
+            // makes, which costs a second token lookup; at a household's scale
+            // that is cheaper than a second path to the same judgement.
             let authorization = request.headers().get(header::AUTHORIZATION).cloned();
             let check = endpoint.check(authorization).await;
             if !check.status().is_success() {

@@ -213,14 +213,16 @@ where
                 .oneshot(request.map(|body| boxed(Full::new(body))))
                 .await?;
             let (parts, body) = response.into_parts();
-            // A body the API fails to write midway reaches the tool as an empty
-            // answer of the status it began.
-            let body = body
-                .collect()
-                .await
-                .map(http_body_util::Collected::to_bytes)
-                .unwrap_or_default();
-            Ok(Response::from_parts(parts, body))
+            Ok(match body.collect().await {
+                Ok(body) => Response::from_parts(parts, body.to_bytes()),
+                Err(error) => {
+                    tracing::error!(%error, "an MCP call's answer could not be read");
+                    let mut failed =
+                        Response::new(Bytes::from_static(b"the answer could not be read"));
+                    *failed.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                    failed
+                }
+            })
         }
     }))
 }
