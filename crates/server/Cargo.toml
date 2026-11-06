@@ -44,8 +44,8 @@ http-body = "1.0.1"
 hyper = "1.12.0"
 # Device state for Home Assistant over MQTT; `url` reads the broker's address.
 rumqttc = { version = "0.25.1", features = ["url"] }
-# The host's CA certificates for an mqtts:// broker, which rumqttc's own TLS
-# setup loads with a panic when the host has none.
+# The host's CA certificates for an mqtts:// broker, loaded here because
+# rumqttc's own TLS setup expects them to load without errors.
 rustls-native-certs = "0.8.5"
 # RustCrypto's argon2id with its default cost, as PHC strings the accounts table stores.
 password-auth = "2.0.0"

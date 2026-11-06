@@ -112,9 +112,11 @@ impl Telemetry {
         firmware: Arc<Firmware>,
     ) -> Result<Self, String> {
         let mut url = settings.url.clone();
-        // rumqttc's own TLS for `mqtts://` panics without a process-wide crypto
-        // provider or a host certificate store, so the URL is read as plain
-        // `mqtt://` and the TLS transport set here.
+        // rumqttc's own TLS for `mqtts://` panics here: it asks rustls for a
+        // process-wide crypto provider, which rustls cannot pick while the build
+        // enables both of its providers, and it `expect`s the host's certificate
+        // store to load without errors. So the URL is read as plain `mqtt://` and
+        // the TLS transport set here.
         let tls = url.scheme() == "mqtts";
         if tls {
             if url.port().is_none() {
@@ -261,7 +263,9 @@ impl Publisher {
                 let subscriptions = [
                     format!("{}/status", self.settings.discovery_prefix),
                     format!("{}/+/firmware/install", self.settings.topic),
-                    // Read back once, to clear what devices since removed left.
+                    // The retained ones arrive on subscribing, which clears what
+                    // devices since removed left. The subscription stays, and the
+                    // server's own state comes back to it unflagged and is ignored.
                     format!("{}/+/state", self.settings.topic),
                 ];
                 for topic in subscriptions {
@@ -307,7 +311,7 @@ impl Publisher {
                 Ok(Some(device)) => {
                     // A device whose MAC another device holds more recently
                     // leaves the topics to that one.
-                    if let Some(live) = self.live(&device.mac).await
+                    if let Ok(Some(live)) = self.live(&device.mac).await
                         && live.id == device.id
                     {
                         let boards = self.firmware.boards_on_hand();
@@ -320,15 +324,17 @@ impl Publisher {
                 }
             },
             Change::Removed(mac) => match self.live(&mac).await {
-                Some(other) => {
+                Ok(Some(other)) => {
                     let boards = self.firmware.boards_on_hand();
                     self.publish_device(&other, boards.as_deref()).await;
                 }
-                None => {
+                Ok(None) => {
                     if let Some(key) = key(&mac) {
                         self.clear(&key).await;
                     }
                 }
+                // Unknown is not gone: the topics stay until the next change.
+                Err(()) => {}
             },
         }
     }
@@ -343,7 +349,7 @@ impl Publisher {
         };
         let boards = self.firmware.boards_on_hand();
         for device in &devices {
-            if let Some(live) = self.live(&device.mac).await
+            if let Ok(Some(live)) = self.live(&device.mac).await
                 && live.id == device.id
             {
                 self.publish_device(device, boards.as_deref()).await;
@@ -351,15 +357,12 @@ impl Publisher {
         }
     }
 
-    /// The device whose MAC this is and which checked in last, when any holds it.
-    async fn live(&self, mac: &str) -> Option<Device> {
-        match self.devices.with_mac(mac).await {
-            Ok(device) => device,
-            Err(error) => {
-                tracing::error!(%error, "a device to publish could not be read");
-                None
-            }
-        }
+    /// The device whose MAC this is and which checked in last, when any holds
+    /// it; `Err` when storage could not tell, which is logged.
+    async fn live(&self, mac: &str) -> Result<Option<Device>, ()> {
+        self.devices.with_mac(mac).await.map_err(|error| {
+            tracing::error!(%error, "a device to publish could not be read");
+        })
     }
 
     /// Clears a key's topics when no device holds its MAC any more.
@@ -367,7 +370,7 @@ impl Publisher {
         let Some(mac) = mac_of(key) else {
             return;
         };
-        if self.live(&mac).await.is_none() {
+        if let Ok(None) = self.live(&mac).await {
             self.clear(key).await;
         }
     }

@@ -260,15 +260,8 @@ async fn retained_topics_of_a_gone_device_are_cleared_on_connecting() {
     observer.wait(CONFIG, |_| true).await;
 }
 
-/// A retained install would replay at every connection, so it is ignored.
-#[tokio::test]
-async fn a_retained_install_command_is_ignored() {
-    let broker = Broker::start().await;
-    let observer = Observer::start(&broker);
-    observer
-        .publish("afterimage/41b41039a101/firmware/install", "install", true)
-        .await;
-    let server = start(&broker).await;
+/// Publishes a board named like the harness's model, `og`, with one release.
+fn publish_og(server: &Server) {
     let url = server
         .trmnl
         .publish("og.bin", flash_image(&app_image(b"firmware")));
@@ -276,18 +269,51 @@ async fn a_retained_install_command_is_ignored() {
         { "keyname": "og", "chipFamily": "ESP32-C3", "label": "OG",
           "versions": [{ "version": "FW1.8.18", "url": url }] }
     ] } })));
+}
+
+/// A retained install would replay at every connection, so it is ignored. It
+/// reaches the server from the broker's store when the server subscribes again,
+/// here after a broker restart.
+#[tokio::test]
+async fn a_retained_install_command_is_ignored() {
+    let broker = Broker::start().await;
+    let port = broker.port;
+    let observer = Observer::start(&broker);
+    let server = start(&broker).await;
+    publish_og(&server);
     server.sign_up().await;
     let (device, _) = server.claim(&mac(1)).await;
-    // Home Assistant's announcement goes through the same queue after the
-    // retained command, so once its republish shows, the command was handled.
     observer.wait(CONFIG, |_| true).await;
-    observer.publish(CONFIG, "", true).await;
-    observer.gone(CONFIG).await;
+
+    drop(broker);
+    let _restarted = Broker::start_on(port).await;
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+    while observer
+        .connections
+        .load(std::sync::atomic::Ordering::SeqCst)
+        < 2
+    {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the observer never reconnected"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
     observer
-        .publish("homeassistant/status", "online", false)
+        .publish("afterimage/41b41039a101/firmware/install", "install", true)
         .await;
+    // The server's republish shows it subscribed again; the announcement after
+    // it arrives behind the retained command.
     observer.wait(CONFIG, |_| true).await;
+    observer.settle(CONFIG).await;
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert_eq!(
+        server
+            .trmnl
+            .flash_requests
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
     let (_, body) = server
         .call("GET", &format!("/manage/devices/{}", device["id"]), None)
         .await;
@@ -324,13 +350,15 @@ async fn a_restarted_broker_gets_every_device_again() {
 }
 
 /// A device set up again and claimed by another account leaves a device of the
-/// first account on its old registration. The topics follow the device that
-/// checks in, and removing the stale one leaves them published.
+/// first account on its old registration. The topics and Home Assistant's
+/// install follow the device that checked in last; a change to the stale one
+/// publishes nothing, and removing it leaves the live one published.
 #[tokio::test]
 async fn one_mac_in_two_accounts_publishes_the_device_that_checks_in() {
     let broker = Broker::start().await;
     let observer = Observer::start(&broker);
     let server = start(&broker).await;
+    publish_og(&server);
     server.sign_up().await;
     let (stale, _) = server.claim(&mac(1)).await;
 
@@ -373,19 +401,60 @@ async fn one_mac_in_two_accounts_publishes_the_device_that_checks_in() {
         .json()
         .await
         .unwrap();
-    assert_eq!(claimed["device"]["name"], "Eve's display");
+    let live = claimed["device"]["id"].as_i64().unwrap();
     observer
         .wait(CONFIG, |config| config["device"]["name"] == "Eve's display")
         .await;
 
     let (status, _) = server
+        .call(
+            "PATCH",
+            &format!("/manage/devices/{}", stale["id"]),
+            Some(json!({ "name": "Ada's old display" })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    observer
+        .publish("afterimage/41b41039a101/firmware/install", "install", false)
+        .await;
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+    loop {
+        let eves: Value = eve
+            .get(format!("{}/manage/devices/{live}", server.url))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        if eves["device"]["firmware"]["update"]["state"] == "requested" {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the install never reached Eve's display"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    let (_, adas) = server
+        .call("GET", &format!("/manage/devices/{}", stale["id"]), None)
+        .await;
+    assert!(adas["device"]["firmware"]["update"].is_null(), "{adas}");
+
+    let (status, _) = server
         .call("DELETE", &format!("/manage/devices/{}", stale["id"]), None)
         .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    server.clock.advance(60);
-    server.display(&key, &READINGS).await;
-    let config = observer.wait(CONFIG, |_| true).await;
-    assert_eq!(config["device"]["name"], "Eve's display", "still published");
+    observer.settle(CONFIG).await;
+    let names: Vec<Value> = observer
+        .seen(CONFIG)
+        .iter()
+        .map(|config| config["device"]["name"].clone())
+        .collect();
+    assert!(
+        !names.contains(&json!("Ada's old display")) && !names.contains(&Value::Null),
+        "the stale device took the topics or emptied them: {names:?}"
+    );
 }
 
 /// rumqttc's own TLS setup panics without a process-wide crypto provider; the

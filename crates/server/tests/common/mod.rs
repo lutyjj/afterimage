@@ -561,6 +561,8 @@ impl Drop for Broker {
 pub struct Observer {
     pub client: rumqttc::AsyncClient,
     messages: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    /// Every message in the order it arrived, an emptied topic included.
+    history: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
     /// Connections to the broker so far.
     pub connections: Arc<AtomicUsize>,
 }
@@ -572,6 +574,8 @@ impl Observer {
         let (client, mut eventloop) = rumqttc::AsyncClient::new(options, 64);
         let messages = Arc::new(Mutex::new(HashMap::new()));
         let kept = Arc::clone(&messages);
+        let history = Arc::new(Mutex::new(Vec::new()));
+        let recorded = Arc::clone(&history);
         let connections = Arc::new(AtomicUsize::new(0));
         let connected = Arc::clone(&connections);
         let subscriber = client.clone();
@@ -586,6 +590,10 @@ impl Observer {
                         let _ = subscriber.try_subscribe("#", rumqttc::QoS::AtLeastOnce);
                     }
                     Ok(rumqttc::Event::Incoming(rumqttc::Packet::Publish(message))) => {
+                        recorded
+                            .lock()
+                            .unwrap()
+                            .push((message.topic.clone(), message.payload.to_vec()));
                         let mut kept = kept.lock().unwrap();
                         if message.payload.is_empty() {
                             kept.remove(&message.topic);
@@ -601,6 +609,7 @@ impl Observer {
         Self {
             client,
             messages,
+            history,
             connections,
         }
     }
@@ -626,6 +635,33 @@ impl Observer {
                     .unwrap()
                     .get(topic)
                     .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+    }
+
+    /// Every message `topic` had, in order; an emptied topic reads as null.
+    pub fn seen(&self, topic: &str) -> Vec<Value> {
+        self.history
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(seen, _)| seen == topic)
+            .map(|(_, bytes)| serde_json::from_slice(bytes).unwrap_or(Value::Null))
+            .collect()
+    }
+
+    /// Waits until the broker has delivered every message published before Home
+    /// Assistant announces itself, by announcing it and waiting for the server's
+    /// answer: the discovery payload of `topic` once more.
+    pub async fn settle(&self, topic: &str) {
+        let before = self.seen(topic).len();
+        self.publish("homeassistant/status", "online", false).await;
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        while self.seen(topic).len() <= before {
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "the server never answered"
             );
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
