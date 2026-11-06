@@ -431,10 +431,17 @@ async fn a_screen_document_comes_back_as_written_with_its_defaults() {
     let mut expected = document();
     expected["sources"]["weather"]["method"] = json!("GET");
     let column = &mut expected["content"]["column"];
-    for (member, value) in [("gap", "medium"), ("align", "start"), ("justify", "start")] {
+    for (member, value) in [
+        ("gap", "medium"),
+        ("align", "start"),
+        ("justify", "start"),
+        ("padding", "none"),
+        ("rounded", "none"),
+    ] {
         column[member] = json!(value);
     }
     column["grow"] = json!(false);
+    column["inverse"] = json!(false);
     for child in column["children"].as_array_mut().unwrap() {
         if let Some(value) = child.get_mut("value") {
             value["fit"] = json!(false);
