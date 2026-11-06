@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use crate::{oidc, telemetry};
-use afterimage_management_api::model::{MqttDiscoveryPrefix, MqttTopic};
+use afterimage_management_api::model::{MqttDiscoveryPrefix, MqttTopic, MqttUrl, MqttUsername};
 
 #[derive(Debug, Clone, clap::Parser)]
 #[command(
@@ -76,12 +76,13 @@ pub struct Config {
     pub oidc_name: String,
 
     /// The MQTT broker to publish device state to, with Home Assistant's
-    /// discovery, such as `mqtt://broker.example:1883` or `mqtts://` with TLS;
-    /// nothing is published without it.
-    #[arg(long, env = "AFTERIMAGE_MQTT_URL", value_parser = telemetry::broker_url)]
+    /// discovery, such as `mqtt://broker.example:1883` or `mqtts://` with TLS.
+    /// Set, it is the broker and the web UI only shows it; unset, the server
+    /// publishes to the broker the administrator saves on the Server page, if any.
+    #[arg(long, env = "AFTERIMAGE_MQTT_URL", value_parser = parse_mqtt_url)]
     pub mqtt_url: Option<url::Url>,
 
-    #[arg(long, env = "AFTERIMAGE_MQTT_USERNAME", requires = "mqtt_url")]
+    #[arg(long, env = "AFTERIMAGE_MQTT_USERNAME", requires = "mqtt_url", value_parser = parse_mqtt_username)]
     pub mqtt_username: Option<String>,
 
     #[arg(
@@ -157,6 +158,20 @@ impl Config {
             .as_deref()
             .map(|url| url.starts_with("https://"))
     }
+}
+
+/// The broker's address, as the management API's model constrains it and as
+/// telemetry reads it.
+fn parse_mqtt_url(text: &str) -> Result<url::Url, String> {
+    MqttUrl::try_from(text.to_owned()).map_err(|violation| violation.to_string())?;
+    telemetry::broker_url(text)
+}
+
+/// The broker's username, as the management API's model constrains it.
+fn parse_mqtt_username(text: &str) -> Result<String, String> {
+    MqttUsername::try_from(text.to_owned())
+        .map(MqttUsername::into_inner)
+        .map_err(|violation| violation.to_string())
 }
 
 /// The base topic, as the management API's model constrains it: one level of
@@ -267,6 +282,11 @@ mod tests {
             assert!(parse(&["--mqtt-topic", topic]).is_err(), "{topic:?}");
         }
         assert!(parse(&["--mqtt-topic", "afterimage-2"]).is_ok());
+        // The model's bounds, which the management API answers within.
+        let broker = "mqtt://broker.example.test:1883";
+        assert!(parse(&["--mqtt-url", broker, "--mqtt-username", ""]).is_err());
+        let long = format!("mqtt://{}.example.test:1883", "b".repeat(520));
+        assert!(parse(&["--mqtt-url", &long]).is_err());
         assert!(parse(&["--mqtt-discovery-prefix", "a/#"]).is_err());
         assert!(parse(&["--mqtt-discovery-prefix", "ha/discovery"]).is_ok());
     }

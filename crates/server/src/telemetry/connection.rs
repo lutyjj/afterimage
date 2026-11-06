@@ -7,7 +7,8 @@ use std::time::Duration;
 
 use rumqttc::tokio_rustls::rustls;
 use rumqttc::{
-    AsyncClient, Event, LastWill, MqttOptions, Outgoing, Packet, QoS, TlsConfiguration, Transport,
+    AsyncClient, ConnectionError, Event, LastWill, MqttOptions, Outgoing, Packet, QoS,
+    TlsConfiguration, Transport,
 };
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
@@ -66,8 +67,12 @@ pub(super) fn options(settings: &Settings) -> Result<MqttOptions, String> {
 /// What the publisher acts on besides the broker.
 enum Message {
     Change(Change),
-    /// Clear, say goodbye and stop; answered with whether the goodbye was sent.
-    Retire(oneshot::Sender<bool>),
+    /// Say goodbye and stop, clearing what it published first where `clear` is
+    /// set; answered with whether the goodbye was sent.
+    Retire {
+        clear: bool,
+        done: oneshot::Sender<bool>,
+    },
 }
 
 /// An open connection: its tasks, and the way to hand them a change.
@@ -93,10 +98,10 @@ impl Open {
         let (incoming_sender, mut incoming) = mpsc::unbounded_channel();
         state.send_replace(Connection::Connecting);
 
-        // The event loop is polled on its own, since a publish waits on it. After
-        // the goodbye it goes on polling, which sends it, until the broker closes
-        // the connection: a connection dropped before the goodbye reaches the
-        // broker would have the broker publish the last will.
+        // The event loop is polled on its own, since a publish waits on it. It
+        // writes and flushes the goodbye before it reports it, then goes on until
+        // the publisher has dropped the client or the broker has closed the
+        // connection, so no request the publisher queued is lost.
         let polling = tokio::spawn(async move {
             let mut connected = true;
             let mut leaving = false;
@@ -124,10 +129,17 @@ impl Open {
                     Ok(_) => {}
                     Err(_) if leaving => return,
                     Err(error) => {
+                        // A broker that answers with a refusal, such as for a wrong
+                        // password, is told apart from one that cannot be reached.
+                        let now = if matches!(error, ConnectionError::ConnectionRefused(_)) {
+                            Connection::Refused
+                        } else {
+                            Connection::Connecting
+                        };
+                        state.send_if_modified(|state| std::mem::replace(state, now) != now);
                         if connected {
-                            tracing::warn!(%error, "the MQTT broker cannot be reached; trying again");
+                            tracing::warn!(%error, "the MQTT broker cannot be reached or refused; trying again");
                             connected = false;
-                            state.send_replace(Connection::Connecting);
                             if incoming_sender.send(Incoming::Disconnected).is_err() {
                                 return;
                             }
@@ -150,12 +162,15 @@ impl Open {
         };
         let publisher = tokio::spawn(async move {
             loop {
+                // What the broker sent first, so a connection it has just
+                // acknowledged counts as connected when a retirement follows.
                 tokio::select! {
+                    biased;
                     Some(event) = incoming.recv() => publisher.incoming(event).await,
                     Some(message) = pending.recv() => match message {
                         Message::Change(change) => publisher.change(change).await,
-                        Message::Retire(done) => {
-                            let _ = done.send(publisher.retire().await);
+                        Message::Retire { clear, done } => {
+                            let _ = done.send(publisher.retire(clear).await);
                             return;
                         }
                     },
@@ -175,11 +190,12 @@ impl Open {
         let _ = self.messages.send(Message::Change(change));
     }
 
-    /// Clears what the connection published and says goodbye, waiting at most
-    /// [`RETIRE`] for the broker; its tasks end either way.
-    pub(super) async fn retire(self) {
+    /// Says goodbye, clearing what the connection published first where `clear`
+    /// is set, and waits at most [`RETIRE`] for the broker; its tasks end either
+    /// way. A broker out of reach is told nothing, so it keeps what was published.
+    pub(super) async fn retire(self, clear: bool) {
         let (done, said) = oneshot::channel();
-        let _ = self.messages.send(Message::Retire(done));
+        let _ = self.messages.send(Message::Retire { clear, done });
         let mut polling = self.polling;
         let goodbye = tokio::time::timeout(RETIRE, async {
             if said.await.unwrap_or(false) {
@@ -245,12 +261,25 @@ struct Publisher {
 }
 
 impl Publisher {
-    /// Takes every device it published out of the broker, empties its status, and
-    /// says goodbye; `false` when it is not connected and so has nobody to tell.
-    async fn retire(&mut self) -> bool {
+    /// Says goodbye, first taking every device it published out of the broker
+    /// and emptying its status where `clear` is set; `false` when it is not
+    /// connected and so has nobody to tell.
+    async fn retire(&mut self, clear: bool) -> bool {
         if !self.connected {
+            tracing::info!("the MQTT broker is out of reach; what was published there stays");
             return false;
         }
+        if clear {
+            self.clear_all().await;
+        }
+        if let Err(error) = self.client.disconnect().await {
+            tracing::warn!(%error, "the MQTT goodbye was not sent");
+            return false;
+        }
+        true
+    }
+
+    async fn clear_all(&self) {
         match self.devices.all().await {
             Ok(devices) => {
                 for key in devices.iter().filter_map(|device| key(&device.mac)) {
@@ -262,11 +291,6 @@ impl Publisher {
             }
         }
         self.publish(&self.status.clone(), "").await;
-        if let Err(error) = self.client.disconnect().await {
-            tracing::warn!(%error, "the MQTT goodbye was not sent");
-            return false;
-        }
-        true
     }
 
     async fn incoming(&mut self, event: Incoming) {

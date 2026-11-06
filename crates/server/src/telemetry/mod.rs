@@ -102,6 +102,9 @@ pub enum Connection {
     Off,
     /// Connecting, or trying again after the broker could not be reached.
     Connecting,
+    /// The broker refused the connection, such as for a wrong username or
+    /// password; trying again.
+    Refused,
     Connected,
 }
 
@@ -162,7 +165,9 @@ impl Telemetry {
         let open = |settings: Settings| {
             connection::Open::new(settings, &parts, telemetry.clone(), state.clone())
         };
-        let mut current = settings.map(open).transpose()?;
+        let mut current = settings
+            .map(|settings| open(settings.clone()).map(|opened| (settings, opened)))
+            .transpose()?;
         let telemetry_of_task = telemetry.clone();
         tokio::spawn(async move {
             let open = |settings: Settings| {
@@ -171,16 +176,29 @@ impl Telemetry {
             while let Some(command) = received.recv().await {
                 match command {
                     Command::Change(change) => {
-                        if let Some(current) = &current {
+                        if let Some((_, current)) = &current {
                             current.change(change);
                         }
                     }
                     Command::Configure(settings, done) => {
-                        if let Some(retiring) = current.take() {
-                            retiring.retire().await;
+                        // Nothing changes for the same settings.
+                        if current.as_ref().map(|(held, _)| held) == settings.as_ref() {
+                            let _ = done.send(Ok(()));
+                            continue;
+                        }
+                        if let Some((held, retiring)) = current.take() {
+                            // What was published stays where only the credentials
+                            // change; another broker or topics take it away.
+                            let moves = settings.as_ref().is_none_or(|next| {
+                                (&next.url, &next.topic, &next.discovery_prefix)
+                                    != (&held.url, &held.topic, &held.discovery_prefix)
+                            });
+                            retiring.retire(moves).await;
                         }
                         state.send_replace(Connection::Off);
-                        let opened = settings.map(open).transpose();
+                        let opened = settings
+                            .map(|settings| open(settings.clone()).map(|opened| (settings, opened)))
+                            .transpose();
                         let answer = opened.map(|opened| current = opened);
                         // The caller may have stopped waiting; the settings hold
                         // all the same.
@@ -208,8 +226,10 @@ impl Telemetry {
         *self.connection.borrow()
     }
 
-    /// Publishes with `settings` from now on, or stops publishing with none:
-    /// what the current connection published is cleared first.
+    /// Publishes with `settings` from now on, or stops publishing with none.
+    /// Another broker or other topics first clear what the current connection
+    /// published, when its broker can be reached; other credentials reconnect
+    /// and keep it; the same settings change nothing.
     ///
     /// # Errors
     ///

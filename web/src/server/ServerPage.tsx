@@ -64,7 +64,9 @@ function Connection({ settings }: { settings: MqttSettings }) {
       ? `Connected to ${settings.url}`
       : settings.connection === "connecting"
         ? `Connecting to ${settings.url}`
-        : "Not publishing";
+        : settings.connection === "refused"
+          ? `Refused by ${settings.url}`
+          : "Not publishing";
   return (
     <dl className={`${styles.facts} ${styles.whole}`} aria-live="polite">
       <div>
@@ -73,6 +75,9 @@ function Connection({ settings }: { settings: MqttSettings }) {
           {state}
           {settings.connection === "connecting" && (
             <span className={styles.aside}> · trying again every few seconds until the broker answers</span>
+          )}
+          {settings.connection === "refused" && (
+            <span className={styles.aside}> · the broker answered and refused; check the username and password</span>
           )}
         </dd>
       </div>
@@ -138,6 +143,13 @@ function BrokerForm({
     });
   };
   const movesDevices = publishing && (topic.trim() !== settings.topic || prefix.trim() !== settings.discoveryPrefix);
+  // The server sends a saved password only to the broker and username it was
+  // given for, so naming another asks for it again.
+  const needsPassword =
+    settings.passwordSet &&
+    !removePassword &&
+    !password &&
+    (url.trim() !== settings.url || (username.trim() || undefined) !== settings.username);
 
   return (
     <form className={styles.form} onSubmit={submit}>
@@ -176,8 +188,10 @@ function BrokerForm({
           disabled={removePassword}
           autoComplete="new-password"
           placeholder={settings.passwordSet ? "Saved; type to replace it" : ""}
+          aria-invalid={needsPassword || undefined}
           onChange={(event) => setPassword(event.target.value)}
         />
+        {needsPassword && <span className="hint">Another broker or username needs the password again.</span>}
       </label>
       {settings.passwordSet && (
         <label className={`${styles.check} ${styles.wide}`}>

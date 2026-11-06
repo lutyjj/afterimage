@@ -202,7 +202,31 @@ async fn start_full(entropy: Arc<dyn Entropy>, settings: &[&str], secrets: Secre
     start_at(new_clock(), entropy, settings, secrets).await
 }
 
+/// The server on a data directory the test prepared, such as a database
+/// migrated to an earlier schema.
+pub async fn start_on_data(data: TempDir) -> Server {
+    start_on(
+        Arc::new(data),
+        new_clock(),
+        Arc::new(OsEntropy),
+        &[],
+        Secrets::default(),
+    )
+    .await
+}
+
 impl Server {
+    /// Another handle on this server, with this one's cookies.
+    pub fn clone_handle(&self) -> Server {
+        Server {
+            url: self.url.clone(),
+            clock: Arc::clone(&self.clock),
+            data: Arc::clone(&self.data),
+            http: self.http.clone(),
+            trmnl: self.trmnl.clone(),
+        }
+    }
+
     /// Another server on this one's data and clock, as the server is after a
     /// restart, with these settings.
     pub async fn again(&self, settings: &[&str]) -> Server {
@@ -572,11 +596,26 @@ impl Broker {
 
     /// A broker on `port`, as after a restart; it keeps no retained messages.
     pub async fn start_on(port: u16) -> Self {
+        Self::start_with(port, true).await
+    }
+
+    /// A broker that refuses every client: it takes no anonymous client and
+    /// knows no user.
+    pub async fn start_refusing() -> Self {
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        Self::start_with(port, false).await
+    }
+
+    async fn start_with(port: u16, anonymous: bool) -> Self {
         let directory = TempDir::new().unwrap();
         let config = directory.path().join("mosquitto.conf");
         std::fs::write(
             &config,
-            format!("listener {port} 127.0.0.1\nallow_anonymous true\npersistence false\n"),
+            format!("listener {port} 127.0.0.1\nallow_anonymous {anonymous}\npersistence false\n"),
         )
         .unwrap();
         let child = std::process::Command::new("mosquitto")
@@ -704,13 +743,26 @@ impl Observer {
         }
     }
 
+    /// Every payload `topic` carried, in order, as text; an emptied topic reads
+    /// as an empty string.
+    pub fn payloads(&self, topic: &str) -> Vec<String> {
+        self.history
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(seen, _)| seen == topic)
+            .map(|(_, bytes)| String::from_utf8_lossy(bytes).into_owned())
+            .collect()
+    }
+
     /// Waits until `topic` holds nothing, as after the server cleared it.
     pub async fn wait_gone(&self, topic: &str) {
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
         while self.messages.lock().unwrap().contains_key(topic) {
             assert!(
                 tokio::time::Instant::now() < deadline,
-                "{topic} was never cleared"
+                "{topic} was never cleared: {:?}",
+                self.payloads(topic)
             );
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }

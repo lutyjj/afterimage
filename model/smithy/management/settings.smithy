@@ -21,8 +21,9 @@ operation GetMqttSettings {
     ]
 }
 
-/// Sets the broker, or with no `url` stops publishing. The server clears what it
-/// published under the settings it had, then connects with these.
+/// Sets the broker, or with no `url` stops publishing. Another broker or other
+/// topics first clear what the server published, when its broker can be
+/// reached; other credentials only reconnect; the same settings change nothing.
 @idempotent
 @http(method: "PUT", uri: "/manage/server/mqtt")
 @optionalAuth
@@ -34,7 +35,9 @@ operation UpdateMqttSettings {
 
         username: MqttUsername
 
-        /// Absent keeps the password the server has; empty removes it.
+        /// Absent keeps the password the server has, for the same broker and
+        /// username; another broker or username needs it again, so a saved
+        /// password never goes where it was not given for. Empty removes it.
         password: MqttPassword
 
         /// The topic every device is published under, also the server's client ID
@@ -87,6 +90,10 @@ enum MqttConnection {
     /// The server is connecting, or the broker cannot be reached and it is trying
     /// again.
     CONNECTING = "connecting"
+
+    /// The broker answered and refused the connection, such as for a wrong
+    /// username or password; the server tries again.
+    REFUSED = "refused"
 
     CONNECTED = "connected"
 }

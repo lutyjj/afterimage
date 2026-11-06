@@ -7,7 +7,7 @@ mod common;
 
 use std::sync::Arc;
 
-use common::{Broker, Observer, Server, mac, start, start_with};
+use common::{Broker, Observer, Server, mac, start, start_on_data, start_with};
 use afterimage_server::keys::OsEntropy;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
@@ -54,15 +54,12 @@ async fn second_account(server: &Server) -> Server {
     .await
     .unwrap();
     let eve = Server {
-        url: server.url.clone(),
-        clock: Arc::clone(&server.clock),
-        data: Arc::clone(&server.data),
         http: reqwest::Client::builder()
             .tls_certs_only([])
             .cookie_store(true)
             .build()
             .unwrap(),
-        trmnl: server.trmnl.clone(),
+        ..server.clone_handle()
     };
     let credentials = json!({ "username": "eve", "password": "second password here" });
     let (status, _) = eve
@@ -139,6 +136,197 @@ async fn a_saved_broker_takes_effect_at_once_and_moves_or_clears_the_topics() {
     assert!(off.get("url").is_none(), "{off}");
     observer.wait_gone(MOVED).await;
     observer.wait_gone("frames/status").await;
+
+    // Each connection said goodbye, so the broker never published a last will.
+    for status in ["afterimage/status", "frames/status"] {
+        let payloads = observer.payloads(status);
+        assert!(
+            !payloads.contains(&"offline".to_owned()),
+            "{status}: {payloads:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn other_credentials_or_the_same_settings_keep_what_was_published() {
+    let broker = Broker::start().await;
+    let observer = Observer::start(&broker);
+    let server = start().await;
+    server.sign_up().await;
+    server.claim(&mac(1)).await;
+    let settings = json!({ "url": broker.url(), "username": "afterimage", "password": "first" });
+    save(&server, settings.clone()).await;
+    observer.wait(CONFIG, |_| true).await;
+    connection(&server, "connected").await;
+
+    save(&server, settings).await;
+    let rotated = json!({ "url": broker.url(), "username": "afterimage", "password": "second" });
+    save(&server, rotated).await;
+    connection(&server, "connected").await;
+    observer.settle(CONFIG).await;
+    assert!(
+        !observer.payloads(CONFIG).iter().any(String::is_empty),
+        "the device never left Home Assistant"
+    );
+}
+
+#[tokio::test]
+async fn a_saved_password_goes_only_to_its_own_broker_and_username() {
+    let broker = Broker::start().await;
+    let server = start().await;
+    server.sign_up().await;
+    let url = broker.url();
+    save(
+        &server,
+        json!({ "url": url, "username": "afterimage", "password": "secret" }),
+    )
+    .await;
+
+    let refused = |settings: Value| {
+        let server = &server;
+        async move { server.call("PUT", SETTINGS, Some(settings)).await }
+    };
+    // Another host, or another username, without the password again.
+    let (status, body) =
+        refused(json!({ "url": "mqtt://other.example.test:1883", "username": "afterimage" })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    let (status, _) = refused(json!({ "url": url, "username": "someone-else" })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(settings(&server).await["url"], url, "nothing changed");
+
+    // The same broker, spelt with a slash, keeps it.
+    let kept = save(
+        &server,
+        json!({ "url": format!("{url}/"), "username": "afterimage" }),
+    )
+    .await;
+    assert_eq!(kept["passwordSet"], true);
+}
+
+#[tokio::test]
+async fn a_change_while_the_broker_is_away_does_not_wait_for_it() {
+    let broker = Broker::start().await;
+    let server = start().await;
+    server.sign_up().await;
+    save(&server, json!({ "url": broker.url() })).await;
+    connection(&server, "connected").await;
+    let url = broker.url();
+    drop(broker);
+    connection(&server, "connecting").await;
+
+    let started = std::time::Instant::now();
+    let moved = save(&server, json!({ "url": url, "topic": "frames" })).await;
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(7),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(moved["topic"], "frames");
+    assert_eq!(moved["connection"], "connecting");
+}
+
+#[tokio::test]
+async fn a_broker_that_refuses_shows_as_refused() {
+    let broker = Broker::start_refusing().await;
+    let server = start().await;
+    server.sign_up().await;
+    save(&server, json!({ "url": broker.url() })).await;
+    connection(&server, "refused").await;
+}
+
+#[tokio::test]
+async fn tokens_act_as_their_account_on_the_broker_settings() {
+    let server = start().await;
+    server.sign_up().await;
+    let token = |server: &Server, scope: Value| {
+        let server = server.clone_handle();
+        async move {
+            let mut body = json!({ "name": "Script" });
+            if !scope.is_null() {
+                body["scope"] = scope;
+            }
+            let (status, created) = server
+                .call("POST", "/manage/account/tokens", Some(body))
+                .await;
+            assert_eq!(status, StatusCode::CREATED, "{created}");
+            created["secret"].as_str().unwrap().to_owned()
+        }
+    };
+    let with = |secret: String, method: &'static str, body: Option<Value>| {
+        let url = format!("{}{SETTINGS}", server.url);
+        async move {
+            let mut request = reqwest::Client::new()
+                .request(reqwest::Method::from_bytes(method.as_bytes()).unwrap(), url)
+                .bearer_auth(secret);
+            if let Some(body) = body {
+                request = request.json(&body);
+            }
+            request.send().await.unwrap().status()
+        }
+    };
+    let read_only = token(&server, json!("read_only")).await;
+    assert_eq!(with(read_only.clone(), "GET", None).await, StatusCode::OK);
+    assert_eq!(
+        with(read_only, "PUT", Some(json!({}))).await,
+        StatusCode::FORBIDDEN
+    );
+    let eve = second_account(&server).await;
+    let members = token(&eve, Value::Null).await;
+    assert_eq!(with(members, "GET", None).await, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn the_first_account_of_an_older_database_administers_it() {
+    // A database at the schema the deployments ran before administrators, with
+    // two accounts: the migration names the first.
+    let data = tempfile::TempDir::new().unwrap();
+    let options = sqlx::sqlite::SqliteConnectOptions::new()
+        .filename(data.path().join("afterimage.db"))
+        .create_if_missing(true);
+    let pool = sqlx::SqlitePool::connect_with(options).await.unwrap();
+    let mut earlier = sqlx::migrate!("./migrations");
+    earlier.migrations = earlier
+        .migrations
+        .iter()
+        .filter(|migration| migration.version <= 3)
+        .cloned()
+        .collect::<Vec<_>>()
+        .into();
+    earlier.run(&pool).await.unwrap();
+    let hash = password_auth::generate_hash("correct horse battery");
+    for (name, username) in [("Ada", "ada"), ("Eve", "eve")] {
+        sqlx::query(
+            "INSERT INTO accounts (name, username, password_hash, created_at) VALUES (?, ?, ?, 0)",
+        )
+        .bind(name)
+        .bind(username)
+        .bind(&hash)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    pool.close().await;
+
+    let server = start_on_data(data).await;
+    for (username, administrator) in [("ada", true), ("eve", false)] {
+        let client = Server {
+            http: reqwest::Client::builder()
+                .tls_certs_only([])
+                .cookie_store(true)
+                .build()
+                .unwrap(),
+            ..server.clone_handle()
+        };
+        let credentials = json!({ "username": username, "password": "correct horse battery" });
+        let (status, body) = client
+            .call("POST", "/manage/auth/password", Some(credentials))
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(
+            body["account"]["administrator"], administrator,
+            "{username}"
+        );
+    }
 }
 
 #[tokio::test]

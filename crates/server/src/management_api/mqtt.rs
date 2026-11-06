@@ -7,7 +7,7 @@ use afterimage_management_api::{error, input, model, output};
 
 use super::wire::fit;
 use super::{Caller, Shared, State, internal};
-use crate::telemetry::{Connection, SavedBroker};
+use crate::telemetry::{self, Connection, SavedBroker};
 
 /// The topic and discovery prefix a broker saved without them takes, as the
 /// deployment's settings default to.
@@ -24,6 +24,25 @@ fn administrator(caller: &Caller) -> Result<(), error::Forbidden> {
     }
 }
 
+/// Whether two broker addresses name one broker: the same scheme, host and port,
+/// whatever their spelling.
+fn same_broker(saved: &str, given: &str) -> bool {
+    match (telemetry::broker_url(saved), telemetry::broker_url(given)) {
+        (Ok(saved), Ok(given)) => {
+            (
+                saved.scheme(),
+                saved.host_str(),
+                saved.port_or_known_default(),
+            ) == (
+                given.scheme(),
+                given.host_str(),
+                given.port_or_known_default(),
+            )
+        }
+        _ => false,
+    }
+}
+
 fn invalid(message: String) -> error::ValidationException {
     error::ValidationException {
         message,
@@ -36,6 +55,7 @@ async fn current(state: &State) -> Result<model::MqttSettings, error::InternalFa
     let connection = match state.telemetry.connection() {
         Connection::Off => model::MqttConnection::Off,
         Connection::Connecting => model::MqttConnection::Connecting,
+        Connection::Refused => model::MqttConnection::Refused,
         Connection::Connected => model::MqttConnection::Connected,
     };
     if let Some(deployment) = &state.deployment_broker {
@@ -93,6 +113,8 @@ pub async fn update_mqtt_settings(
     caller: Caller,
 ) -> Result<output::UpdateMqttSettingsOutput, error::UpdateMqttSettingsError> {
     administrator(&caller)?;
+    // One change at a time, so the saved broker and the connection agree.
+    let _changing = state.broker_change.lock().await;
     if state.deployment_broker.is_some() {
         return Err(error::Conflict {
             message: "The deployment sets the MQTT broker (AFTERIMAGE_MQTT_URL); change it there."
@@ -108,10 +130,25 @@ pub async fn update_mqtt_settings(
     let broker = match input.url {
         None => None,
         Some(url) => {
+            let url = url.into_inner();
             let username = input.username.map(model::MqttUsername::into_inner);
-            // Absent keeps the password saved; empty removes it.
+            // Absent keeps the saved password, but only for the broker and the
+            // username it was given for: a password never goes to a broker an
+            // administrator, or a token acting as one, merely names. Empty removes
+            // it.
             let password = match input.password.map(model::MqttPassword::into_inner) {
-                None => saved.and_then(|saved| saved.password),
+                None => match saved {
+                    Some(saved) if saved.password.is_some() => {
+                        if !same_broker(&saved.url, &url) || saved.username != username {
+                            return Err(invalid(
+                                "Another broker or username needs its password again.".to_owned(),
+                            )
+                            .into());
+                        }
+                        saved.password
+                    }
+                    _ => None,
+                },
                 Some(password) if password.is_empty() => None,
                 Some(password) => Some(password),
             };
@@ -119,7 +156,7 @@ pub async fn update_mqtt_settings(
                 return Err(invalid("A password needs a username.".to_owned()).into());
             }
             let broker = SavedBroker {
-                url: url.into_inner(),
+                url,
                 username,
                 password,
                 topic: input.topic.into_inner(),

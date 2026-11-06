@@ -69,6 +69,8 @@ pub struct State {
     pub deployment_broker: Option<telemetry::Settings>,
     /// The broker the administrator saved, used where the deployment sets none.
     pub saved_broker: Saved,
+    /// Held while the broker's settings change, so changes take turns.
+    pub broker_change: tokio::sync::Mutex<()>,
     /// The web UI's address, for each MQTT device's link back to its page.
     pub public_url: Option<String>,
     pub clock: Arc<dyn Clock>,

@@ -156,6 +156,7 @@ pub async fn build(
         telemetry,
         deployment_broker: config.mqtt(),
         saved_broker,
+        broker_change: tokio::sync::Mutex::new(()),
         public_url: config.public_url.clone(),
         clock,
     });
