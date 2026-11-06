@@ -5,6 +5,7 @@
 use std::str::FromStr;
 
 use afterimage_trmnl::Mac;
+use serde::Serialize;
 use serde_json::{Value, json};
 
 use super::Settings;
@@ -55,31 +56,51 @@ pub(super) fn state(device: &Device, screen: &str) -> Value {
     })
 }
 
+/// The state of Home Assistant's update entity. A version the server does not
+/// know is left out: the entity refuses a null one, which it reads as a string.
+#[derive(Serialize)]
+struct FirmwareState<'a> {
+    in_progress: bool,
+    title: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    installed_version: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    latest_version: Option<&'a str>,
+}
+
 /// The device's firmware, in the shape of Home Assistant's update entity. An
 /// install request between its request and the check-in that decides it is in
-/// progress. A version the server does not know is left out: the entity refuses
-/// a null one, which it reads as a string.
+/// progress.
 pub(super) fn firmware_state(device: &Device, boards: Option<&[Board]>) -> Value {
     let latest = boards
         .and_then(|boards| Firmware::board(boards, device))
-        .and_then(Board::latest)
-        .map(|release| release.version.clone());
-    let in_progress = device.firmware_update.as_ref().is_some_and(|update| {
-        matches!(
-            update.state(),
-            firmware::State::Requested | firmware::State::Sent
-        )
-    });
-    let mut state = json!({ "in_progress": in_progress, "title": "TRMNL firmware" });
-    if let Some(state) = state.as_object_mut() {
-        if let Some(installed) = &device.readings.firmware_version {
-            state.insert("installed_version".to_owned(), json!(installed));
-        }
-        if let Some(latest) = latest {
-            state.insert("latest_version".to_owned(), json!(latest));
-        }
-    }
-    state
+        .and_then(Board::latest);
+    json!(FirmwareState {
+        in_progress: device.firmware_update.as_ref().is_some_and(|update| {
+            matches!(
+                update.state(),
+                firmware::State::Requested | firmware::State::Sent
+            )
+        }),
+        title: "TRMNL firmware",
+        installed_version: device.readings.firmware_version.as_deref(),
+        latest_version: latest.map(|release| release.version.as_str()),
+    })
+}
+
+/// The device as Home Assistant's discovery describes it. Home Assistant drops
+/// a device whose optional fields are null, so an unknown one is left out.
+#[derive(Serialize)]
+struct DeviceInfo<'a> {
+    identifiers: [String; 1],
+    connections: [(&'static str, String); 1],
+    name: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sw_version: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    configuration_url: Option<String>,
 }
 
 /// The device's discovery payload: the device, the server as its origin, and
@@ -101,27 +122,17 @@ pub(super) fn discovery(settings: &Settings, key: &str, device: &Device) -> Valu
         }
         component
     };
-    // Home Assistant drops a device whose optional fields are null, so an
-    // unknown one is left out.
-    let mut device_info = json!({
-        "identifiers": [format!("{base}_{key}")],
-        "connections": [["mac", device.mac.to_lowercase()]],
-        "name": device.name,
-    });
-    if let Some(info) = device_info.as_object_mut() {
-        if !device.firmware_model.is_empty() {
-            info.insert("model".to_owned(), json!(device.firmware_model));
-        }
-        if let Some(version) = &device.readings.firmware_version {
-            info.insert("sw_version".to_owned(), json!(version));
-        }
-        if let Some(url) = &settings.public_url {
-            info.insert(
-                "configuration_url".to_owned(),
-                json!(format!("{url}/devices/{}", device.id)),
-            );
-        }
-    }
+    let device_info = DeviceInfo {
+        identifiers: [format!("{base}_{key}")],
+        connections: [("mac", device.mac.to_lowercase())],
+        name: &device.name,
+        model: Some(device.firmware_model.as_str()).filter(|model| !model.is_empty()),
+        sw_version: device.readings.firmware_version.as_deref(),
+        configuration_url: settings
+            .public_url
+            .as_ref()
+            .map(|url| format!("{url}/devices/{}", device.id)),
+    };
     json!({
         "device": device_info,
         "origin": { "name": "Afterimage", "sw_version": env!("CARGO_PKG_VERSION") },

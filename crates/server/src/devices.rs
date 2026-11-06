@@ -59,6 +59,8 @@ pub struct Device {
     pub name: String,
     pub mac: String,
     pub firmware_model: String,
+    /// The panel's size in pixels as the firmware reported it at check-in.
+    pub panel: Option<(u32, u32)>,
     pub display: Display,
     pub refresh_minutes: i64,
     pub playlist: Vec<Entry>,
@@ -169,14 +171,11 @@ impl Devices {
             .await?;
             (existing.id, true)
         } else {
-            let size = registration
-                .width
-                .zip(registration.height)
-                .and_then(|(width, height)| {
-                    Some((u32::try_from(width).ok()?, u32::try_from(height).ok()?))
-                });
-            let (model, palette) =
-                Catalog::get().default_display(&registration.model, size, Renderer::supports);
+            let (model, palette) = Catalog::get().default_display(
+                &registration.model,
+                panel(registration.width, registration.height),
+                Renderer::supports,
+            );
             let name = name.map_or_else(|| format!("Device {code}"), str::to_owned);
             let id = sqlx::query_scalar!(
                 "INSERT INTO devices
@@ -526,6 +525,11 @@ impl Devices {
     }
 }
 
+/// A panel size as registrations store it.
+fn panel(width: Option<i64>, height: Option<i64>) -> Option<(u32, u32)> {
+    Some((u32::try_from(width?).ok()?, u32::try_from(height?).ok()?))
+}
+
 async fn load(
     tx: &mut Transaction<'_, Sqlite>,
     account_id: i64,
@@ -535,7 +539,7 @@ async fn load(
         "SELECT devices.id, devices.account_id, devices.name, devices.display_model, devices.palette,
                 devices.refresh_minutes, devices.playlist_position, devices.image_name,
                 devices.image_screen_id, devices.rendered_at, devices.firmware_board,
-                registrations.mac, registrations.model,
+                registrations.mac, registrations.model, registrations.width, registrations.height,
                 registrations.seen_at, registrations.battery_voltage,
                 registrations.battery_percent, registrations.signal_dbm,
                 registrations.firmware_version
@@ -583,6 +587,7 @@ async fn load(
         name: row.name,
         mac: row.mac,
         firmware_model: row.model,
+        panel: panel(row.width, row.height),
         display: Display {
             model: row.display_model,
             palette: row.palette,

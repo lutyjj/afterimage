@@ -40,12 +40,12 @@ pub enum Error {
     Fallback(String),
 }
 
-/// The model and palette a device's display names; the catalogue's default for
-/// its firmware when they can no longer be drawn, as after a catalogue refresh.
+/// The model and palette a device's display names; when they can no longer be
+/// drawn, as after a catalogue refresh, the one a claim would choose now.
 #[must_use]
 pub fn display(device: &Device) -> (&'static Model, &'static Palette) {
     drawing::drawable(&device.display.model, &device.display.palette).unwrap_or_else(|| {
-        Catalog::get().default_display(&device.firmware_model, None, Renderer::supports)
+        Catalog::get().default_display(&device.firmware_model, device.panel, Renderer::supports)
     })
 }
 

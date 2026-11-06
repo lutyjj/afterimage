@@ -190,16 +190,22 @@ fn parse_topic(text: &str) -> Result<String, String> {
         .map_err(|violation| violation.to_string())
 }
 
+/// An origin: `https://` or `http://`, a host and a port where it is not the
+/// scheme's own, written as browsers write one.
 fn parse_origin(text: &str) -> Result<String, String> {
-    let rest = text
-        .strip_prefix("https://")
-        .or_else(|| text.strip_prefix("http://"))
-        .ok_or("must start with https:// or http://")?;
-    let host = rest.trim_end_matches('/');
-    if host.is_empty() || host.contains(['/', '?', '#', '@']) {
+    let url = url::Url::parse(text).map_err(|error| error.to_string())?;
+    if !matches!(url.scheme(), "https" | "http") {
+        return Err("must start with https:// or http://".to_owned());
+    }
+    if url.path() != "/"
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
         return Err("must be a scheme and host, with no path, query or fragment".to_owned());
     }
-    Ok(text.trim_end_matches('/').to_owned())
+    Ok(url.origin().ascii_serialization())
 }
 
 #[cfg(test)]
@@ -263,6 +269,9 @@ mod tests {
             "mqtt://",
             "mqtt://broker.example.test/path",
             "mqtt://user:secret@broker.example.test",
+            // rumqttc reads a query as its own options, and an inflight of 0 panics.
+            "mqtt://broker.example.test:1883?inflight_num=0",
+            "mqtt://broker.example.test:1883#fragment",
         ] {
             assert!(parse(&["--mqtt-url", url]).is_err(), "{url}");
         }
@@ -298,8 +307,24 @@ mod tests {
             "https://",
             "https://afterimage.example/?a=b",
             "https://afterimage.example/sub",
+            "https://after image.example",
+            "https://afterimage.example:port",
+            "https://admin@afterimage.example",
         ] {
             assert!(parse(&["--public-url", url]).is_err(), "{url}");
         }
+        let origin = |url: &str| parse(&["--public-url", url]).unwrap().public_url.unwrap();
+        assert_eq!(
+            origin("https://Afterimage.Example/"),
+            "https://afterimage.example"
+        );
+        assert_eq!(
+            origin("https://afterimage.example:443"),
+            "https://afterimage.example"
+        );
+        assert_eq!(
+            origin("http://afterimage.example:8080"),
+            "http://afterimage.example:8080"
+        );
     }
 }

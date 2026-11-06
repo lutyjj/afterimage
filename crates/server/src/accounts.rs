@@ -154,39 +154,29 @@ impl Accounts {
         )
         .execute(&self.pool)
         .await?;
-        let row = sqlx::query!(
+        Ok(sqlx::query_as!(
+            Account,
             r#"SELECT id, name, username, administrator AS "administrator: bool"
                FROM accounts WHERE oidc_issuer = ? AND oidc_subject = ?"#,
             issuer,
             subject
         )
         .fetch_one(&self.pool)
-        .await?;
-        Ok(Account {
-            id: row.id,
-            name: row.name,
-            username: row.username,
-            administrator: row.administrator,
-        })
+        .await?)
     }
 
     /// # Errors
     ///
     /// When storage fails.
     pub async fn get(&self, id: i64) -> Result<Option<Account>, Error> {
-        let row = sqlx::query!(
+        Ok(sqlx::query_as!(
+            Account,
             r#"SELECT id, name, username, administrator AS "administrator: bool"
                FROM accounts WHERE id = ?"#,
             id
         )
         .fetch_optional(&self.pool)
-        .await?;
-        Ok(row.map(|row| Account {
-            id: row.id,
-            name: row.name,
-            username: row.username,
-            administrator: row.administrator,
-        }))
+        .await?)
     }
 }
 
@@ -237,9 +227,13 @@ async fn verify(password: String, stored: String) -> bool {
     .unwrap_or(false)
 }
 
-/// Spends what a verify costs, for a username that has no account.
+/// Spends what a verify costs, for a username that has no account. The hash is
+/// first read on the blocking pool, since that read makes it.
 async fn verify_unknown(password: String) {
-    verify(password, UNKNOWN_USER_HASH.clone()).await;
+    bounded(&HASHING, move || {
+        password_auth::verify_password(password, &UNKNOWN_USER_HASH).is_ok()
+    })
+    .await;
 }
 
 #[cfg(test)]

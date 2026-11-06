@@ -27,29 +27,19 @@ const QUEUE: usize = 64;
 /// its goodbye; past it, the connection ends all the same.
 const RETIRE: Duration = Duration::from_secs(5);
 
-/// The client's options for these settings.
+/// The client's options for these settings, whose address
+/// [`super::broker_url`] read: a host and a port, and TLS for `mqtts://`.
 pub(super) fn options(settings: &Settings) -> Result<MqttOptions, String> {
-    let mut url = settings.url.clone();
-    // rumqttc's own TLS for `mqtts://` panics here: it asks rustls for a
+    let url = &settings.url;
+    let (Some(host), Some(port)) = (url.host_str(), url.port()) else {
+        return Err("must name a host and a port".to_owned());
+    };
+    let mut options = MqttOptions::new(&settings.topic, host, port);
+    // rumqttc's own TLS for `mqtts://` would panic: it asks rustls for a
     // process-wide crypto provider, which rustls cannot pick while the build
     // enables both of its providers, and it `expect`s the host's certificate
-    // store to load without errors. So the URL is read as plain `mqtt://` and
-    // the TLS transport set here.
-    let tls = url.scheme() == "mqtts";
-    if tls {
-        if url.port().is_none() {
-            url.set_port(Some(8883))
-                .map_err(|()| "an mqtts:// URL without a host".to_owned())?;
-        }
-        url.set_scheme("mqtt")
-            .map_err(|()| "an mqtts:// URL that cannot be read as mqtt://".to_owned())?;
-    }
-    if !url.query_pairs().any(|(name, _)| name == "client_id") {
-        url.query_pairs_mut()
-            .append_pair("client_id", &settings.topic);
-    }
-    let mut options = MqttOptions::try_from(url).map_err(|error| error.to_string())?;
-    if tls {
+    // store to load without errors. So the transport is built here.
+    if url.scheme() == "mqtts" {
         options.set_transport(tls_transport());
     }
     if let Some(username) = &settings.username {

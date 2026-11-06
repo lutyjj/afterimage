@@ -76,7 +76,8 @@ impl Settings {
 }
 
 /// A broker's address: `mqtt://` or `mqtts://`, a host and a port, without a
-/// path or credentials, which the username and password carry.
+/// path or credentials, which the username and password carry, or a query,
+/// which the MQTT client would read as its own options.
 ///
 /// # Errors
 ///
@@ -91,6 +92,9 @@ pub fn broker_url(text: &str) -> Result<url::Url, String> {
     }
     if !url.username().is_empty() || url.password().is_some() {
         return Err("takes no credentials; set the MQTT username and password".to_owned());
+    }
+    if url.query().is_some() || url.fragment().is_some() {
+        return Err("takes no query or fragment".to_owned());
     }
     // One spelling for one broker: no closing slash, and the port the client
     // connects to when none is given (rumqttc's 1883, or 8883 with TLS).

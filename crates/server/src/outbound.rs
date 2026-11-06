@@ -11,34 +11,46 @@ pub struct Outbound {
     timeout: Duration,
 }
 
-impl Outbound {
-    /// A client whose HTTPS trusts the host's certificate store, so a host behind
-    /// a private CA works where the host trusts it. Loading that store is the only
-    /// part that can fail, as on a bare container without one; such a host still
-    /// serves devices, and its HTTPS requests fail with a certificate error until
-    /// it has a store and the server restarts.
-    ///
-    /// # Panics
-    ///
-    /// When even a client that trusts no certificate cannot be built.
-    #[must_use]
-    pub fn new(timeout: Duration) -> Self {
-        let builder = || {
+/// A client whose HTTPS trusts the host's certificate store, so a host behind a
+/// private CA works where the host trusts it; every client of the server is
+/// built here. Loading that store is the only part that can fail, as on a bare
+/// container without one; such a host still serves devices, and its HTTPS
+/// requests fail with a certificate error until it has a store and the server
+/// restarts.
+///
+/// # Panics
+///
+/// When even a client that trusts no certificate cannot be built.
+pub fn client(
+    timeout: Duration,
+    configure: fn(reqwest::ClientBuilder) -> reqwest::ClientBuilder,
+) -> reqwest::Client {
+    let builder = || {
+        configure(
             reqwest::Client::builder()
                 .timeout(timeout)
-                .user_agent(concat!("afterimage/", env!("CARGO_PKG_VERSION")))
-        };
-        let client = builder().build().unwrap_or_else(|error| {
-            tracing::warn!(
-                %error,
-                "HTTPS requests will fail: the host's CA certificates could not be loaded; install them and restart"
-            );
-            builder()
-                .tls_certs_only([])
-                .build()
-                .expect("a client that trusts no certificate needs no store")
-        });
-        Self { client, timeout }
+                .user_agent(concat!("afterimage/", env!("CARGO_PKG_VERSION"))),
+        )
+    };
+    builder().build().unwrap_or_else(|error| {
+        tracing::warn!(
+            %error,
+            "HTTPS requests will fail: the host's CA certificates could not be loaded; install them and restart"
+        );
+        builder()
+            .tls_certs_only([])
+            .build()
+            .expect("a client that trusts no certificate needs no store")
+    })
+}
+
+impl Outbound {
+    #[must_use]
+    pub fn new(timeout: Duration) -> Self {
+        Self {
+            client: client(timeout, std::convert::identity),
+            timeout,
+        }
     }
 
     #[must_use]

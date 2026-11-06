@@ -433,6 +433,9 @@ async fn the_password_is_written_and_never_read() {
         "mqtt://",
         "mqtt://broker.example.test/path",
         "http://broker.example.test",
+        // The client would read a query as its own options; an inflight of 0
+        // panics it.
+        "mqtt://broker.example.test:1883?inflight_num=0",
     ] {
         assert_eq!(
             server

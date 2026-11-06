@@ -111,7 +111,7 @@ async fn home_assistant_starting_again_gets_every_device_again() {
     server.claim(&mac(1)).await;
     observer.wait(CONFIG, |_| true).await;
     observer.publish(CONFIG, "", true).await;
-    observer.gone(CONFIG).await;
+    observer.wait_gone(CONFIG).await;
     observer
         .publish("homeassistant/status", "online", false)
         .await;
@@ -131,9 +131,9 @@ async fn a_removed_device_leaves_home_assistant() {
         .call("DELETE", &format!("/manage/devices/{}", device["id"]), None)
         .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    observer.gone(CONFIG).await;
-    observer.gone(STATE).await;
-    observer.gone(FIRMWARE).await;
+    observer.wait_gone(CONFIG).await;
+    observer.wait_gone(STATE).await;
+    observer.wait_gone(FIRMWARE).await;
 }
 
 /// Home Assistant's update entity installs by publishing `install`, which asks
@@ -255,8 +255,8 @@ async fn retained_topics_of_a_gone_device_are_cleared_on_connecting() {
     let server = start(&broker).await;
     server.sign_up().await;
     server.claim(&mac(1)).await;
-    observer.gone(ghost_config).await;
-    observer.gone(ghost_state).await;
+    observer.wait_gone(ghost_config).await;
+    observer.wait_gone(ghost_state).await;
     observer.wait(CONFIG, |_| true).await;
 }
 
@@ -287,18 +287,7 @@ async fn a_retained_install_command_is_ignored() {
 
     drop(broker);
     let _restarted = Broker::start_on(port).await;
-    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
-    while observer
-        .connections
-        .load(std::sync::atomic::Ordering::SeqCst)
-        < 2
-    {
-        assert!(
-            tokio::time::Instant::now() < deadline,
-            "the observer never reconnected"
-        );
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    }
+    observer.connected(2).await;
     observer
         .publish("afterimage/41b41039a101/firmware/install", "install", true)
         .await;
@@ -333,18 +322,7 @@ async fn a_restarted_broker_gets_every_device_again() {
     let _restarted = Broker::start_on(port).await;
     // The new broker keeps nothing, so a discovery payload the observer reads
     // after it reconnected is one the server published again.
-    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
-    while observer
-        .connections
-        .load(std::sync::atomic::Ordering::SeqCst)
-        < 2
-    {
-        assert!(
-            tokio::time::Instant::now() < deadline,
-            "the observer never reconnected"
-        );
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    }
+    observer.connected(2).await;
     observer.wait(CONFIG, |_| true).await;
     assert_eq!(observer.wait("afterimage/status", |_| true).await, "online");
 }

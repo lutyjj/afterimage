@@ -13,13 +13,14 @@ use chrono::{DateTime, Utc};
 use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
 use openidconnect::{
     AccessTokenHash, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointMaybeSet,
-    EndpointNotSet, EndpointSet, IssuerUrl, Nonce, OAuth2TokenResponse, PkceCodeChallenge,
-    PkceCodeVerifier, RedirectUrl, RequestTokenError, Scope, TokenResponse, reqwest,
+    EndpointNotSet, EndpointSet, HttpRequest, HttpResponse, IssuerUrl, Nonce, OAuth2TokenResponse,
+    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RequestTokenError, Scope, TokenResponse,
 };
 use sqlx::SqlitePool;
 
 use crate::clock::Clock;
 use crate::keys::{self, Entropy};
+use crate::outbound;
 use crate::sessions::CookieName;
 
 /// How long a browser has to come back from the provider.
@@ -86,6 +87,19 @@ pub struct Oidc {
     entropy: Arc<dyn Entropy>,
 }
 
+type Pending = std::pin::Pin<Box<dyn Future<Output = Result<HttpResponse, reqwest::Error>> + Send>>;
+
+/// Sends one of the flow's requests to the provider.
+async fn send(http: reqwest::Client, request: HttpRequest) -> Result<HttpResponse, reqwest::Error> {
+    let response = http.execute(reqwest::Request::try_from(request)?).await?;
+    let status = response.status();
+    let headers = response.headers().clone();
+    let mut answer = HttpResponse::new(response.bytes().await?.to_vec());
+    *answer.status_mut() = status;
+    *answer.headers_mut() = headers;
+    Ok(answer)
+}
+
 impl Oidc {
     /// # Errors
     ///
@@ -104,11 +118,10 @@ impl Oidc {
             public_url.trim_end_matches('/')
         ))
         .map_err(|error| format!("the public URL is not a URL: {error}"))?;
-        let http = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .timeout(Duration::from_secs(10))
-            .build()
-            .map_err(|error| format!("the OIDC HTTP client: {error}"))?;
+        // The provider's answers are followed by the flow, never by the client.
+        let http = outbound::client(Duration::from_secs(10), |builder| {
+            builder.redirect(reqwest::redirect::Policy::none())
+        });
         Ok(Self {
             issuer,
             client_id: ClientId::new(settings.client_id),
@@ -127,9 +140,16 @@ impl Oidc {
         &self.name
     }
 
+    /// openidconnect's HTTP client: each request sent with the server's client,
+    /// on a future that owns it.
+    fn sender(&self) -> impl Fn(HttpRequest) -> Pending + use<> {
+        let http = self.http.clone();
+        move |request| Box::pin(send(http.clone(), request))
+    }
+
     /// Discovered on every flow, so the provider's key rotation needs no restart.
     async fn client(&self) -> Result<DiscoveredClient, Error> {
-        let metadata = CoreProviderMetadata::discover_async(self.issuer.clone(), &self.http)
+        let metadata = CoreProviderMetadata::discover_async(self.issuer.clone(), &self.sender())
             .await
             .map_err(|error| {
                 tracing::warn!(%error, "OIDC discovery failed");
@@ -228,7 +248,7 @@ impl Oidc {
             .exchange_code(AuthorizationCode::new(code))
             .map_err(|_| Error::Unavailable)?
             .set_pkce_verifier(PkceCodeVerifier::new(flow.pkce_verifier))
-            .request_async(&self.http)
+            .request_async(&self.sender())
             .await
             .map_err(|error| {
                 tracing::warn!(%error, "OIDC code exchange failed");

@@ -8,7 +8,7 @@ use std::fmt::Write;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use common::{READINGS, Server, app_image, flash_image, mac, start};
+use common::{READINGS, Server, app_image, flash_image, mac, start, until};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -633,16 +633,6 @@ async fn download(url: impl reqwest::IntoUrl) -> reqwest::Result<reqwest::Respon
         .get(url)
         .send()
         .await
-}
-
-/// Waits for a condition that work the test started, such as a background
-/// fetch, brings about.
-async fn until(condition: impl Fn() -> bool, failure: &str) {
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
-    while !condition() {
-        assert!(tokio::time::Instant::now() < deadline, "{failure}");
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
 }
 
 /// The files in the firmware cache.

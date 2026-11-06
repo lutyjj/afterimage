@@ -338,19 +338,17 @@ impl<Protocol> afterimage_device_api::server::request::FromParts<Protocol> for O
     type Rejection = Infallible;
 
     fn from_parts(parts: &mut http::request::Parts) -> Result<Self, Self::Rejection> {
-        let header = |name: http::header::HeaderName| {
-            parts
-                .headers
-                .get(name)
-                .and_then(|value| value.to_str().ok())
-                .map(str::to_owned)
+        let scheme = if crate::proxy::https(&parts.headers) {
+            "https"
+        } else {
+            "http"
         };
-        let scheme = header(http::HeaderName::from_static("x-forwarded-proto"))
-            .filter(|scheme| scheme == "https")
-            .unwrap_or_else(|| "http".to_owned());
-        let host = header(http::header::HOST)
+        let host = parts
+            .headers
+            .get(http::header::HOST)
+            .and_then(|value| value.to_str().ok())
             .filter(|host| !host.is_empty() && host.bytes().all(|b| b.is_ascii_graphic()))
-            .unwrap_or_else(|| "localhost".to_owned());
+            .unwrap_or("localhost");
         Ok(Self(format!("{scheme}://{host}")))
     }
 }

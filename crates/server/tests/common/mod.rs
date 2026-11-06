@@ -28,6 +28,16 @@ use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 use tokio::net::TcpListener;
 
+/// Waits, for at most ten seconds, until `condition` holds: for work the test
+/// started in the background, such as a fetch, a publish or a reconnection.
+pub async fn until(condition: impl Fn() -> bool, failure: &str) {
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !condition() {
+        assert!(tokio::time::Instant::now() < deadline, "{failure}");
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+}
+
 pub struct ManualClock(AtomicI64);
 
 impl Clock for ManualClock {
@@ -816,15 +826,11 @@ impl Observer {
 
     /// Waits until `topic` holds nothing, as after the server cleared it.
     pub async fn wait_gone(&self, topic: &str) {
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
-        while self.messages.lock().unwrap().contains_key(topic) {
-            assert!(
-                tokio::time::Instant::now() < deadline,
-                "{topic} was never cleared: {:?}",
-                self.payloads(topic)
-            );
-            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-        }
+        until(
+            || !self.messages.lock().unwrap().contains_key(topic),
+            &format!("{topic} was never cleared"),
+        )
+        .await;
     }
 
     /// Every message `topic` had, in order; an emptied topic reads as null.
@@ -844,23 +850,20 @@ impl Observer {
     pub async fn settle(&self, topic: &str) {
         let before = self.seen(topic).len();
         self.publish("homeassistant/status", "online", false).await;
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
-        while self.seen(topic).len() <= before {
-            assert!(
-                tokio::time::Instant::now() < deadline,
-                "the server never answered"
-            );
-            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-        }
+        until(
+            || self.seen(topic).len() > before,
+            "the server never answered",
+        )
+        .await;
     }
 
-    /// Waits until `topic` holds no message.
-    pub async fn gone(&self, topic: &str) {
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
-        while self.messages.lock().unwrap().contains_key(topic) {
-            assert!(tokio::time::Instant::now() < deadline, "{topic} stayed");
-            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-        }
+    /// Waits until the observer has connected `times` times.
+    pub async fn connected(&self, times: usize) {
+        until(
+            || self.connections.load(Ordering::SeqCst) >= times,
+            "the observer never reconnected",
+        )
+        .await;
     }
 
     pub async fn publish(&self, topic: &str, payload: &str, retain: bool) {

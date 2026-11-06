@@ -8,7 +8,6 @@
 //! too.
 
 pub mod app_image;
-pub mod cache;
 pub mod releases;
 pub mod updates;
 
@@ -21,13 +20,13 @@ use sqlx::SqlitePool;
 use tokio::sync::Mutex;
 
 use crate::clock::Clock;
+use crate::content::Store;
 use crate::devices::Device;
 use crate::outbound::Outbound;
 
 pub use releases::{Board, Release};
 pub use updates::{State, Update};
 
-use cache::Cache;
 use releases::Releases;
 use updates::{Delivery, Recorded, Updates};
 
@@ -69,7 +68,8 @@ pub enum InstallError {
 
 pub struct Firmware {
     releases: Arc<Releases>,
-    cache: Cache,
+    /// The app images, each named by its SHA-256.
+    cache: Store,
     updates: Updates,
     http: Outbound,
     clock: Arc<dyn Clock>,
@@ -89,7 +89,7 @@ impl Firmware {
     pub fn new(trmnl: &str, cache_dir: PathBuf, pool: SqlitePool, clock: Arc<dyn Clock>) -> Self {
         Self {
             releases: Arc::new(Releases::new(trmnl, Arc::clone(&clock))),
-            cache: Cache::new(cache_dir),
+            cache: Store::new(cache_dir, 64, "bin"),
             updates: Updates::new(pool, Arc::clone(&clock)),
             http: Outbound::new(IMAGE_TIMEOUT),
             clock,
@@ -349,7 +349,7 @@ impl Firmware {
         let result = match self.updates.images_in_use().await {
             Ok(images) => self
                 .cache
-                .retain(&images)
+                .retain(|name, _| images.iter().any(|image| image == name))
                 .map_err(|error| error.to_string()),
             Err(error) => Err(error.to_string()),
         };

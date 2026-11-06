@@ -119,7 +119,11 @@ pub async fn update_mqtt_settings(
     let broker = match input.url {
         None => None,
         Some(url) => {
-            let url = url.into_inner();
+            // Kept as the client reads it, so the settings shown are the ones in
+            // force.
+            let url = telemetry::broker_url(&url.into_inner())
+                .map_err(|reason| invalid(format!("The broker's address {reason}.")))?
+                .to_string();
             let username = input.username.map(model::MqttUsername::into_inner);
             // Absent keeps the saved password, but only for the broker and the
             // username it was given for: a password never goes to a broker an

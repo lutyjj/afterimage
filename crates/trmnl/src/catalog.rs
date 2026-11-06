@@ -232,20 +232,12 @@ mod tests {
 
     #[test]
     fn otherwise_the_panel_size_picks_trmnl_hardware_with_the_most_grays() {
-        let catalog = Catalog::get();
+        // TRMNL's 800×480 hardware in the snapshot: og_png (1 bit), og_plus (2
+        // bits) and og_bwry (four colors, which a size alone does not pick).
         let (model, palette) =
-            catalog.default_display("xiao_epaper_display", Some((800, 480)), |_, _| true);
-        assert_eq!(model.kind, "trmnl");
-        assert_eq!((model.width, model.height), (800, 480));
-        let most = catalog
-            .models
-            .iter()
-            .filter(|m| m.kind == "trmnl" && (m.width, m.height) == (800, 480))
-            .map(|m| catalog.gray_levels(m))
-            .max()
-            .unwrap();
-        assert_eq!(palette.grays, most);
-        assert!(palette.colors.is_none());
+            Catalog::get().default_display("xiao_epaper_display", Some((800, 480)), |_, _| true);
+        assert_eq!(model.name, "og_plus");
+        assert_eq!(palette.id, "gray-4");
     }
 
     #[test]

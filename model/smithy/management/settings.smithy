@@ -31,8 +31,9 @@ operation GetMqttSettings {
 @optionalAuth
 operation UpdateMqttSettings {
     input := {
-        /// `mqtt://` or `mqtts://`, the host and its port, without credentials;
-        /// absent stops publishing.
+        /// `mqtt://` or `mqtts://`, the host and its port, without credentials,
+        /// a path or a query; absent stops publishing. The server keeps it with
+        /// the port it connects to written out.
         url: MqttUrl
 
         username: MqttUsername

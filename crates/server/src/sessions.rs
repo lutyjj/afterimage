@@ -66,7 +66,8 @@ impl Sessions {
     pub async fn account(&self, token: &str) -> Result<Option<Account>, sqlx::Error> {
         let token_hash = keys::token_hash(token);
         let now = self.clock.now();
-        let row = sqlx::query!(
+        sqlx::query_as!(
+            Account,
             r#"SELECT accounts.id, accounts.name, accounts.username,
                  accounts.administrator AS "administrator: bool"
              FROM sessions JOIN accounts ON accounts.id = sessions.account_id
@@ -75,13 +76,7 @@ impl Sessions {
             now
         )
         .fetch_optional(&self.pool)
-        .await?;
-        Ok(row.map(|row| Account {
-            id: row.id,
-            name: row.name,
-            username: row.username,
-            administrator: row.administrator,
-        }))
+        .await
     }
 
     /// # Errors
@@ -114,12 +109,8 @@ impl CookiePolicy {
 
     #[must_use]
     pub fn secure(&self, headers: &http::HeaderMap) -> bool {
-        self.configured.unwrap_or_else(|| {
-            headers
-                .get("x-forwarded-proto")
-                .and_then(|scheme| scheme.to_str().ok())
-                .is_some_and(|scheme| scheme.eq_ignore_ascii_case("https"))
-        })
+        self.configured
+            .unwrap_or_else(|| crate::proxy::https(headers))
     }
 }
 

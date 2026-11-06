@@ -62,6 +62,18 @@ mod tests {
     }
 
     #[test]
+    fn every_friendly_id_is_a_claim_code_the_model_takes() {
+        use afterimage_management_api::model::ClaimCode;
+        for byte in 0..32 {
+            let id = new_friendly_id(&Fixed(byte));
+            assert!(ClaimCode::try_from(id.clone()).is_ok(), "{id}");
+        }
+        for unused in ["000000", "111111", "IIIIII", "OOOOOO"] {
+            assert!(ClaimCode::try_from(unused.to_owned()).is_err(), "{unused}");
+        }
+    }
+
+    #[test]
     fn tokens_carry_256_bits_in_url_safe_text() {
         let key = new_token(&OsEntropy);
         assert_eq!(key.len(), 43);
