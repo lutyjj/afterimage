@@ -14,7 +14,9 @@ string ScreenName
 /// is a list; any other template is text. Templates read every data source by its
 /// name, `now()` (the time of the render, for filters such as `datetimeformat`)
 /// and `device` (`name`, `width`, `height`). Data source requests also read
-/// `secrets`.
+/// `secrets`. Besides the filters of MiniJinja and minijinja-contrib, `multiply`
+/// scales a number as in Home Assistant, so `map('multiply', 0.01)` turns amounts
+/// in minor units into a series.
 @length(max: 4096)
 string Template
 

@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use minijinja::value::{Serde, Value as Template};
-use minijinja::{Environment, State, UndefinedBehavior, context};
+use minijinja::{Environment, Error, ErrorKind, State, UndefinedBehavior, context};
 use afterimage_render_typst::{Image, Renderer};
 use afterimage_trmnl::catalog::{Catalog, Model, Palette};
 use serde_json::{Map, Value, json};
@@ -97,22 +97,45 @@ pub struct Drawing {
     time_zone: TimeZone,
 }
 
+/// The environment every template renders in: `MiniJinja` with `minijinja-contrib`
+/// and its Python methods, Home Assistant's `multiply`, and `now()`.
+fn templates() -> Environment<'static> {
+    let mut templates = Environment::new();
+    minijinja_contrib::add_to_environment(&mut templates);
+    templates.set_unknown_method_callback(minijinja_contrib::pycompat::unknown_method_callback);
+    templates.set_undefined_behavior(UndefinedBehavior::Chainable);
+    templates.set_fuel(Some(FUEL));
+    templates.add_filter("multiply", multiply);
+    // The time of the render, not of the call, so a screen is drawn at one
+    // instant; as minijinja-contrib's `now`, a Unix timestamp for its filters.
+    templates.add_function("now", |state: &State| {
+        state.lookup("__render_time").unwrap_or_default()
+    });
+    templates
+}
+
+/// Home Assistant's `multiply`: a number, or text that reads as one, times
+/// `by`, so `map('multiply', 0.01)` turns amounts in minor units into a series.
+fn multiply(value: &Template, by: f64) -> Result<f64, Error> {
+    f64::try_from(value.clone())
+        .ok()
+        .or_else(|| value.as_str().and_then(|text| text.trim().parse().ok()))
+        .map(|number| number * by)
+        .ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidOperation,
+                format!("multiply needs a number, not {value}"),
+            )
+        })
+}
+
 impl Drawing {
     /// # Panics
     ///
     /// When even an HTTP client that trusts no certificate cannot be built.
     #[must_use]
     pub fn new(secrets: Secrets, time_zone: TimeZone) -> Self {
-        let mut templates = Environment::new();
-        minijinja_contrib::add_to_environment(&mut templates);
-        templates.set_unknown_method_callback(minijinja_contrib::pycompat::unknown_method_callback);
-        templates.set_undefined_behavior(UndefinedBehavior::Chainable);
-        templates.set_fuel(Some(FUEL));
-        // The time of the render, not of the call, so a screen is drawn at one
-        // instant; as minijinja-contrib's `now`, a Unix timestamp for its filters.
-        templates.add_function("now", |state: &State| {
-            state.lookup("__render_time").unwrap_or_default()
-        });
+        let templates = templates();
         let builder = || {
             reqwest::Client::builder()
                 .timeout(FETCH_TIMEOUT)
@@ -790,11 +813,7 @@ mod tests {
     use super::*;
 
     fn resolver() -> Resolver {
-        let mut templates = Environment::new();
-        minijinja_contrib::add_to_environment(&mut templates);
-        templates.set_undefined_behavior(UndefinedBehavior::Chainable);
-        templates.set_fuel(Some(FUEL));
-        Resolver::new(Arc::new(templates))
+        Resolver::new(Arc::new(templates()))
     }
 
     fn resolve(document: &Value, scope: &Template) -> (Value, Vec<Problem>) {
@@ -839,6 +858,24 @@ mod tests {
         assert_eq!(children[1]["title"]["text"], "B");
         assert_eq!(children[2]["label"]["text"], "and 1 more");
         assert_eq!(children.as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn multiply_scales_numbers_and_numeric_text_and_refuses_the_rest() {
+        let document = json!({ "content": { "column": { "children": [
+            { "lineChart": { "series": [ { "values": "{{ [150, '2.5'] | map('multiply', 0.01) | list }}" } ] } },
+            { "title": { "text": "{{ 'many' | multiply(2) }}" } }
+        ] } } });
+        let (resolved, problems) = resolve(&document, &context! {});
+        assert_eq!(
+            resolved["content"]["column"]["children"][0]["lineChart"]["series"][0]["values"],
+            json!([1.5, 0.025])
+        );
+        assert_eq!(problems.len(), 1);
+        assert_eq!(
+            problems[0].path.as_deref(),
+            Some("/content/column/children/1/title/text")
+        );
     }
 
     #[test]
