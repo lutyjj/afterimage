@@ -33,10 +33,13 @@ async function requireAccount({ request }: { request: Request }) {
   return signedIn;
 }
 
-/** Signing out is a navigation, so a page with unsaved changes asks first. */
+/** Signing out is a navigation, so a page with unsaved changes asks first. A
+ * session that has already ended is signed out all the same. */
 async function signOut() {
   try {
     await client.signOut({});
+  } catch (error) {
+    if (!(error instanceof Unauthenticated)) throw error;
   } finally {
     queryClient.clear();
   }
@@ -56,7 +59,7 @@ const screenEditor = async () => {
 
 export const router = createBrowserRouter([
   { path: "/sign-in", loader: signedOutOnly, Component: SignIn, ErrorBoundary: RouteError },
-  { path: "/sign-out", action: signOut },
+  { path: "/sign-out", action: signOut, ErrorBoundary: RouteError },
   {
     path: "/",
     loader: requireAccount,

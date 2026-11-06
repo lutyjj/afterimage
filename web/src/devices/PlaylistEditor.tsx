@@ -7,25 +7,13 @@ import { Link } from "react-router";
 import { client, messageOf, queryClient } from "../app/client";
 import { DayStrip } from "./DayStrip";
 import styles from "./PlaylistEditor.module.css";
+import { draftOf, entryOf, newKey, sameAs, type Draft } from "./playlistDraft";
 import { daysLabel, isAllDay, nowIn, shortDay, WEEK, windowLabel } from "./schedule";
 import { deviceQuery, devicesQuery } from "./queries";
 
 /** The window an entry takes when it stops being all day, as a start to edit. */
 const DAYTIME = { from: "08:00", until: "20:00" };
 
-interface Draft extends PlaylistEntry {
-  key: number;
-  /** Chosen with the row's checkbox, so times typed equal on the way to another
-   * value do not make the entry all day. */
-  allDay: boolean;
-}
-
-let nextKey = 0;
-const draftOf = (entries: PlaylistEntry[]): Draft[] =>
-  entries.map((entry) => ({ ...entry, key: nextKey++, allDay: isAllDay(entry) }));
-const entryOf = ({ key: _key, allDay, ...entry }: Draft): PlaylistEntry =>
-  allDay ? { ...entry, from: undefined, until: undefined } : entry;
-const same = (a: PlaylistEntry[], b: PlaylistEntry[]) => JSON.stringify(a) === JSON.stringify(b);
 
 /** The screens a device shows, in order, each on its days and hours. Every entry
  * draws as a strip of the day, as long as the time it is current. */
@@ -40,7 +28,7 @@ export function PlaylistEditor({
 }) {
   const [draft, setDraft] = useState(() => draftOf(device.playlist));
   const saved = device.playlist;
-  const dirty = !same(draft.map(entryOf), saved);
+  const dirty = !sameAs(draft, saved);
 
   // A playlist saved elsewhere replaces an untouched draft.
   const savedKey = JSON.stringify(saved);
@@ -48,7 +36,7 @@ export function PlaylistEditor({
   useEffect(() => {
     const before = previous.current;
     previous.current = saved;
-    setDraft((current) => (same(current.map(entryOf), before) ? draftOf(saved) : current));
+    setDraft((current) => (sameAs(current, before) ? draftOf(saved) : current));
     // `saved` is a new array on every poll; its content is what changes.
   }, [savedKey]);
 
@@ -74,7 +62,7 @@ export function PlaylistEditor({
   const add = () => {
     const unused = screens?.find((screen) => !draft.some((entry) => entry.screenId === screen.id));
     const screen = unused ?? screens?.[0];
-    if (screen) setDraft((entries) => [...entries, { key: nextKey++, screenId: screen.id, allDay: true }]);
+    if (screen) setDraft((entries) => [...entries, { key: newKey(), screenId: screen.id, allDay: true }]);
   };
 
   const name = (id: number) => screens?.find((screen) => screen.id === id)?.name ?? "A deleted screen";
