@@ -211,10 +211,16 @@ fn describe(error: &TypstAsLibError) -> String {
 /// `frame` with every text run's origin, the start of its baseline, moved to the
 /// nearest whole device pixel at `scale` device pixels per point, as browsers
 /// place text, so glyphs drawn on a pixel grid, such as TRMNL's pixel fonts, stay
-/// on it instead of blurring across two pixels. `origin` is the frame's place on
-/// the page; inside a group that scales or skews, positions stay as laid out.
+/// on it instead of blurring across two pixels. The shapes beside the text in its
+/// frame, a line's underline among them, move down or up with it, so they keep
+/// their distance from its baseline. `origin` is the frame's place on the page;
+/// inside a group that scales or skews, positions stay as laid out.
 fn snapped(frame: &Frame, origin: Point, scale: f64) -> Frame {
     let nudge = |at: Abs| Abs::pt((at.to_pt() * scale).round() / scale) - at;
+    // The text of one frame is one line, on one baseline.
+    let line = frame.items().find_map(|(position, item)| {
+        matches!(item, FrameItem::Text(_)).then(|| nudge(origin.y + position.y))
+    });
     let mut out = Frame::new(frame.size(), frame.kind());
     if frame.has_baseline() {
         out.set_baseline(frame.baseline());
@@ -241,6 +247,12 @@ fn snapped(frame: &Frame, origin: Point, scale: f64) -> Frame {
             FrameItem::Text(_) => {
                 out.push(
                     *position + Point::new(nudge(at.x), nudge(at.y)),
+                    item.clone(),
+                );
+            }
+            FrameItem::Shape(..) => {
+                out.push(
+                    *position + Point::with_y(line.unwrap_or_default()),
                     item.clone(),
                 );
             }

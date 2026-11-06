@@ -13,6 +13,13 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 part=${1:-all}
+case $part in
+all | contract | design) ;;
+*)
+	echo "usage: tools/generate [contract | design]" >&2
+	exit 2
+	;;
+esac
 mkdir -p gen
 
 if [ "$part" != design ]; then

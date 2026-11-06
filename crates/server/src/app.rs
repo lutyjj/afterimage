@@ -44,20 +44,29 @@ pub enum Error {
 }
 
 /// The broker to publish to: the deployment's, or else the one the
-/// administrator saved, or none until one is saved.
+/// administrator saved, or none until one is saved. A saved broker the server
+/// no longer reads, such as an address with a query that an earlier release
+/// took, leaves publishing off, so the web UI that corrects it still starts.
 async fn broker(config: &Config, saved: &Saved) -> Result<Option<telemetry::Settings>, Error> {
     if let Some(settings) = config.mqtt() {
         return Ok(Some(settings));
     }
-    let failed =
-        |error: &dyn std::fmt::Display| Error::Settings(format!("the saved MQTT broker: {error}"));
-    saved
+    let Some(saved) = saved
         .get()
         .await
-        .map_err(|error| failed(&error))?
-        .map(|saved| saved.settings(config.public_url.clone()))
-        .transpose()
-        .map_err(|error| failed(&error))
+        .map_err(|error| Error::Settings(format!("the saved MQTT broker: {error}")))?
+    else {
+        return Ok(None);
+    };
+    Ok(saved
+        .settings(config.public_url.clone())
+        .inspect_err(|reason| {
+            tracing::warn!(
+                %reason,
+                "the saved MQTT broker's address cannot be used; publishing stays off until the administrator saves another"
+            );
+        })
+        .ok())
 }
 
 /// Opens the database under the data directory and builds the router.

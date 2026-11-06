@@ -652,3 +652,69 @@ fn gray_text_takes_the_stylesheets_gray() {
     let colors: std::collections::BTreeSet<[u8; 3]> = pixels.iter().flatten().copied().collect();
     assert!(colors.contains(&[0x77, 0x77, 0x77]), "{colors:?}");
 }
+
+fn small_label(text: &str) -> Value {
+    json!({ "label": { "text": text, "size": "small", "style": "plain" } })
+}
+
+fn is_gray(pixel: [u8; 3]) -> bool {
+    pixel != [255, 255, 255] && pixel != [0, 0, 0]
+}
+
+#[test]
+fn a_small_label_takes_its_line_box() {
+    // TRMNL's `label--small` sets TRMNL12 at 12 pixels in a 12-pixel line, so
+    // two of them stacked with no gap start 12 pixels apart. A line only as
+    // tall as the font's capitals would put them 8 apart.
+    let labels = json!({ "content": { "column": { "gap": "none", "align": "start", "justify": "start", "grow": false,
+        "children": [small_label("MON"), small_label("MON")] } } });
+    let (rows, _) = inked(&render(&labels, "og_plus", "gray-4"));
+    let breaks: Vec<usize> = rows
+        .windows(2)
+        .filter(|pair| pair[1] > pair[0] + 1)
+        .map(|pair| pair[1])
+        .collect();
+    assert_eq!(breaks.len(), 1, "two separate lines of ink: {rows:?}");
+    assert_eq!(breaks[0] - rows[0], 12, "{rows:?}");
+}
+
+#[test]
+fn pixel_fonts_land_on_whole_device_pixels() {
+    // Seven columns share the width unevenly, so most labels start between
+    // two pixels; TRMNL's pixel fonts drawn there would blur into grays.
+    let cells: Vec<Value> = (0..7)
+        .map(|day| json!({ "span": 1, "content": small_label(&format!("Day {day}")) }))
+        .collect();
+    let week = json!({ "content": { "grid": { "columns": 7, "gap": "medium", "grow": false, "cells": cells } } });
+    let drawn = pixels(&render(&week, "og_plus", "gray-4"));
+    let grays = drawn
+        .iter()
+        .flatten()
+        .filter(|pixel| is_gray(**pixel))
+        .count();
+    let ink = drawn
+        .iter()
+        .flatten()
+        .filter(|pixel| **pixel != [255, 255, 255])
+        .count();
+    assert!(ink > 0);
+    assert_eq!(grays, 0, "{grays} gray pixels among {ink} inked");
+}
+
+#[test]
+fn a_divider_in_a_column_inks_one_device_row() {
+    // TRMNL's divider is one row of device pixels; a stroke centred on a grid
+    // line would cover two.
+    let column = json!({ "content": stack("column", false, &[title("Above"), json!({ "divider": {} }), title("Below")]) });
+    let drawn = pixels(&render(&column, "og_png", "bw"));
+    let ink = |row: &Vec<[u8; 3]>| {
+        row.iter()
+            .filter(|pixel| **pixel != [255, 255, 255])
+            .count()
+    };
+    let line = (0..drawn.len()).max_by_key(|&y| ink(&drawn[y])).unwrap();
+    let rule_rows = (line.saturating_sub(3)..=line + 3)
+        .filter(|&y| ink(&drawn[y]) * 4 >= ink(&drawn[line]))
+        .count();
+    assert_eq!(rule_rows, 1);
+}

@@ -401,6 +401,52 @@ async fn a_saved_broker_holds_after_a_restart() {
 }
 
 #[tokio::test]
+async fn a_saved_broker_the_server_cannot_read_leaves_publishing_off() {
+    let server = start().await;
+    server.sign_up().await;
+    // An address with a query, which an earlier release took and this one refuses.
+    let pool = sqlx::SqlitePool::connect(&format!(
+        "sqlite://{}",
+        server.data.path().join("afterimage.db").display()
+    ))
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO mqtt_settings (id, url, topic, discovery_prefix, updated_at)
+         VALUES (1, 'mqtt://broker.example.test:1883?client_id=other', 'afterimage', 'homeassistant', 0)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let restarted = server.again(&[]).await;
+    let credentials = json!({ "username": "ada", "password": "correct horse battery" });
+    restarted
+        .call("POST", "/manage/auth/password", Some(credentials))
+        .await;
+    assert_eq!(settings(&restarted).await["connection"], "off");
+}
+
+#[tokio::test]
+async fn a_saved_address_names_the_port_the_client_connects_to() {
+    let server = start().await;
+    server.sign_up().await;
+    for (given, kept) in [
+        (
+            "mqtt://broker.example.test",
+            "mqtt://broker.example.test:1883",
+        ),
+        (
+            "mqtts://broker.example.test/",
+            "mqtts://broker.example.test:8883",
+        ),
+    ] {
+        assert_eq!(save(&server, json!({ "url": given })).await["url"], kept);
+        assert_eq!(settings(&server).await["url"], kept);
+    }
+}
+
+#[tokio::test]
 async fn the_password_is_written_and_never_read() {
     let broker = Broker::start().await;
     let server = start().await;

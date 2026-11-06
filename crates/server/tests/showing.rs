@@ -9,7 +9,7 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::routing::get;
-use common::{READINGS, mac, start, start_with_secrets};
+use common::{FIRMWARE, READINGS, mac, start, start_with_secrets};
 use afterimage_server::secrets::Secrets;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
@@ -629,4 +629,41 @@ async fn a_device_reporting_a_model_afterimage_cannot_draw_gets_one_it_can() {
     assert_ne!(body["device"]["display"]["model"], "openframe");
     let answer = server.display(&key, &READINGS).await;
     assert_eq!(answer["status"], 0, "{answer}");
+}
+
+#[tokio::test]
+async fn a_display_that_can_no_longer_be_drawn_falls_back_by_the_panel_size() {
+    let server = start().await;
+    server.sign_up().await;
+    // A model TRMNL's catalogue does not list, as the Seeed kit's firmware reports.
+    let model = "xiao_epaper_display";
+    let answer = server.setup_as(&mac(1), model).await;
+    let key = answer["api_key"].as_str().unwrap().to_owned();
+    let code = answer["friendly_id"].as_str().unwrap().to_owned();
+    let (status, body) = server
+        .call("POST", "/manage/devices", Some(json!({ "code": code })))
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    // A check-in reports the panel, 800 by 480; then the stored display leaves
+    // the catalogue, as after a catalogue refresh.
+    server.display_as(&key, &READINGS, FIRMWARE, model).await;
+    server
+        .stored("UPDATE devices SET display_model = 'retired'")
+        .await;
+
+    let answer = server.display_as(&key, &READINGS, FIRMWARE, model).await;
+    let bytes = download(&server, &answer, &key)
+        .await
+        .bytes()
+        .await
+        .unwrap();
+    let info = png::Decoder::new(std::io::Cursor::new(bytes.to_vec()))
+        .read_info()
+        .unwrap()
+        .info()
+        .clone();
+    // TRMNL's 800×480 hardware with the most grays, og_plus at 2 bits, rather
+    // than the 1-bit og_png that a name alone falls back to.
+    assert_eq!((info.width, info.height), (800, 480));
+    assert_eq!(info.bit_depth, png::BitDepth::Two);
 }

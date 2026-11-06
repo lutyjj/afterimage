@@ -4,6 +4,7 @@
 
 use std::io;
 use std::path::PathBuf;
+use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, SystemTime};
 
 use crate::content::Store;
@@ -13,12 +14,19 @@ pub const RETAIN: Duration = Duration::from_mins(5);
 
 pub struct Images {
     root: PathBuf,
+    /// Held while a device's images change, so that one check-in's store of an
+    /// image cannot interleave with another's removal of old ones: the second
+    /// would read the first image's time before the first renews it.
+    changing: Mutex<()>,
 }
 
 impl Images {
     #[must_use]
     pub fn new(root: PathBuf) -> Self {
-        Self { root }
+        Self {
+            root,
+            changing: Mutex::new(()),
+        }
     }
 
     fn of(&self, device: i64) -> Store {
@@ -35,6 +43,7 @@ impl Images {
     ///
     /// When the file cannot be written.
     pub fn save(&self, device: i64, bytes: &[u8]) -> io::Result<String> {
+        let _changing = self.changing.lock().unwrap_or_else(PoisonError::into_inner);
         let store = self.of(device);
         let name = store.store(bytes)?;
         let now = SystemTime::now();
@@ -66,6 +75,7 @@ impl Images {
     ///
     /// When the directory exists but cannot be removed.
     pub fn forget(&self, device: i64) -> io::Result<()> {
+        let _changing = self.changing.lock().unwrap_or_else(PoisonError::into_inner);
         self.of(device).remove()
     }
 }

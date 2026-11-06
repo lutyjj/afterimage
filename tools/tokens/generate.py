@@ -27,9 +27,10 @@ from pathlib import Path
 
 
 FRAMEWORK = "3.4.4"
-STYLESHEET = f"https://trmnl.com/css/{FRAMEWORK}/plugins.css"
-# The commit tag v3.4.4 names; a tag can move, a commit cannot.
+# The commit tag v3.4.4 names; a tag can move, a commit cannot. Every file of the
+# release comes from it, the compiled stylesheet that trmnl.com serves included.
 REPOSITORY = "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc"
+STYLESHEET = f"{REPOSITORY}/public/css/{FRAMEWORK}/plugins.css"
 TOKEN_LIST = f"{REPOSITORY}/public/framework/docs/3.4/tokens.md"
 FONT_REGISTRY = f"{REPOSITORY}/db/data/framework_fonts.yml"
 FRAMEWORK_LICENSE = f"{REPOSITORY}/LICENSE"
@@ -163,7 +164,12 @@ SOURCES: Path | None = None
 
 def fetch(url: str) -> bytes:
     if SOURCES is not None:
-        return (SOURCES / PINS.get(url, "unpinned")).read_bytes()
+        if url not in PINS:
+            sys.exit(
+                f"{url} is not pinned in sources.json; run the generator without a sources "
+                "directory to download it and print its SHA-256"
+            )
+        return (SOURCES / PINS[url]).read_bytes()
     request = urllib.request.Request(url, headers={"User-Agent": "afterimage-tokens"})
     with urllib.request.urlopen(request, timeout=60) as response:
         return response.read()

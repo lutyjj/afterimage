@@ -154,9 +154,10 @@ impl Config {
     /// Whether the public URL is `https`, when there is one.
     #[must_use]
     pub fn public_url_is_https(&self) -> Option<bool> {
-        self.public_url
-            .as_deref()
-            .map(|url| url.starts_with("https://"))
+        self.public_url.as_deref().map(|url| {
+            url.get(..8)
+                .is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"))
+        })
     }
 }
 
@@ -190,8 +191,8 @@ fn parse_topic(text: &str) -> Result<String, String> {
         .map_err(|violation| violation.to_string())
 }
 
-/// An origin: `https://` or `http://`, a host and a port where it is not the
-/// scheme's own, written as browsers write one.
+/// An origin: `https://` or `http://`, a host and a port, kept as written but
+/// for a closing slash, since an OIDC provider matches its redirect URL exactly.
 fn parse_origin(text: &str) -> Result<String, String> {
     let url = url::Url::parse(text).map_err(|error| error.to_string())?;
     if !matches!(url.scheme(), "https" | "http") {
@@ -205,7 +206,7 @@ fn parse_origin(text: &str) -> Result<String, String> {
     {
         return Err("must be a scheme and host, with no path, query or fragment".to_owned());
     }
-    Ok(url.origin().ascii_serialization())
+    Ok(text.trim_end_matches('/').to_owned())
 }
 
 #[cfg(test)]
@@ -315,16 +316,12 @@ mod tests {
         }
         let origin = |url: &str| parse(&["--public-url", url]).unwrap().public_url.unwrap();
         assert_eq!(
-            origin("https://Afterimage.Example/"),
+            origin("https://afterimage.example/"),
             "https://afterimage.example"
         );
         assert_eq!(
-            origin("https://afterimage.example:443"),
-            "https://afterimage.example"
-        );
-        assert_eq!(
-            origin("http://afterimage.example:8080"),
-            "http://afterimage.example:8080"
+            origin("https://afterimage.example:8443"),
+            "https://afterimage.example:8443"
         );
     }
 }

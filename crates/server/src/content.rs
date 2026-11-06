@@ -37,7 +37,9 @@ impl Store {
     }
 
     /// Keeps `bytes` and returns their name. A file already kept is stored again
-    /// only in its time, so what ages files counts from the latest store.
+    /// only in its time, so what ages files counts from the latest store. Its
+    /// callers store one at a time: two first stores of the same bytes would
+    /// write one partial file.
     ///
     /// # Errors
     ///
