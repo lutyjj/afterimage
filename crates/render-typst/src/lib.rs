@@ -225,10 +225,10 @@ fn snapped(frame: &Frame, origin: Point, scale: f64) -> Frame {
             FrameItem::Group(group) => {
                 let transform = group.transform;
                 let mut group = group.clone();
-                let translates_only = transform.sx.get() == 1.0
-                    && transform.sy.get() == 1.0
-                    && transform.kx.get() == 0.0
-                    && transform.ky.get() == 0.0;
+                let translates_only = transform.sx.is_one()
+                    && transform.sy.is_one()
+                    && transform.kx.is_zero()
+                    && transform.ky.is_zero();
                 if translates_only {
                     group.frame = snapped(
                         &group.frame,
@@ -239,7 +239,10 @@ fn snapped(frame: &Frame, origin: Point, scale: f64) -> Frame {
                 out.push(*position, FrameItem::Group(group));
             }
             FrameItem::Text(_) => {
-                out.push(*position + Point::new(nudge(at.x), nudge(at.y)), item.clone());
+                out.push(
+                    *position + Point::new(nudge(at.x), nudge(at.y)),
+                    item.clone(),
+                );
             }
             _ => out.push(*position, item.clone()),
         }
