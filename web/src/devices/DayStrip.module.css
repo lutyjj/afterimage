@@ -10,13 +10,13 @@
 }
 
 .strip[data-named] {
-  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  grid-template-columns: 6.5rem minmax(0, 1fr);
 }
 
 .names {
   display: grid;
+  align-content: start;
   gap: var(--lane-gap);
-  max-width: 9rem;
   padding: 4px 0;
   border-block: 1px solid transparent;
   color: var(--blue-text);

@@ -239,7 +239,7 @@ function EntryRow({
             All day
           </label>
           {!allDay && (
-            <>
+            <span className={styles.range}>
               <label>
                 <span className="visually-hidden">From</span>
                 <input
@@ -264,11 +264,17 @@ function EntryRow({
                   onChange={(event) => onChange({ until: event.target.value || undefined })}
                 />
               </label>
-            </>
+            </span>
           )}
         </div>
         <div className={styles.strip}>
-          <DayStrip day="monday" entries={[{ entry: window, name: "" }]} hours={index === count - 1} label={`${daysLabel(entry.days)}, ${windowLabel(entry)}`} />
+          <DayStrip
+            day="monday"
+            entries={[{ entry: window, name: "" }]}
+            hours={index === count - 1}
+            names={false}
+            label={`${daysLabel(entry.days)}, ${windowLabel(entry)}`}
+          />
           <span className="annotation">
             {daysLabel(entry.days)} · {windowLabel(entry)}
           </span>

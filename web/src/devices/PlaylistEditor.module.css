@@ -120,6 +120,12 @@
   width: 8.25rem;
 }
 
+.range {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .allDay {
   display: inline-flex;
   white-space: nowrap;

@@ -22,10 +22,12 @@
   align-items: start;
 }
 
+/* Below the list's top rule, so the panel's crop mark never lies on it. */
 .claim {
   grid-area: claim;
   position: sticky;
   top: 4.5rem;
+  margin-top: var(--space-5);
 }
 
 .list {

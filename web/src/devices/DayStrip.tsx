@@ -10,19 +10,20 @@ export interface DayStripProps {
   now?: number | undefined;
   /** Hour labels under the track. */
   hours?: boolean;
+  /** A column of the lanes' names before the track, kept at one width even with
+   * no lanes, so strips stacked down a page start their tracks at one edge. */
+  names?: boolean;
   label: string;
 }
 
 const percent = (minute: number) => `${(minute / DAY_MINUTES) * 100}%`;
 
 /** One day as a track from midnight to midnight, each playlist entry a lane whose
- * marks are as long as the time it is current. Lanes with names carry them at
- * their start. */
-export function DayStrip({ entries, day, now, hours = true, label }: DayStripProps) {
-  const named = entries.some(({ name }) => name !== "");
+ * marks are as long as the time it is current, its name at its start. */
+export function DayStrip({ entries, day, now, hours = true, names = true, label }: DayStripProps) {
   return (
-    <div className={styles.strip} role="img" aria-label={label} data-named={named || undefined}>
-      {named && (
+    <div className={styles.strip} role="img" aria-label={label} data-named={names || undefined}>
+      {names && (
         <ol className={styles.names} aria-hidden="true">
           {entries.map(({ name }, lane) => (
             <li key={lane} title={name}>
