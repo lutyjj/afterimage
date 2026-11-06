@@ -9,6 +9,7 @@ import { accountQuery, client, queryClient, whenSignedOut } from "./client";
 import { NotFoundPage, RouteError } from "./RouteError";
 import { Shell } from "./Shell";
 import { signInPath } from "./signInPath";
+import { signOutAction } from "./signOut";
 
 /** The signed-in account, asked of the server directly so that a missing session
  * is the loader's answer rather than an error for the whole app. */
@@ -33,19 +34,6 @@ async function requireAccount({ request }: { request: Request }) {
   return signedIn;
 }
 
-/** Signing out is a navigation, so a page with unsaved changes asks first. A
- * session that has already ended is signed out all the same. */
-async function signOut() {
-  try {
-    await client.signOut({});
-  } catch (error) {
-    if (!(error instanceof Unauthenticated)) throw error;
-  } finally {
-    queryClient.clear();
-  }
-  return redirect("/sign-in");
-}
-
 async function signedOutOnly() {
   if (await account()) throw redirect("/");
   return null;
@@ -59,7 +47,7 @@ const screenEditor = async () => {
 
 export const router = createBrowserRouter([
   { path: "/sign-in", loader: signedOutOnly, Component: SignIn, ErrorBoundary: RouteError },
-  { path: "/sign-out", action: signOut, ErrorBoundary: RouteError },
+  { path: "/sign-out", action: signOutAction(client, queryClient), ErrorBoundary: RouteError },
   {
     path: "/",
     loader: requireAccount,
