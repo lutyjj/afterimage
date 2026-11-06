@@ -362,6 +362,23 @@ fn a_divider_in_an_item_keeps_the_item_as_wide_as_its_content() {
 }
 
 #[test]
+fn an_items_children_follow_the_alignment_around_it() {
+    // A plain item in a column centred across the screen: its lines are centred.
+    let item = json!({ "item": { "emphasis": 1, "plain": true, "grow": false, "children": [
+        title("A"), title("A much longer line of text")
+    ] } });
+    let screen = json!({ "content": { "column": {
+        "gap": "medium", "align": "center", "justify": "start", "grow": false, "children": [item]
+    } } });
+    let (_, columns) = inked(&render(&screen, "og_plus", "gray-4"));
+    let middle = (columns.first().unwrap() + columns.last().unwrap()) / 2;
+    assert!(
+        middle.abs_diff(400) < 20,
+        "the item's ink is centred on x={middle}"
+    );
+}
+
+#[test]
 fn a_column_that_does_not_grow_is_as_wide_as_its_content() {
     // Beside a column that grows, a column of one short title ends at the right edge.
     let screen = json!({ "content": stack("row", false, &[

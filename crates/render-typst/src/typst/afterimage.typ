@@ -268,7 +268,8 @@
   let tracks = children.map(child => if length and not divider(child) and grows(child) { 1fr } else { auto })
   let spacing = gap(t, v.at("gap", default: "medium"))
   let justify = v.at("justify", default: "start")
-  let cross = v.at("align", default: "start")
+  // Absent for an item's children, which keep the alignment around the item.
+  let cross = v.at("align", default: none)
   let free = length and not tracks.contains(1fr)
   let gutter = if free and justify == "between" and children.len() > 1 { 1fr } else { spacing }
   let cells = children.zip(tracks).map(((child, track)) => {
@@ -288,12 +289,14 @@
   }
   if direction == "column" {
     let horizontal = if cross == "center" { center } else if cross == "end" { right } else { left }
+    let aligned = if cross == none { (:) } else { (align: horizontal) }
     let rules = dividers.map(at => grid.hline(y: at + lead, stroke: 1pt + black))
-    grid(columns: (across,), rows: tracks, row-gutter: gutter, align: horizontal, ..cells, ..rules)
+    grid(columns: (across,), rows: tracks, row-gutter: gutter, ..aligned, ..cells, ..rules)
   } else {
     let vertical = if cross == "center" { horizon } else if cross == "end" { bottom } else { top }
+    let aligned = if cross == none { (:) } else { (align: vertical) }
     let rules = dividers.map(at => grid.vline(x: at + lead, stroke: 1pt + black))
-    grid(rows: (across,), columns: tracks, column-gutter: gutter, align: vertical, ..cells, ..rules)
+    grid(rows: (across,), columns: tracks, column-gutter: gutter, ..aligned, ..cells, ..rules)
   }
 }
 
