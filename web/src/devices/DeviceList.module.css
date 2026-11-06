@@ -22,12 +22,14 @@
   align-items: start;
 }
 
-/* Below the list's top rule, so the panel's crop mark never lies on it. */
+/* Level with the first plate (the row's padding, less the proof's offset, plus
+   its room for crop marks), so the panel's crop mark never lies on the list's
+   top rule. */
 .claim {
   grid-area: claim;
   position: sticky;
   top: 4.5rem;
-  margin-top: var(--space-5);
+  margin-top: calc(var(--space-4) - 0.25rem + 1.25rem);
 }
 
 .list {
@@ -213,5 +215,6 @@
 
   .claim {
     position: static;
+    margin-top: 0;
   }
 }

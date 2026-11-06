@@ -16,16 +16,27 @@ const hourCycle = new Intl.DateTimeFormat(undefined, { hour: "numeric" }).resolv
 /** "07:30" on a 24-hour clock, "7:30 am" on a 12-hour one. */
 const hour = hourCycle === "h23" || hourCycle === "h24" ? "2-digit" : "numeric";
 
+/** Formats `date`, keeping a time and its am or pm on one line. */
+function unbroken(format: Intl.DateTimeFormat, date: Date): string {
+  const parts = format.formatToParts(date);
+  return parts
+    .map((part, index) =>
+      part.type === "literal" && parts[index + 1]?.type === "dayPeriod" ? "\u00a0" : part.value,
+    )
+    .join("");
+}
+
 /** A moment in the server's time zone, such as "Thu 14:05" or "3 Nov 14:05". */
 export function moment(date: Date, timeZone: string, now: Date = new Date()): string {
   const sameWeek = Math.abs(now.getTime() - date.getTime()) < 6 * 86_400_000;
-  return new Intl.DateTimeFormat("en-GB", {
+  const format = new Intl.DateTimeFormat("en-GB", {
     timeZone,
     ...(sameWeek ? { weekday: "short" } : { day: "numeric", month: "short" }),
     hour,
     minute: "2-digit",
     hourCycle,
-  }).format(date);
+  });
+  return unbroken(format, date);
 }
 
 const timeOfDayFormat = new Intl.DateTimeFormat("en-GB", {
@@ -37,7 +48,7 @@ const timeOfDayFormat = new Intl.DateTimeFormat("en-GB", {
 
 /** A time of day, given as minutes after midnight, such as "07:30" or "7:30 am". */
 export function timeOfDay(minute: number): string {
-  return timeOfDayFormat.format(new Date(minute * 60_000));
+  return unbroken(timeOfDayFormat, new Date(minute * 60_000));
 }
 
 /** A reading of signal strength in words, from RSSI in dBm. */
