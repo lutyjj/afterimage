@@ -48,6 +48,9 @@ class Pattern(unittest.TestCase):
         self.assertIsNone(pattern("none", "auto", 1.0))
         down = HEAD.replace("to right", "to bottom")
         self.assertIsNone(pattern(down, "2px 1px", 1.0))
+        # Without a direction, CSS runs it to the bottom.
+        unstated = HEAD.replace("to right, ", "")
+        self.assertIsNone(pattern(unstated, "2px 1px", 1.0))
 
 
 if __name__ == "__main__":

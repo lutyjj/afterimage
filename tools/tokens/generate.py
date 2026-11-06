@@ -233,9 +233,10 @@ def pattern(image: str, size: str, ratio: float):
     if not layer.startswith("linear-gradient("):
         return None
     arguments = split(layer[len("linear-gradient(") : -1])
+    # CSS runs a gradient without a direction to the bottom, as no rule across is.
+    across = False
     if arguments and re.match(r"to |-?[0-9.]+deg$", arguments[0]):
-        if arguments[0] not in ("to right", "90deg"):
-            return None
+        across = arguments[0] in ("to right", "90deg")
         arguments = arguments[1:]
     stops = []
     for stop in arguments:
@@ -247,7 +248,7 @@ def pattern(image: str, size: str, ratio: float):
     thickness = float(lengths[1].group(1)) if len(lengths) > 1 and lengths[1] else 1.0
     if len({color for color, _ in stops}) == 1:
         return {"pixels": [stops[0][0]], "period": round(1 / ratio, 4), "thickness": thickness}
-    if not lengths[0] or any(position is None for _, position in stops):
+    if not across or not lengths[0] or any(position is None for _, position in stops):
         return None
     period = float(lengths[0].group(1))
     pixels = max(1, round(period * ratio))
