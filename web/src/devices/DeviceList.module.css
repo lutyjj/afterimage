@@ -28,7 +28,8 @@
 .claim {
   grid-area: claim;
   position: sticky;
-  top: 4.5rem;
+  /* Stuck under the top bar with room for its crop mark above it. */
+  top: 5.5rem;
   margin-top: calc(var(--space-4) - 0.25rem + 1.25rem);
 }
 
