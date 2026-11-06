@@ -4,10 +4,14 @@
 
 #![allow(dead_code, unreachable_pub)]
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
+use axum::extract::{Path, State};
+use axum::response::IntoResponse;
+use axum::routing::get;
 
 use clap::Parser;
 use afterimage_server::app;
@@ -58,6 +62,63 @@ pub struct Server {
     pub data: TempDir,
     /// Keeps cookies, as a browser does.
     pub http: reqwest::Client,
+    pub trmnl: Trmnl,
+}
+
+/// A stand-in for TRMNL's site: the firmware list, which lists no board until
+/// a test sets one, and the flash images it names under `/flash/`.
+#[derive(Clone)]
+pub struct Trmnl {
+    pub url: String,
+    /// `None` answers 503.
+    list: Arc<Mutex<Option<Value>>>,
+    flash: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    /// Requests for the list so far.
+    pub list_requests: Arc<AtomicUsize>,
+}
+
+impl Trmnl {
+    async fn start() -> Self {
+        async fn list(State(trmnl): State<Trmnl>) -> axum::response::Response {
+            trmnl.list_requests.fetch_add(1, Ordering::SeqCst);
+            match trmnl.list.lock().unwrap().clone() {
+                Some(list) => axum::Json(list).into_response(),
+                None => StatusCode::SERVICE_UNAVAILABLE.into_response(),
+            }
+        }
+        async fn flash(
+            State(trmnl): State<Trmnl>,
+            Path(name): Path<String>,
+        ) -> axum::response::Response {
+            match trmnl.flash.lock().unwrap().get(&name) {
+                Some(bytes) => bytes.clone().into_response(),
+                None => StatusCode::NOT_FOUND.into_response(),
+            }
+        }
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let trmnl = Self {
+            url: format!("http://{}", listener.local_addr().unwrap()),
+            list: Arc::new(Mutex::new(Some(json!({ "data": { "models": [] } })))),
+            flash: Arc::new(Mutex::new(HashMap::new())),
+            list_requests: Arc::new(AtomicUsize::new(0)),
+        };
+        let app = axum::Router::new()
+            .route("/api/firmware/flash", get(list))
+            .route("/flash/{name}", get(flash))
+            .with_state(trmnl.clone());
+        tokio::spawn(async move { axum::serve(listener, app).await });
+        trmnl
+    }
+
+    pub fn set_list(&self, list: Option<Value>) {
+        *self.list.lock().unwrap() = list;
+    }
+
+    /// Serves a flash image and returns its URL.
+    pub fn publish(&self, name: &str, bytes: Vec<u8>) -> String {
+        self.flash.lock().unwrap().insert(name.to_owned(), bytes);
+        format!("{}/flash/{name}", self.url)
+    }
 }
 
 pub const FIRMWARE: &str = "1.8.18";
@@ -95,9 +156,18 @@ async fn start_full(entropy: Arc<dyn Entropy>, settings: &[&str], secrets: Secre
     let data = TempDir::new().unwrap();
     let clock = Arc::new(ManualClock(AtomicI64::new(1_800_000_000)));
     let data_dir = data.path().to_str().unwrap().to_owned();
-    let arguments = ["afterimage", "--data-dir", &data_dir, "--time-zone", "UTC"]
-        .into_iter()
-        .chain(settings.iter().copied());
+    let trmnl = Trmnl::start().await;
+    let arguments = [
+        "afterimage",
+        "--data-dir",
+        &data_dir,
+        "--time-zone",
+        "UTC",
+        "--trmnl-url",
+        &trmnl.url,
+    ]
+    .into_iter()
+    .chain(settings.iter().copied());
     let config = Config::try_parse_from(arguments).unwrap();
     let app = app::build(&config, secrets, clock.clone(), entropy)
         .await
@@ -116,6 +186,7 @@ async fn start_full(entropy: Arc<dyn Entropy>, settings: &[&str], secrets: Secre
             .cookie_store(true)
             .build()
             .unwrap(),
+        trmnl,
     }
 }
 
@@ -164,6 +235,17 @@ impl Server {
     /// `GET /api/display` with `buildDisplayHeaders`, including the values whose
     /// format differs from TRMNL's published types.
     pub async fn display(&self, key: &str, readings: &Readings) -> Value {
+        self.display_as(key, readings, FIRMWARE, MODEL).await
+    }
+
+    /// A check-in from this firmware release and model.
+    pub async fn display_as(
+        &self,
+        key: &str,
+        readings: &Readings,
+        firmware: &str,
+        model: &str,
+    ) -> Value {
         let response = self
             .http
             .get(format!("{}/api/display", self.url))
@@ -184,8 +266,8 @@ impl Server {
             .header("Gauge-SOC", "-1")
             .header("Gauge-Health", "-1")
             .header("Gauge-Capacity", "-1/-1")
-            .header("FW-Version", FIRMWARE)
-            .header("Model", MODEL)
+            .header("FW-Version", firmware)
+            .header("Model", model)
             .header("Image-Cached", "false")
             .header("Wake-Time", "12")
             .header("RSSI", readings.rssi)

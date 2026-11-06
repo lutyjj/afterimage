@@ -5,7 +5,8 @@ namespace afterimage.management
 use aws.protocols#restJson1
 use smithy.framework#ValidationException
 
-/// The API the web UI uses: sign-in, devices, screens and their playlists.
+/// The API the web UI uses: sign-in, devices, their firmware, screens and their
+/// playlists.
 ///
 /// Every operation needs a session except those that exist to start one
 /// (`GetSignInOptions`, `CreateFirstAccount`, `SignIn`, `StartOidcSignIn`,
@@ -31,6 +32,9 @@ service Management {
         SetPlaylist
         DeleteDevice
         GetDeviceImage
+        ListFirmwareBoards
+        InstallFirmware
+        CancelFirmwareUpdate
         ListScreens
         CreateScreen
         GetScreen

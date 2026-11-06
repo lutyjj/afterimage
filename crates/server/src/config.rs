@@ -21,10 +21,19 @@ pub struct Config {
     #[arg(long, env = "AFTERIMAGE_DATA_DIR", default_value = "data")]
     pub data_dir: PathBuf,
 
+    /// Directory of files the server can fetch again, such as firmware images;
+    /// `cache` in the data directory when unset.
+    #[arg(long, env = "AFTERIMAGE_CACHE_DIR")]
+    pub cache_dir: Option<PathBuf>,
+
+    /// TRMNL's site, which publishes the firmware releases devices install.
+    #[arg(long, env = "AFTERIMAGE_TRMNL_URL", default_value = "https://trmnl.com", value_parser = parse_origin)]
+    pub trmnl_url: String,
+
     /// The address browsers reach the server at, such as `https://afterimage.example`.
     /// OIDC sign-in needs it, and an `https` address makes cookies `Secure`; without
     /// it, the reverse proxy's `X-Forwarded-Proto` decides.
-    #[arg(long, env = "AFTERIMAGE_URL", value_parser = parse_public_url)]
+    #[arg(long, env = "AFTERIMAGE_URL", value_parser = parse_origin)]
     pub public_url: Option<String>,
 
     /// Directory of the built web UI, served at `/`.
@@ -87,6 +96,14 @@ impl Config {
         )
     }
 
+    /// Where firmware images are cached.
+    #[must_use]
+    pub fn cache_dir(&self) -> PathBuf {
+        self.cache_dir
+            .clone()
+            .unwrap_or_else(|| self.data_dir.join("cache"))
+    }
+
     /// Whether the public URL is `https`, when there is one.
     #[must_use]
     pub fn public_url_is_https(&self) -> Option<bool> {
@@ -96,7 +113,7 @@ impl Config {
     }
 }
 
-fn parse_public_url(text: &str) -> Result<String, String> {
+fn parse_origin(text: &str) -> Result<String, String> {
     let rest = text
         .strip_prefix("https://")
         .or_else(|| text.strip_prefix("http://"))
@@ -131,6 +148,8 @@ mod tests {
         assert!(config.password_sign_in);
         assert!(config.oidc().is_none());
         assert_eq!(config.landing(), "/");
+        assert_eq!(config.cache_dir(), PathBuf::from("data/cache"));
+        assert_eq!(config.trmnl_url, "https://trmnl.com");
     }
 
     #[test]

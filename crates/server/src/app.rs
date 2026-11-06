@@ -20,6 +20,7 @@ use crate::clock::Clock;
 use crate::config::Config;
 use crate::devices::Devices;
 use crate::drawing::Drawing;
+use crate::firmware::Firmware;
 use crate::images::Images;
 use crate::keys::Entropy;
 use crate::oidc::Oidc;
@@ -85,12 +86,19 @@ pub async fn build(
     let secret_names = secrets.names();
     let drawing = Arc::new(Drawing::new(secrets, time_zone.clone()));
     let images = Arc::new(Images::new(config.data_dir.join("images")));
+    let firmware = Arc::new(Firmware::new(
+        &config.trmnl_url,
+        config.cache_dir().join("firmware"),
+        pool.clone(),
+        Arc::clone(&clock),
+    ));
     let device_state = Arc::new(device_api::State {
         registrations: Registrations::new(pool.clone(), Arc::clone(&clock), Arc::clone(&entropy)),
         devices: Devices::new(pool.clone(), Arc::clone(&clock)),
         screens: Screens::new(pool.clone(), Arc::clone(&clock)),
         drawing: Arc::clone(&drawing),
         images: Arc::clone(&images),
+        firmware: Arc::clone(&firmware),
         clock: Arc::clone(&clock),
     });
     let state = Arc::new(management_api::State {
@@ -110,6 +118,7 @@ pub async fn build(
         secret_names,
         drawing,
         images,
+        firmware,
         clock,
     });
     Ok(router(

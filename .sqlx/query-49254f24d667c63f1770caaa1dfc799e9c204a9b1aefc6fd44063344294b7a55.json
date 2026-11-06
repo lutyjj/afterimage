@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT image FROM firmware_updates WHERE finished_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "image",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "firmware_updates",
+            "name": "image"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "49254f24d667c63f1770caaa1dfc799e9c204a9b1aefc6fd44063344294b7a55"
+}

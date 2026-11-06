@@ -6,7 +6,7 @@ See [the design](docs/design.md).
 
 ## Running
 
-`nix build` produces `result/bin/afterimage`, which serves TRMNL's device API under `/api/`, the management API under `/manage/` and the web UI everywhere else. It listens on `AFTERIMAGE_BIND` (default `0.0.0.0:8080`) and keeps its database in `AFTERIMAGE_DATA_DIR` (default `./data`); `afterimage --help` lists every setting, each a flag or a `AFTERIMAGE_*` environment variable. Data sources read secrets from `AFTERIMAGE_SECRET_<NAME>` variables. In a device's Wi-Fi setup portal, set the server URL to this server's address.
+`nix build` produces `result/bin/afterimage`, which serves TRMNL's device API under `/api/`, the management API under `/manage/` and the web UI everywhere else. It listens on `AFTERIMAGE_BIND` (default `0.0.0.0:8080`), keeps its database in `AFTERIMAGE_DATA_DIR` (default `./data`) and the firmware images it serves in `AFTERIMAGE_CACHE_DIR`, and fetches firmware from `https://trmnl.com` and the images it lists; `afterimage --help` lists every setting, each a flag or a `AFTERIMAGE_*` environment variable. Data sources read secrets from `AFTERIMAGE_SECRET_<NAME>` variables. In a device's Wi-Fi setup portal, set the server URL to this server's address.
 
 On NixOS, the flake's `nixosModules.default` runs it as `services.afterimage`: `settings` takes the `AFTERIMAGE_*` variables, `environmentFile` the secrets (`AFTERIMAGE_OIDC_CLIENT_ID`, `AFTERIMAGE_OIDC_CLIENT_SECRET` and the `AFTERIMAGE_SECRET_*` values), and the database lives in the service's state directory.
 

@@ -1,13 +1,24 @@
 //! Display models, claiming devices, their settings and playlists.
 
-use afterimage_management_api::model::DeviceName;
+use afterimage_management_api::model::{self, DeviceName, FirmwareBoardName};
 use afterimage_management_api::server::Extension;
 use afterimage_management_api::{error, input, output};
 
-use super::{Caller, Shared, internal, wire};
-use crate::devices::{self, Changes, Claim};
+use super::firmware::unavailable;
+use super::{Caller, Shared, State, internal, wire};
+use crate::devices::{self, Changes, Claim, Device};
 
-fn not_found() -> error::NotFound {
+/// The device as the API shows it, with what TRMNL's firmware list says of its
+/// board. A list that cannot be read leaves that out.
+pub(super) async fn shown(
+    state: &State,
+    device: Device,
+) -> Result<model::Device, error::InternalFailure> {
+    let boards = state.firmware.boards().await.ok();
+    wire::device(device, boards.as_deref())
+}
+
+pub(super) fn not_found() -> error::NotFound {
     error::NotFound {
         message: "This device does not exist.".to_owned(),
     }
@@ -40,10 +51,11 @@ pub async fn list_devices(
         .list(caller.account.id)
         .await
         .map_err(|error| internal(&error))?;
+    let boards = state.firmware.boards().await.ok();
     Ok(output::ListDevicesOutput {
         devices: devices
             .into_iter()
-            .map(wire::device)
+            .map(|device| wire::device(device, boards.as_deref()))
             .collect::<Result<_, _>>()?,
     })
 }
@@ -74,7 +86,7 @@ pub async fn claim_device(
     };
     tracing::info!(device = device.id, replaced, "device claimed");
     Ok(output::ClaimDeviceOutput {
-        device: wire::device(device)?,
+        device: shown(&state, device).await?,
         replaced,
     })
 }
@@ -91,7 +103,7 @@ pub async fn get_device(
         .map_err(|error| internal(&error))?
         .ok_or_else(not_found)?;
     Ok(output::GetDeviceOutput {
-        device: wire::device(device)?,
+        device: shown(&state, device).await?,
     })
 }
 
@@ -100,13 +112,27 @@ pub async fn update_device(
     Extension(state): Shared,
     caller: Caller,
 ) -> Result<output::UpdateDeviceOutput, error::UpdateDeviceError> {
+    if let Some(board) = &input.firmware_board {
+        let boards = state
+            .firmware
+            .boards()
+            .await
+            .map_err(|failure| unavailable(&failure))?;
+        if !boards.iter().any(|listed| listed.name == board.as_str()) {
+            return Err(
+                invalid(format!("TRMNL lists no firmware board {}.", board.as_str())).into(),
+            );
+        }
+    }
     let changes = Changes {
         name: input.name.map(DeviceName::into_inner),
         display: input.display.map(wire::display),
         refresh_minutes: input
             .refresh_minutes
             .map(|minutes| i64::from(minutes.into_inner())),
+        firmware_board: input.firmware_board.map(FirmwareBoardName::into_inner),
     };
+    let board_chosen = changes.firmware_board.is_some();
     let device = match state
         .devices
         .update(caller.account.id, *input.device_id.inner(), changes)
@@ -118,8 +144,11 @@ pub async fn update_device(
         }
         Err(error) => return Err(internal(&error).into()),
     };
+    if board_chosen {
+        state.firmware.forget_unused().await;
+    }
     Ok(output::UpdateDeviceOutput {
-        device: wire::device(device)?,
+        device: shown(&state, device).await?,
     })
 }
 
@@ -146,7 +175,7 @@ pub async fn set_playlist(
         Err(error) => return Err(internal(&error).into()),
     };
     Ok(output::SetPlaylistOutput {
-        device: wire::device(device)?,
+        device: shown(&state, device).await?,
     })
 }
 

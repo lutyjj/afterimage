@@ -15,6 +15,7 @@ use tower::Service;
 use crate::clock::Clock;
 use crate::devices::Devices;
 use crate::drawing::Drawing;
+use crate::firmware::Firmware;
 use crate::images::Images;
 use crate::registrations::{CheckIn, Refusal, Registrations, Setup};
 use crate::screens::Screens;
@@ -27,6 +28,7 @@ pub struct State {
     pub screens: Screens,
     pub drawing: Arc<Drawing>,
     pub images: Arc<Images>,
+    pub firmware: Arc<Firmware>,
     pub clock: Arc<dyn Clock>,
 }
 
@@ -72,6 +74,7 @@ pub fn service(
         .get_current_screen(get_current_screen)
         .create_device_log(create_device_log)
         .get_screen_image(get_screen_image)
+        .get_firmware_image(get_firmware_image)
         .build()
         .expect("every device API operation has a handler")
 }
@@ -207,11 +210,20 @@ async fn get_display(
             )
             .await
             .map_err(|error| internal_failure(&error))?;
+            let firmware = state
+                .firmware
+                .check_in(&device)
+                .await
+                .map_err(|error| internal_failure(&error))?;
             output::GetDisplayOutput {
                 status: DisplayStatus::Show.code(),
                 image_url: Some(format!("{origin}/api/images/{}", shown.image)),
                 filename: Some(filename(&shown.image)),
                 refresh_rate: i32::try_from(shown.wait).unwrap_or(i32::MAX),
+                // With status 0, the only status on which firmware 1.6 reads
+                // them. 1.8 draws the screen before it installs; 1.6 skips it.
+                update_firmware: firmware.is_some(),
+                firmware_url: firmware.map(|image| format!("{origin}/api/firmware-images/{image}")),
                 ..waiting()
             }
         }
@@ -284,6 +296,23 @@ async fn get_screen_image(
         .ok_or_else(not_found)?;
     Ok(output::GetScreenImageOutput {
         content_type: "image/png".to_owned(),
+        image: aws_smithy_types::Blob::new(image),
+    })
+}
+
+async fn get_firmware_image(
+    input: input::GetFirmwareImageInput,
+    Extension(state): Shared,
+) -> Result<output::GetFirmwareImageOutput, error::GetFirmwareImageError> {
+    let image = state
+        .firmware
+        .image(input.name.as_str())
+        .map_err(|error| internal_failure(&error))?
+        .ok_or_else(|| error::FirmwareNotFound {
+            message: Some("This server keeps no firmware image of that name.".to_owned()),
+        })?;
+    Ok(output::GetFirmwareImageOutput {
+        content_type: "application/octet-stream".to_owned(),
         image: aws_smithy_types::Blob::new(image),
     })
 }

@@ -16,7 +16,11 @@ testers.runNixOSTest {
     services.afterimage = {
       enable = true;
       package = afterimage;
-      settings.AFTERIMAGE_URL = "http://machine";
+      settings = {
+        AFTERIMAGE_URL = "http://machine";
+        # The VM has no internet; TRMNL's firmware list fails at once here.
+        AFTERIMAGE_TRMNL_URL = "http://127.0.0.1:9";
+      };
     };
     time.timeZone = "Europe/Berlin";
   };

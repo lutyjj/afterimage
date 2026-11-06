@@ -18,6 +18,7 @@ function device(change: Partial<Device>): Device {
     playlist: [{ screenId: 1 }],
     readings: {},
     seenAt: new Date(NOW.getTime() - 60_000),
+    firmware: { boardChosen: false },
     ...change,
   };
 }

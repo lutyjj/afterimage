@@ -29,6 +29,8 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 cookie = "0.18.2"
 # data: URLs in image components.
 data-url = "0.3.2"
+# The partition table of TRMNL's flash images, with its MD5 checked.
+esp-idf-part = "0.6.0"
 getrandom = "0.4.3"
 http = "1.5.0"
 # Local time for playlists; the time zone database is bundled so that a host or
@@ -45,6 +47,8 @@ password-auth = "2.0.0"
 # Data sources and images.
 reqwest = "0.13.5"
 openidconnect = { version = "4.1.0", default-features = false, features = ["reqwest", "rustls-tls"] }
+# Ordering TRMNL's firmware releases and telling variants (`1.7.8-sensors`) from them.
+semver = "1.0.28"
 serde = { workspace = true }
 serde_json.workspace = true
 sha2 = "0.11.1"

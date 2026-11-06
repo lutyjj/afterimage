@@ -122,6 +122,9 @@ structure Device {
 
     /// The screen the device shows now; absent before its first image.
     showing: Showing
+
+    @required
+    firmware: DeviceFirmware
 }
 
 list Devices {
@@ -263,6 +266,11 @@ operation UpdateDevice {
         display: Display
 
         refreshMinutes: RefreshMinutes
+
+        /// The board whose firmware the device installs, from
+        /// `ListFirmwareBoards`. Choosing a board withdraws an install request the
+        /// device has not received.
+        firmwareBoard: FirmwareBoardName
     }
 
     output := {
@@ -272,6 +280,7 @@ operation UpdateDevice {
 
     errors: [
         NotFound
+        UpstreamFailure
     ]
 }
 

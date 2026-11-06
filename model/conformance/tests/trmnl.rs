@@ -116,10 +116,16 @@ const FIRMWARE_ADDITIONS: [(&str, &str, &str); 3] = [
 
 /// Operations of Afterimage's own in the device API, each with why TRMNL's document
 /// has no place for it.
-const AFTERIMAGE_OPERATIONS: [(&str, &str); 1] = [(
-    "GET /api/images/{name}",
-    "TRMNL's document leaves `image_url` to the server; firmware downloads it with buildImageHeaders",
-)];
+const AFTERIMAGE_OPERATIONS: [(&str, &str); 2] = [
+    (
+        "GET /api/images/{name}",
+        "TRMNL's document leaves `image_url` to the server; firmware downloads it with buildImageHeaders",
+    ),
+    (
+        "GET /api/firmware-images/{name}",
+        "TRMNL's document leaves `firmware_url` to the server; firmware downloads it without headers",
+    ),
+];
 
 #[test]
 fn adds_nothing_but_listed_firmware_additions() {

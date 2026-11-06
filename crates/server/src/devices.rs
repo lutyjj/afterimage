@@ -18,6 +18,7 @@ use afterimage_trmnl::catalog::Catalog;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
 use crate::clock::Clock;
+use crate::firmware;
 use crate::registrations::IDLE_SECONDS;
 
 /// A new device's minutes between check-ins, TRMNL's default refresh rate.
@@ -66,6 +67,10 @@ pub struct Device {
     /// The playlist position shown last.
     pub playlist_position: Option<usize>,
     pub showing: Option<Showing>,
+    /// The firmware board a user chose, a name from TRMNL's firmware list.
+    pub firmware_board: Option<String>,
+    /// The latest firmware install request.
+    pub firmware_update: Option<firmware::Update>,
 }
 
 /// What a claim did.
@@ -84,6 +89,9 @@ pub struct Changes {
     pub name: Option<String>,
     pub display: Option<Display>,
     pub refresh_minutes: Option<i64>,
+    /// Choosing another board withdraws an install request the device has not
+    /// received, since it names the old board's image.
+    pub firmware_board: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -320,26 +328,37 @@ impl Devices {
             .display
             .map(|display| (display.model, display.palette))
             .unzip();
-        let mut tx = self.pool.begin().await?;
-        let updated = sqlx::query!(
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let Some(board) = sqlx::query_scalar!(
+            "SELECT firmware_board FROM devices WHERE id = ? AND account_id = ?",
+            id,
+            account_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        else {
+            return Ok(None);
+        };
+        if changes.firmware_board.is_some() && changes.firmware_board != board {
+            firmware::updates::withdraw_unsent(&mut tx, id).await?;
+        }
+        sqlx::query!(
             "UPDATE devices SET
                  name = COALESCE(?, name),
                  display_model = COALESCE(?, display_model),
                  palette = COALESCE(?, palette),
-                 refresh_minutes = COALESCE(?, refresh_minutes)
-             WHERE id = ? AND account_id = ?",
+                 refresh_minutes = COALESCE(?, refresh_minutes),
+                 firmware_board = COALESCE(?, firmware_board)
+             WHERE id = ?",
             changes.name,
             model,
             palette,
             changes.refresh_minutes,
-            id,
-            account_id
+            changes.firmware_board,
+            id
         )
         .execute(&mut *tx)
         .await?;
-        if updated.rows_affected() == 0 {
-            return Ok(None);
-        }
         let device = load(&mut tx, account_id, id).await?;
         tx.commit().await?;
         Ok(device)
@@ -449,7 +468,8 @@ async fn load(
     let Some(row) = sqlx::query!(
         "SELECT devices.id, devices.account_id, devices.name, devices.display_model, devices.palette,
                 devices.refresh_minutes, devices.playlist_position, devices.image_name,
-                devices.image_screen_id, devices.rendered_at, registrations.mac, registrations.model,
+                devices.image_screen_id, devices.rendered_at, devices.firmware_board,
+                registrations.mac, registrations.model,
                 registrations.seen_at, registrations.battery_voltage,
                 registrations.battery_percent, registrations.signal_dbm,
                 registrations.firmware_version
@@ -490,6 +510,7 @@ async fn load(
             screen_id: row.image_screen_id,
             rendered_at,
         });
+    let firmware_update = firmware::updates::load(tx, id).await?;
     Ok(Some(Device {
         id: row.id,
         account_id: row.account_id,
@@ -513,5 +534,7 @@ async fn load(
             .playlist_position
             .and_then(|position| usize::try_from(position).ok()),
         showing,
+        firmware_board: row.firmware_board,
+        firmware_update,
     }))
 }

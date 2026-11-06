@@ -1,5 +1,6 @@
 # The NixOS module: Afterimage as a systemd service whose database and images
-# live in its state directory. The flake's `nixosModules.default` imports it
+# live in its state directory, and the firmware images it serves in its cache
+# directory. The flake's `nixosModules.default` imports it
 # with the flake's package as the default.
 {
   config,
@@ -60,7 +61,8 @@ in
       };
       description = ''
         Environment variables of the server, each one `afterimage --help` lists.
-        The module sets `AFTERIMAGE_BIND` and `AFTERIMAGE_DATA_DIR`, and
+        The module sets `AFTERIMAGE_BIND`, `AFTERIMAGE_DATA_DIR` and
+        `AFTERIMAGE_CACHE_DIR`, and
         `AFTERIMAGE_TIME_ZONE` from `time.timeZone` when that is set. Secrets
         belong in `environmentFile`, since these values land in the Nix store.
       '';
@@ -89,6 +91,7 @@ in
       environment = {
         AFTERIMAGE_BIND = "${host}:${toString cfg.port}";
         AFTERIMAGE_DATA_DIR = "%S/afterimage";
+        AFTERIMAGE_CACHE_DIR = "%C/afterimage";
       }
       // lib.optionalAttrs (config.time.timeZone != null) {
         AFTERIMAGE_TIME_ZONE = config.time.timeZone;
@@ -103,6 +106,8 @@ in
         DynamicUser = true;
         StateDirectory = "afterimage";
         StateDirectoryMode = "0700";
+        CacheDirectory = "afterimage";
+        CacheDirectoryMode = "0700";
         UMask = "0077";
 
         # A port below 1024 needs the one capability; nothing else does.

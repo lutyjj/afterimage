@@ -12,6 +12,7 @@ use afterimage_trmnl::catalog::Catalog;
 use crate::accounts::Account;
 use crate::devices::{self, Device, Entry};
 use crate::drawing;
+use crate::firmware::{self, Board, Firmware};
 use crate::screens::{Screen, Summary};
 
 /// A stored value into its constrained model shape.
@@ -35,7 +36,24 @@ pub fn account(account: Account) -> Result<model::Account, InternalFailure> {
     })
 }
 
-pub fn device(device: Device) -> Result<model::Device, InternalFailure> {
+/// A device, with its board and that board's newest release from TRMNL's
+/// `boards` when they could be read.
+pub fn device(device: Device, boards: Option<&[Board]>) -> Result<model::Device, InternalFailure> {
+    let board = boards.and_then(|boards| Firmware::board(boards, &device));
+    let firmware = model::DeviceFirmware {
+        board: device
+            .firmware_board
+            .clone()
+            .or_else(|| board.map(|board| board.name.clone()))
+            .map(fit)
+            .transpose()?,
+        board_chosen: device.firmware_board.is_some(),
+        latest_version: board
+            .and_then(Board::latest)
+            .map(|release| fit(release.version.clone()))
+            .transpose()?,
+        update: device.firmware_update.map(firmware_update).transpose()?,
+    };
     Ok(model::Device {
         id: fit(device.id)?,
         name: fit(device.name)?,
@@ -67,6 +85,22 @@ pub fn device(device: Device) -> Result<model::Device, InternalFailure> {
                 })
             })
             .transpose()?,
+        firmware,
+    })
+}
+
+fn firmware_update(update: firmware::Update) -> Result<model::FirmwareUpdate, InternalFailure> {
+    Ok(model::FirmwareUpdate {
+        state: match update.state() {
+            firmware::State::Requested => model::FirmwareUpdateState::Requested,
+            firmware::State::Sent => model::FirmwareUpdateState::Sent,
+            firmware::State::Installed => model::FirmwareUpdateState::Installed,
+            firmware::State::NotInstalled => model::FirmwareUpdateState::NotInstalled,
+        },
+        version: fit(update.version)?,
+        requested_at: DateTime::from_secs(update.requested_at),
+        sent_at: update.sent_at.map(DateTime::from_secs),
+        finished_at: update.finished_at.map(DateTime::from_secs),
     })
 }
 

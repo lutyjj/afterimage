@@ -399,6 +399,7 @@ fn clone_server(server: &common::Server) -> common::Server {
             .tls_certs_only([])
             .build()
             .unwrap(),
+        trmnl: server.trmnl.clone(),
     }
 }
 

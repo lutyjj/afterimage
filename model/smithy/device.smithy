@@ -23,6 +23,7 @@ service DeviceApi {
         GetCurrentScreen
         CreateDeviceLog
         GetScreenImage
+        GetFirmwareImage
     ]
     errors: [
         ValidationException
@@ -320,5 +321,50 @@ operation GetScreenImage {
 @error("client")
 @httpError(404)
 structure ImageNotFound {
+    message: String
+}
+
+/// The firmware a check-in answer names in `firmware_url`: the app image of a
+/// release TRMNL publishes, cut from its flash image where TRMNL publishes no
+/// other, which the server checked and keeps. This operation is Afterimage's: TRMNL's
+/// document leaves the firmware URL to the server. The firmware downloads it
+/// without headers of its own (1.6.10 `checkAndPerformFirmwareUpdate` in
+/// `src/bl.cpp`, 1.8.18 `performFirmwareUpdate` in
+/// `src/services/firmware_update.cpp`), and follows no redirect, so the image
+/// needs no key; TRMNL publishes it anyway.
+@readonly
+@http(method: "GET", uri: "/api/firmware-images/{name}", code: 200)
+operation GetFirmwareImage {
+    input := {
+        /// The image's SHA-256 in lowercase hex, and `.bin`.
+        @required
+        @httpLabel
+        name: FirmwareImageName
+    }
+
+    output := {
+        @required
+        @httpHeader("Content-Type")
+        contentType: String
+
+        /// The firmware writes the image to its update partition (`Update.begin`
+        /// with the response's length).
+        @required
+        @httpPayload
+        image: Blob
+    }
+
+    errors: [
+        FirmwareNotFound
+    ]
+}
+
+@pattern("^[0-9a-f]{64}\\.bin$")
+string FirmwareImageName
+
+/// The server keeps no firmware image of that name.
+@error("client")
+@httpError(404)
+structure FirmwareNotFound {
     message: String
 }

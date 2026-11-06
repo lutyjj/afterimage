@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE devices SET\n                 name = COALESCE(?, name),\n                 display_model = COALESCE(?, display_model),\n                 palette = COALESCE(?, palette),\n                 refresh_minutes = COALESCE(?, refresh_minutes),\n                 firmware_board = COALESCE(?, firmware_board)\n             WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "067c87a0468aa9095d06b63948fdc74e4055b0f7d0bd007127d830fdca6175ed"
+}

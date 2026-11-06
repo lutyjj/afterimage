@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE firmware_updates SET finished_at = ?, installed = ? WHERE device_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "77731ab015ddeb9b9789e6b16e9bda2ffbd00b9688b138747b5a2e6793d2fcab"
+}

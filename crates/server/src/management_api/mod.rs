@@ -7,6 +7,7 @@
 mod accounts;
 mod deployment;
 mod devices;
+mod firmware;
 mod screens;
 mod wire;
 
@@ -31,6 +32,7 @@ use crate::accounts::{Account, Accounts};
 use crate::clock::Clock;
 use crate::devices::Devices;
 use crate::drawing::Drawing;
+use crate::firmware::Firmware;
 use crate::images::Images;
 use crate::oidc::Oidc;
 use crate::screens::Screens;
@@ -53,6 +55,7 @@ pub struct State {
     pub secret_names: Vec<String>,
     pub drawing: Arc<Drawing>,
     pub images: Arc<Images>,
+    pub firmware: Arc<Firmware>,
     pub clock: Arc<dyn Clock>,
 }
 
@@ -98,6 +101,9 @@ pub fn service(
         .set_playlist(devices::set_playlist)
         .delete_device(devices::delete_device)
         .get_device_image(devices::get_device_image)
+        .list_firmware_boards(firmware::list_firmware_boards)
+        .install_firmware(firmware::install_firmware)
+        .cancel_firmware_update(firmware::cancel_firmware_update)
         .list_screens(screens::list_screens)
         .create_screen(screens::create_screen)
         .get_screen(screens::get_screen)

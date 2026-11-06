@@ -27,6 +27,7 @@ use serde_json::{Map, Value, json};
 use tokio::sync::Semaphore;
 use tokio::time::Instant;
 
+use crate::outbound::Outbound;
 use crate::secrets::Secrets;
 use crate::time_zone::TimeZone;
 
@@ -89,7 +90,7 @@ pub struct Drawn {
 /// the renderer and a bound on CPU-bound work at once.
 pub struct Drawing {
     templates: Arc<Environment<'static>>,
-    http: reqwest::Client,
+    http: Outbound,
     renderer: Arc<Renderer>,
     /// One place per CPU, held while templates resolve and while Typst renders.
     places: Arc<Semaphore>,
@@ -145,35 +146,12 @@ fn multiply(
 }
 
 impl Drawing {
-    /// # Panics
-    ///
-    /// When even an HTTP client that trusts no certificate cannot be built.
     #[must_use]
     pub fn new(secrets: Secrets, time_zone: TimeZone) -> Self {
         let templates = templates();
-        let builder = || {
-            reqwest::Client::builder()
-                .timeout(FETCH_TIMEOUT)
-                .user_agent(concat!("afterimage/", env!("CARGO_PKG_VERSION")))
-        };
-        // HTTPS trusts the host's certificate store, so a source behind a private CA
-        // works where the host trusts it. Loading that store is the only part of
-        // this builder that can fail, as on a bare container without one; such a
-        // host still serves devices, and its HTTPS sources fail with a certificate
-        // error until it has a store and the server restarts.
-        let http = builder().build().unwrap_or_else(|error| {
-            tracing::warn!(
-                %error,
-                "HTTPS data sources and images will fail: the host's CA certificates could not be loaded; install them and restart"
-            );
-            builder()
-                .tls_certs_only([])
-                .build()
-                .expect("a client that trusts no certificate needs no store")
-        });
         Self {
             templates: Arc::new(templates),
-            http,
+            http: Outbound::new(FETCH_TIMEOUT),
             renderer: Arc::new(Renderer::new()),
             places: Arc::new(Semaphore::new(
                 std::thread::available_parallelism().map_or(2, std::num::NonZero::get),
@@ -347,7 +325,7 @@ impl Drawing {
             let path = format!("/sources/{}", pointer_escape(name));
             let request = resolver
                 .request(source, &scope, &path)
-                .map(|request| self.http.request(request.0, request.1));
+                .map(|request| self.http.client().request(request.0, request.1));
             let name = name.clone();
             match request {
                 Ok(builder) => {
@@ -375,8 +353,9 @@ impl Drawing {
                             ),
                             None => builder,
                         };
+                    let http = self.http.clone();
                     requests.spawn(async move {
-                        let answer = tokio::time::timeout_at(deadline, fetch_json(builder))
+                        let answer = tokio::time::timeout_at(deadline, fetch_json(&http, builder))
                             .await
                             .unwrap_or_else(|_| Err(too_late()));
                         (name, answer)
@@ -459,7 +438,7 @@ fn too_late() -> String {
     )
 }
 
-async fn fetch_image(http: &reqwest::Client, url: &str) -> Result<Vec<u8>, String> {
+async fn fetch_image(http: &Outbound, url: &str) -> Result<Vec<u8>, String> {
     if url.starts_with("data:") {
         let data = data_url::DataUrl::process(url).map_err(|error| format!("{error:?}"))?;
         let (bytes, _) = data.decode_to_vec().map_err(|error| format!("{error:?}"))?;
@@ -468,51 +447,13 @@ async fn fetch_image(http: &reqwest::Client, url: &str) -> Result<Vec<u8>, Strin
     if !(url.starts_with("https://") || url.starts_with("http://")) {
         return Err("an image URL starts with http://, https:// or data:".to_owned());
     }
-    read_limited(http.get(url), IMAGE_BYTES).await
+    http.read(http.client().get(url), IMAGE_BYTES).await
 }
 
-/// A failed request in words, without its URL: reqwest's own message names the
-/// URL, whose query or path may carry a secret. The causes beneath it (the
-/// connection, the name lookup, TLS) do not.
-fn describe(error: &reqwest::Error) -> String {
-    if error.is_timeout() {
-        return format!("gave no answer within {} seconds", FETCH_TIMEOUT.as_secs());
-    }
-    let mut message = if error.is_connect() {
-        "could not connect".to_owned()
-    } else if error.is_body() || error.is_decode() {
-        "its answer broke off".to_owned()
-    } else {
-        "the request failed".to_owned()
-    };
-    let mut cause = std::error::Error::source(error);
-    while let Some(inner) = cause {
-        message.push_str(": ");
-        message.push_str(&inner.to_string());
-        cause = inner.source();
-    }
-    message
-}
-
-/// Sends the request and reads at most `limit` bytes of a successful answer.
-async fn read_limited(request: reqwest::RequestBuilder, limit: usize) -> Result<Vec<u8>, String> {
-    let mut response = request.send().await.map_err(|error| describe(&error))?;
-    let status = response.status();
-    if !status.is_success() {
-        return Err(format!("answered HTTP {status}"));
-    }
-    let mut bytes = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|error| describe(&error))? {
-        if bytes.len() + chunk.len() > limit {
-            return Err(format!("answered more than {limit} bytes"));
-        }
-        bytes.extend_from_slice(&chunk);
-    }
-    Ok(bytes)
-}
-
-async fn fetch_json(request: reqwest::RequestBuilder) -> Result<Value, String> {
-    let bytes = read_limited(request.header("Accept", "application/json"), SOURCE_BYTES).await?;
+async fn fetch_json(http: &Outbound, request: reqwest::RequestBuilder) -> Result<Value, String> {
+    let bytes = http
+        .read(request.header("Accept", "application/json"), SOURCE_BYTES)
+        .await?;
     serde_json::from_slice(&bytes)
         .map_err(|error| format!("answered something other than JSON: {error}"))
 }
