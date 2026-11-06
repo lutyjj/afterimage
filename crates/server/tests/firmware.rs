@@ -241,7 +241,7 @@ async fn the_next_check_in_carries_the_install_and_the_one_after_tells_the_outco
     assert_eq!(firmware_of(&server, id).await["update"]["state"], "sent");
 
     // The firmware sends no headers of its own for the image.
-    let response = reqwest::get(url).await.unwrap();
+    let response = download(url).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
         response.headers()["content-type"],
@@ -394,7 +394,7 @@ async fn an_image_the_cache_lost_is_cut_again_before_it_is_sent() {
     }
     let answer = server.display(&key, &READINGS).await;
     assert_eq!(answer["update_firmware"], true);
-    let image = reqwest::get(answer["firmware_url"].as_str().unwrap())
+    let image = download(answer["firmware_url"].as_str().unwrap())
         .await
         .unwrap()
         .bytes()
@@ -446,14 +446,27 @@ async fn serves_only_firmware_images_it_keeps() {
     let server = start().await;
     let missing = format!("{}/api/firmware-images/{}.bin", server.url, "0".repeat(64));
     assert_eq!(
-        reqwest::get(missing).await.unwrap().status(),
+        download(missing).await.unwrap().status(),
         StatusCode::NOT_FOUND
     );
     let traversal = format!("{}/api/firmware-images/..%2Fafterimage.db", server.url);
     assert_eq!(
-        reqwest::get(traversal).await.unwrap().status(),
+        download(traversal).await.unwrap().status(),
         StatusCode::BAD_REQUEST
     );
+}
+
+/// A GET as the firmware sends one for `firmware_url`: no headers of its own and
+/// no cookies. The client trusts no certificate, since the build sandbox has no
+/// store to load.
+async fn download(url: impl reqwest::IntoUrl) -> reqwest::Result<reqwest::Response> {
+    reqwest::Client::builder()
+        .tls_certs_only([])
+        .build()
+        .unwrap()
+        .get(url)
+        .send()
+        .await
 }
 
 /// The files in the firmware cache.
