@@ -24,22 +24,23 @@ import { Panel } from "../../panel/Panel";
 import { screenQuery, screensQuery } from "../queries";
 import { Editor, type EditorHandle, type Located } from "./Editor";
 import { SourcesPanel } from "./SourcesPanel";
+import { SAVE_STATES, saveState } from "./saveState";
 import { STARTERS } from "./starters";
 import { usePreview } from "./usePreview";
 import { openingText, parseYaml, rangeOf } from "./yamlDocument";
 
 const TRAIL = [{ to: "/screens", label: "Screens" }];
 
-const SAVE_LABELS = { save: "Save", saving: "Saving", saved: "Saved" } as const;
-
-/** The save button's words, every one laid in the same cell so the button
+/** Every word the save button says, laid in the same cell so the button
  * keeps the width of the longest and its neighbour never shifts. */
-function SaveLabel({ shown }: { shown: keyof typeof SAVE_LABELS }) {
+const SAVE_LABELS = [...new Set(Object.values(SAVE_STATES).map((state) => state.label))];
+
+function SaveLabel({ shown }: { shown: string }) {
   return (
     <span className="grid">
-      {Object.entries(SAVE_LABELS).map(([key, text]) => (
-        <span key={key} className={classes("col-start-1 row-start-1", key !== shown && "invisible")}>
-          {text}
+      {SAVE_LABELS.map((label) => (
+        <span key={label} className={classes("col-start-1 row-start-1", label !== shown && "invisible")}>
+          {label}
         </span>
       ))}
     </span>
@@ -182,14 +183,8 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const status = save.isPending
-    ? "Saving"
-    : !screen && !save.isSuccess
-      ? "Not saved yet"
-      : dirty
-        ? "Unsaved changes"
-        : "Saved";
-  const saved = status === "Saved";
+  const shown =
+    SAVE_STATES[saveState({ saving: save.isPending, stored: screen !== undefined || save.isSuccess, dirty })];
 
   return (
     <div
@@ -213,7 +208,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
           // The eye reads the state from the save button: quiet once saved,
           // in ink while there is something to save.
           <span role="status" className="sr-only">
-            {status}
+            {shown.status}
           </span>
         }
       >
@@ -229,12 +224,12 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
           </IconButton>
         )}
         <Button
-          variant={saved ? "default" : "primary"}
+          variant={shown.quiet ? "default" : "primary"}
           disabled={!canSave}
           onClick={() => save.mutate()}
           title="Ctrl+S"
         >
-          <SaveLabel shown={save.isPending ? "saving" : saved ? "saved" : "save"} />
+          <SaveLabel shown={shown.label} />
         </Button>
       </TopBar>
 

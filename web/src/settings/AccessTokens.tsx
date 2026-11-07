@@ -68,7 +68,9 @@ export function AccessTokens() {
           </CardBody>
         )}
         {tokens.data?.length === 0 && <Nothing>No tokens yet.</Nothing>}
-        <SettlingRows scope="tokens" marksArrivals>
+        {/* The list says what it answers once the tokens have come, so the
+            ones that load are where it starts and only a new one arrives. */}
+        <SettlingRows scope={tokens.isSuccess ? "tokens" : undefined} marksArrivals>
           {tokens.data?.map((token) => (
             <TokenRow key={token.id} token={token} timeZone={timeZone} />
           ))}
