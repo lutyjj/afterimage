@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
@@ -29,11 +30,14 @@ const proxy = { target: server, changeOrigin: true };
 // The generated client is compiled from its TypeScript source, so it needs no
 // build of its own.
 export default defineConfig({
-  plugins: [browserRuntimeConfig(), react()],
+  plugins: [browserRuntimeConfig(), react(), tailwindcss()],
   resolve: {
     alias: {
       "@afterimage/management-client": `${client}index.ts`,
     },
+    // linen is a workspace package with copies of its peers for its own
+    // development; the app's copies are the ones that run.
+    dedupe: ["react", "react-dom", "react-router", "motion", "@base-ui/react"],
   },
   build: {
     // The editor's chunk carries CodeMirror, the document schema's completion and

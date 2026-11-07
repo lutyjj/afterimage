@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-React with Vite and TypeScript, on the TypeScript client generated from the Smithy model (`gen/management-client`). The server serves the built files from `AFTERIMAGE_WEB_DIR`.
+React with Vite and TypeScript, on the TypeScript client generated from the Smithy model (`gen/management-client`) and [linen](https://github.com/lutyjj/linen), the design language Afterimage shares with its sibling apps (Tailwind CSS, Base UI and Motion underneath). The server serves the built files from `AFTERIMAGE_WEB_DIR`.
 
 ## Users
 

@@ -20,9 +20,7 @@ const hour = hourCycle === "h23" || hourCycle === "h24" ? "2-digit" : "numeric";
 function unbroken(format: Intl.DateTimeFormat, date: Date): string {
   const parts = format.formatToParts(date);
   return parts
-    .map((part, index) =>
-      part.type === "literal" && parts[index + 1]?.type === "dayPeriod" ? "\u00a0" : part.value,
-    )
+    .map((part, index) => (part.type === "literal" && parts[index + 1]?.type === "dayPeriod" ? "\u00a0" : part.value))
     .join("");
 }
 

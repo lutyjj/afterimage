@@ -1,4 +1,4 @@
-import styles from "./StateBadge.module.css";
+import { Chip, classes, WarnDot } from "linen";
 
 export interface StateBadgeProps {
   children: string;
@@ -11,9 +11,15 @@ export interface StateBadgeProps {
 /** A state of a device that asks for the person's attention. */
 export function StateBadge({ children, ended = false, title }: StateBadgeProps) {
   return (
-    <span className={styles.badge} data-ended={ended || undefined} title={title}>
-      {children}
-      {ended && <span className="visually-hidden"> (no longer)</span>}
+    <span
+      title={title}
+      className={classes("inline-flex [transition:opacity_var(--motion-state)]", ended && "line-through opacity-55")}
+    >
+      <Chip size="row" tone={ended ? "neutral" : "warn"}>
+        {!ended && <WarnDot />}
+        {children}
+        {ended && <span className="sr-only"> (no longer)</span>}
+      </Chip>
     </span>
   );
 }

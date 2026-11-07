@@ -1,8 +1,9 @@
 import type { Device, ScreenSummary } from "@afterimage/management-client";
 import type { ReactNode } from "react";
 
+import { classes } from "linen";
+
 import { ago, moment, signalQuality } from "../app/format";
-import styles from "./DeviceFacts.module.css";
 
 /** What a device last reported and what it shows, as label and value pairs;
  * `children` adds facts of the page's own after them. */
@@ -28,7 +29,7 @@ export function DeviceFacts({
     : "Nothing yet";
 
   return (
-    <dl className={`${styles.facts} ${className ?? ""}`}>
+    <dl className={classes("grid grid-cols-[max-content_minmax(0,1fr)] gap-x-6 gap-y-2 text-sm", className)}>
       <Fact label="Showing">
         {showingName}
         {showing && timeZone && (
@@ -66,9 +67,9 @@ export function DeviceFacts({
 
 export function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{children}</dd>
+    <div className="contents">
+      <dt className="text-text-muted">{label}</dt>
+      <dd className="min-w-0 [overflow-wrap:anywhere]">{children}</dd>
     </div>
   );
 }
@@ -76,7 +77,7 @@ export function Fact({ label, children }: { label: string; children: ReactNode }
 /** A day and time that stays on one line. */
 function Moment({ at, timeZone }: { at: Date; timeZone: string }) {
   return (
-    <time className={styles.moment} dateTime={at.toISOString()}>
+    <time className="whitespace-nowrap" dateTime={at.toISOString()}>
       {moment(at, timeZone)}
     </time>
   );
@@ -84,5 +85,5 @@ function Moment({ at, timeZone }: { at: Date; timeZone: string }) {
 
 /** A fact's detail, quieter, such as the voltage beside the battery's percent. */
 export function Aside({ children }: { children: ReactNode }) {
-  return <span className={styles.aside}>{children}</span>;
+  return <span className="text-text-muted">{children}</span>;
 }

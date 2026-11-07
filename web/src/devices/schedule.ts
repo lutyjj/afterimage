@@ -6,15 +6,7 @@ import { timeOfDay } from "../app/format";
  * from `from` until `until`; one whose `until` comes first runs past midnight and
  * belongs to the day it starts; one whose times are equal is current all day. */
 
-export const WEEK: readonly Weekday[] = [
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-  "sunday",
-];
+export const WEEK: readonly Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
 export const DAY_MINUTES = 24 * 60;
 

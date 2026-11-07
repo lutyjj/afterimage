@@ -16,7 +16,7 @@ On NixOS, the flake's `nixosModules.default` runs it as `services.afterimage`: `
 
 | Command | Does |
 |---|---|
-| `tools/generate` | Generates `gen/`: from `model/smithy/` both services' Rust server crates and OpenAPI documents and the management API's TypeScript client, and the renderer's design tokens and fonts from the pinned release of TRMNL's design system (`tools/trmnl-release.json`) |
+| `tools/generate` | Generates `gen/`: from `model/smithy/` both services' Rust server crates and OpenAPI documents and the management API's TypeScript client, the renderer's design tokens and fonts from the pinned release of TRMNL's design system (`tools/trmnl-release.json`), and the web UI's design language, linen, at the revision `flake.lock` pins. To work on linen beside the web UI, replace `gen/linen` with a link to a linen checkout |
 | `cargo test --workspace` | Runs every Rust test, the conformance test included |
 | `pnpm install` | Installs the web UI's dependencies, after `tools/generate` |
 | `pnpm --filter afterimage-web dev` | Serves the web UI with hot reload at `http://127.0.0.1:5173`, sending `/api`, `/manage` and `/mcp` to a server on port 8080, or to the one `AFTERIMAGE_SERVER` names (an OIDC sign-in returns to that server's own address, so sign in there with a password) |

@@ -5,116 +5,148 @@ import {
   type UpdateMqttSettingsOutput,
 } from "@afterimage/management-client";
 import { useMutation, useQuery, type UseMutationResult } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import {
+  Actions,
+  Button,
+  Card,
+  CardBody,
+  CardHead,
+  Checkbox,
+  Chip,
+  ConfirmDialog,
+  Nothing,
+  SettingNote,
+  SettingRow,
+  TextField,
+  useToast,
+  WarnDot,
+} from "linen";
+import { type FormEvent, useState } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
-import { Section } from "../app/Section";
 import { mqttQuery } from "./queries";
-import styles from "./Settings.module.css";
+
+type Save = UseMutationResult<UpdateMqttSettingsOutput, Error, UpdateMqttSettingsInput>;
 
 /** The MQTT broker that carries every display to Home Assistant, which only the
  * server's administrator, its first account, reads and changes. */
 export function HomeAssistant() {
   const mqtt = useQuery(mqttQuery);
+  const toast = useToast();
   // Kept here, since the form starts afresh from what the server saved.
   const save = useMutation({
     mutationFn: (request: UpdateMqttSettingsInput) => client.updateMqttSettings(request),
-    onSuccess: ({ settings }) => queryClient.setQueryData(mqttQuery.queryKey, settings),
+    onSuccess: ({ settings }) => {
+      queryClient.setQueryData(mqttQuery.queryKey, settings);
+      toast.show({ text: settings.url ? "Broker saved" : "Stopped publishing to Home Assistant" });
+    },
   });
 
   return (
-    <Section
-      title="MQTT broker"
-      intro="Afterimage publishes every claimed display to Home Assistant through its MQTT discovery: battery, signal, last check-in, the screen it shows, and a firmware update Home Assistant can install."
-    >
-      {mqtt.isPending && <p className="muted">Loading the broker</p>}
+    <Card>
+      <CardHead
+        title="Home Assistant"
+        description="Afterimage publishes every claimed display to Home Assistant through MQTT discovery: battery, signal, last check-in, the screen it shows, and a firmware update Home Assistant can install."
+      />
+      {mqtt.isPending && <Nothing>Reading the broker</Nothing>}
       {mqtt.isError && (
-        <p className="error-text" role="alert">
-          {mqtt.error instanceof Forbidden
-            ? "Only the server's administrator, its first account, sees these settings."
-            : messageOf(mqtt.error)}
-        </p>
+        <CardBody>
+          <p role="alert" className="text-sm text-danger">
+            {mqtt.error instanceof Forbidden
+              ? "Only the server's administrator, its first account, sees these settings."
+              : messageOf(mqtt.error)}
+          </p>
+        </CardBody>
       )}
       {mqtt.data && <Connection settings={mqtt.data} />}
       {mqtt.data?.setByDeployment && <SetByDeployment settings={mqtt.data} />}
       {mqtt.data && !mqtt.data.setByDeployment && (
-        <BrokerForm key={JSON.stringify({ ...mqtt.data, connection: undefined })} settings={mqtt.data} save={save} />
+        <>
+          <BrokerForm key={JSON.stringify({ ...mqtt.data, connection: undefined })} settings={mqtt.data} save={save} />
+          {mqtt.data.url !== undefined && <StopPublishing save={save} />}
+        </>
       )}
-    </Section>
+    </Card>
   );
 }
 
+const CONNECTION = {
+  connected: { label: "Connected", detail: undefined },
+  connecting: { label: "Connecting", detail: "Trying again every few seconds until the broker answers." },
+  refused: { label: "Refused", detail: "The broker answered and refused: check the username and password." },
+} as const;
+
+/** Where the displays go, and whether they get there. */
 function Connection({ settings }: { settings: MqttSettings }) {
-  const state =
-    settings.connection === "connected"
-      ? `Connected to ${settings.url}`
-      : settings.connection === "connecting"
-        ? `Connecting to ${settings.url}`
-        : settings.connection === "refused"
-          ? `Refused by ${settings.url}`
-          : "Not publishing";
+  if (settings.connection === "off") {
+    return (
+      <SettingRow title="Broker" description="Save a broker below to publish the displays.">
+        <Chip size="row" tone="muted">
+          Not publishing
+        </Chip>
+      </SettingRow>
+    );
+  }
+  const state = CONNECTION[settings.connection];
   return (
-    <dl className={styles.facts} aria-live="polite">
-      <div>
-        <dt>Connection</dt>
-        <dd>
-          {state}
-          {settings.connection === "connecting" && (
-            <span className="muted"> · trying again every few seconds until the broker answers</span>
-          )}
-          {settings.connection === "refused" && (
-            <span className="muted"> · the broker answered and refused; check the username and password</span>
-          )}
-        </dd>
-      </div>
-    </dl>
+    <div aria-live="polite">
+      <SettingRow
+        title="Broker"
+        description={
+          <span className="grid">
+            <code className="font-mono text-xs break-all text-text">{settings.url}</code>
+            {state.detail}
+          </span>
+        }
+      >
+        {settings.connection === "connected" ? (
+          <Chip size="row">
+            <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-positive" />
+            {state.label}
+          </Chip>
+        ) : (
+          <Chip size="row" tone="warn">
+            <WarnDot />
+            {state.label}
+          </Chip>
+        )}
+      </SettingRow>
+    </div>
   );
 }
 
 /** The deployment's broker, shown as it is: it changes where the deployment sets it. */
 function SetByDeployment({ settings }: { settings: MqttSettings }) {
+  const none = <span className="text-text-muted">None</span>;
   return (
     <>
-      <dl className={styles.facts}>
-        <div>
-          <dt>Username</dt>
-          <dd>{settings.username ?? <span className="muted">None</span>}</dd>
-        </div>
-        <div>
-          <dt>Password</dt>
-          <dd>{settings.passwordSet ? "Set" : <span className="muted">None</span>}</dd>
-        </div>
-        <div>
-          <dt>Topic</dt>
-          <dd>{settings.topic}</dd>
-        </div>
-        <div>
-          <dt>Discovery prefix</dt>
-          <dd>{settings.discoveryPrefix}</dd>
-        </div>
-      </dl>
-      <p className="hint">
-        The deployment sets this broker through <code>AFTERIMAGE_MQTT_URL</code> and the settings beside it. Change it
-        there and restart Afterimage.
-      </p>
+      <SettingRow title="Username">
+        <span className="text-sm">{settings.username ?? none}</span>
+      </SettingRow>
+      <SettingRow title="Password">
+        <span className="text-sm">{settings.passwordSet ? "Set" : none}</span>
+      </SettingRow>
+      <SettingRow title="Topic" description="Names the server at the broker and starts every display's topics.">
+        <code className="font-mono text-xs">{settings.topic}</code>
+      </SettingRow>
+      <SettingRow title="Discovery prefix" description="Where Home Assistant listens for new devices.">
+        <code className="font-mono text-xs">{settings.discoveryPrefix}</code>
+      </SettingRow>
+      <SettingNote>
+        The deployment sets this broker with <code className="font-mono">AFTERIMAGE_MQTT_URL</code> and the settings
+        beside it. Change it there and restart Afterimage.
+      </SettingNote>
     </>
   );
 }
 
-function BrokerForm({
-  settings,
-  save,
-}: {
-  settings: MqttSettings;
-  save: UseMutationResult<UpdateMqttSettingsOutput, Error, UpdateMqttSettingsInput>;
-}) {
+function BrokerForm({ settings, save }: { settings: MqttSettings; save: Save }) {
   const [url, setUrl] = useState(settings.url ?? "");
   const [username, setUsername] = useState(settings.username ?? "");
   const [password, setPassword] = useState("");
   const [removePassword, setRemovePassword] = useState(false);
   const [topic, setTopic] = useState(settings.topic);
   const [prefix, setPrefix] = useState(settings.discoveryPrefix);
-  const [confirmingStop, setConfirmingStop] = useState(false);
 
   const publishing = settings.url !== undefined;
   const submit = (event: FormEvent) => {
@@ -138,37 +170,36 @@ function BrokerForm({
     (url.trim() !== settings.url || (username.trim() || undefined) !== settings.username);
 
   return (
-    <form className={styles.form} onSubmit={submit}>
-      <label className={`field ${styles.wide}`}>
-        <span>Broker</span>
-        <input
-          className="input"
-          value={url}
-          required
-          inputMode="url"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="mqtt://broker.example:1883"
-          onChange={(event) => setUrl(event.target.value)}
-        />
-        <span className="hint">
-          <code>mqtt://</code> or <code>mqtts://</code> for TLS, the host and its port.
-        </span>
-      </label>
-      <label className="field">
-        <span>Username</span>
-        <input
-          className="input"
+    <CardBody className="border-t border-border">
+      <form onSubmit={submit} className="grid max-w-2xl gap-x-4 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <TextField
+            label="Broker"
+            hint={
+              <>
+                <code className="font-mono">mqtt://</code>, or <code className="font-mono">mqtts://</code> for TLS, then
+                the host and its port.
+              </>
+            }
+            value={url}
+            required
+            inputMode="url"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="mqtt://broker.example:1883"
+            onChange={(event) => setUrl(event.target.value)}
+          />
+        </div>
+        <TextField
+          label="Username"
           value={username}
           autoComplete="off"
           spellCheck={false}
           onChange={(event) => setUsername(event.target.value)}
         />
-      </label>
-      <label className="field">
-        <span>Password</span>
-        <input
-          className="input"
+        <TextField
+          label="Password"
+          hint={needsPassword ? "Another broker or username needs the password again." : undefined}
           type="password"
           value={password}
           disabled={removePassword}
@@ -177,18 +208,16 @@ function BrokerForm({
           aria-invalid={needsPassword || undefined}
           onChange={(event) => setPassword(event.target.value)}
         />
-        {needsPassword && <span className="hint">Another broker or username needs the password again.</span>}
-      </label>
-      {settings.passwordSet && (
-        <label className={`${styles.check} ${styles.wide}`}>
-          <input type="checkbox" checked={removePassword} onChange={(event) => setRemovePassword(event.target.checked)} />
-          <span>Remove the saved password</span>
-        </label>
-      )}
-      <label className="field">
-        <span>Topic</span>
-        <input
-          className="input"
+        {settings.passwordSet && (
+          <div className="mb-4 sm:col-span-2">
+            <Checkbox checked={removePassword} onCheckedChange={setRemovePassword}>
+              Remove the saved password
+            </Checkbox>
+          </div>
+        )}
+        <TextField
+          label="Topic"
+          hint="Names the server at the broker and starts every display's topics."
           value={topic}
           required
           maxLength={64}
@@ -196,64 +225,56 @@ function BrokerForm({
           spellCheck={false}
           onChange={(event) => setTopic(event.target.value)}
         />
-      </label>
-      <label className="field">
-        <span>Discovery prefix</span>
-        <input
-          className="input"
+        <TextField
+          label="Discovery prefix"
+          hint="Where Home Assistant listens for new devices."
           value={prefix}
           required
           maxLength={128}
           spellCheck={false}
           onChange={(event) => setPrefix(event.target.value)}
         />
-      </label>
-      <p className={`hint ${styles.wide}`}>
-        {movesDevices
-          ? "Saving takes every display out of Home Assistant under the old topic and adds it again under the new one, as a new device."
-          : "The topic names the server at the broker and starts every display's topics; Home Assistant listens under the discovery prefix."}
-      </p>
-
-      <div className={styles.actions}>
-        <button className="button" data-variant="primary" type="submit" disabled={save.isPending}>
-          {save.isPending && !confirmingStop ? "Saving" : publishing ? "Save" : "Save and connect"}
-        </button>
-        {save.isSuccess && <span className="hint">{save.data.settings.url ? "Saved" : "Stopped"}</span>}
-        {save.isError && (
-          <span className="error-text" role="alert">
-            {messageOf(save.error)}
-          </span>
+        {movesDevices && (
+          <p className="mb-4 rounded-button bg-sunken px-3 py-2 text-sm text-text-secondary sm:col-span-2">
+            Saving takes every display out of Home Assistant under the old topic and adds it again under the new one, as
+            a new device.
+          </p>
         )}
-      </div>
-
-      {publishing && (
-        <div className={`${styles.stop} ${styles.wide}`}>
-          {!confirmingStop ? (
-            <button className="button" data-variant="danger" type="button" onClick={() => setConfirmingStop(true)}>
-              Stop publishing…
-            </button>
-          ) : (
-            <>
-              <p className={`hint ${styles.consequence}`}>
-                Every display leaves Home Assistant, with its entities and their history there, until a broker is
-                saved again.
-              </p>
-              <button
-                className="button"
-                data-variant="danger-solid"
-                type="button"
-                disabled={save.isPending}
-                onClick={() => save.mutate({})}
-              >
-                {save.isPending ? "Stopping" : "Stop publishing"}
-              </button>
-              <button className="button" data-variant="quiet" type="button" onClick={() => setConfirmingStop(false)}>
-                Keep publishing
-              </button>
-            </>
+        <Actions className="sm:col-span-2">
+          <Button type="submit" variant="primary" disabled={save.isPending}>
+            {save.isPending ? "Saving" : publishing ? "Save" : "Save and connect"}
+          </Button>
+          {save.isError && (
+            <span role="alert" className="text-sm text-danger">
+              {messageOf(save.error)}
+            </span>
           )}
-        </div>
-      )}
-    </form>
+        </Actions>
+      </form>
+    </CardBody>
+  );
+}
+
+/** Taking every display out of Home Assistant, said before it happens. */
+function StopPublishing({ save }: { save: Save }) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <SettingRow
+      title="Stop publishing"
+      description="Every display leaves Home Assistant, with its entities and their history there, until a broker is saved again."
+    >
+      <Button variant="destructive" disabled={save.isPending} onClick={() => setConfirming(true)}>
+        Stop publishing
+      </Button>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="Stop publishing to Home Assistant?"
+        detail="Every display leaves Home Assistant, with its entities and their history there, until a broker is saved again."
+        confirmLabel="Stop publishing"
+        destructive
+        onConfirm={() => save.mutate({})}
+      />
+    </SettingRow>
   );
 }

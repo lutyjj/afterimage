@@ -1,4 +1,10 @@
-import { ValidationException, type Display, type Problem, type ScreenDocument, type SourceResult } from "@afterimage/management-client";
+import {
+  ValidationException,
+  type Display,
+  type Problem,
+  type ScreenDocument,
+  type SourceResult,
+} from "@afterimage/management-client";
 import { useEffect, useState } from "react";
 
 import { client, messageOf } from "../../app/client";

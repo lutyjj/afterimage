@@ -26,9 +26,7 @@ const ORDER = ["sources", "titleBar", "content"];
 /** A stored document as YAML, without the defaults the server filled in. */
 export function toYaml(value: unknown): string {
   const document = withoutDefaults(value) as Record<string, unknown>;
-  const ordered = Object.fromEntries(
-    Object.entries(document).sort(([a], [b]) => ORDER.indexOf(a) - ORDER.indexOf(b)),
-  );
+  const ordered = Object.fromEntries(Object.entries(document).sort(([a], [b]) => ORDER.indexOf(a) - ORDER.indexOf(b)));
   return stringify(ordered, { lineWidth: 0, singleQuote: false });
 }
 

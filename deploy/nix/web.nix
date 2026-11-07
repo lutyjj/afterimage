@@ -6,6 +6,7 @@
   pnpm,
   nodejs_24,
   contract,
+  linen,
 }:
 
 # The web UI's static files. Its build type-checks the app together with the
@@ -27,10 +28,11 @@ let
       ))
     ];
   };
-  # The workspace includes the generated client, laid out as tools/generate
-  # writes it in a checkout.
+  # The workspace includes the generated client and linen, laid out as
+  # tools/generate writes them in a checkout.
   withContract = ''
     cp -r --no-preserve=mode ${contract} gen
+    cp -r --no-preserve=mode ${linen} gen/linen
   '';
 in
 stdenvNoCC.mkDerivation (finalAttrs: {
@@ -46,13 +48,13 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   ];
 
   # Fetched once into a fixed output. After changing pnpm-lock.yaml, set
-  # `hash = lib.fakeHash;`, run `nix build .#web`, and copy the hash Nix reports.
+  # `hash = "sha256-0CZh51R82aHhQJ09nPnRdpMD/jR9TNNkvLi4OdlmbSs=";`, run `nix build .#web`, and copy the hash Nix reports.
   pnpmDeps = fetchPnpmDeps {
     inherit (finalAttrs) pname version src;
     postPatch = withContract;
     inherit pnpm;
     fetcherVersion = 5;
-    hash = "sha256-PnZcOF7qjowNz7BaqWdEds08mAC+HrNtC94dA5ak0II=";
+    hash = "sha256-0CZh51R82aHhQJ09nPnRdpMD/jR9TNNkvLi4OdlmbSs=";
   };
 
   buildPhase = ''
@@ -64,6 +66,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   doCheck = true;
   checkPhase = ''
     runHook preCheck
+    pnpm --filter afterimage-web run format:check
     pnpm --filter afterimage-web run test
     runHook postCheck
   '';

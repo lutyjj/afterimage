@@ -1,6 +1,19 @@
 import type { Display, Screen, ScreenDocument } from "@afterimage/management-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Grid3x3 } from "lucide-react";
+import {
+  Button,
+  buttonClass,
+  CellSelect,
+  classes,
+  ConfirmDialog,
+  Content,
+  EmptyState,
+  IconButton,
+  TopBar,
+  useToast,
+  WIDE_COLUMN_CLASS,
+} from "linen";
+import { Grid3x3 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useBlocker, useLocation, useNavigate, useParams } from "react-router";
 
@@ -9,11 +22,12 @@ import { devicesQuery } from "../../devices/queries";
 import { Panel } from "../../panel/Panel";
 import { screenQuery, screensQuery } from "../queries";
 import { Editor, type EditorHandle, type Located } from "./Editor";
-import styles from "./ScreenEditor.module.css";
 import { SourcesPanel } from "./SourcesPanel";
 import { STARTERS } from "./starters";
 import { usePreview } from "./usePreview";
 import { openingText, parseYaml, rangeOf } from "./yamlDocument";
+
+const BACK = { to: "/screens", label: "Screens" };
 
 /** Writing a screen: its YAML beside a preview the server draws at the display's
  * own pixels, with what each source answered and every problem in place. */
@@ -22,13 +36,19 @@ export function ScreenEditor() {
   const id = screenId === undefined ? undefined : Number(screenId);
   const screen = useQuery({ ...screenQuery(id ?? 0), enabled: id !== undefined });
 
-  if (id !== undefined && screen.isPending) return <p className={`${styles.loading} muted`}>Loading screen</p>;
+  if (id !== undefined && screen.isPending) return <TopBar back={BACK} title="Screen" wide />;
   if (id !== undefined && screen.isError) {
     return (
-      <div className={styles.loading}>
-        <p className="error-text">{messageOf(screen.error)}</p>
-        <Link to="/screens">Back to screens</Link>
-      </div>
+      <>
+        <TopBar back={BACK} title="Screen" wide />
+        <Content>
+          <EmptyState title="This screen could not load" detail={messageOf(screen.error)}>
+            <Link to="/screens" className={buttonClass()}>
+              Back to screens
+            </Link>
+          </EmptyState>
+        </Content>
+      </>
     );
   }
   return <Workbench key={id ?? "new"} screen={screen.data} />;
@@ -100,6 +120,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
   // A new screen can be saved as it stands, starter and all.
   const canSave = valid && !save.isPending && (dirty || (!screen && !save.isSuccess));
 
+  const toast = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const remove = useMutation({
     mutationFn: () => client.deleteScreen({ screenId: screen?.id ?? 0 }),
@@ -107,8 +128,10 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
       setBaseline({ text, name: name.trim() });
       await queryClient.invalidateQueries({ queryKey: screensQuery.queryKey });
       await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
+      toast.show({ text: `${screen?.name ?? "The screen"} deleted` });
       void navigate("/screens");
     },
+    onError: (error) => toast.show({ text: `The screen was not deleted. ${messageOf(error)}`, sticky: true }),
   });
   const shownOn = devices?.filter((device) => device.playlist.some((entry) => entry.screenId === screen?.id)) ?? [];
 
@@ -117,11 +140,8 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
     ({ currentLocation, nextLocation }) =>
       dirty && !save.isPending && !remove.isPending && currentLocation.pathname !== nextLocation.pathname,
   );
-  useEffect(() => {
-    if (blocker.state !== "blocked") return;
-    if (window.confirm("Leave this screen without saving your changes?")) blocker.proceed();
-    else blocker.reset();
-  }, [blocker]);
+  // Set as the person chooses to leave, so the dialog closing does not stay.
+  const leaving = useRef(false);
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
@@ -154,233 +174,258 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
         : "Saved";
 
   return (
-    <div className={styles.page}>
-      <header className={styles.head}>
-        <nav className={styles.trail} aria-label="Breadcrumb">
-          <Link to="/screens">
-            <ArrowLeft size={14} aria-hidden="true" />
-            Screens
-          </Link>
-        </nav>
-        <label className={styles.name}>
-          <span className="visually-hidden">Screen name</span>
+    <div
+      className="flex flex-col lg:h-dvh"
+      style={model ? ({ "--display-width": `${model.width}px` } as CSSProperties) : undefined}
+    >
+      <TopBar
+        back={BACK}
+        wide
+        title={
           <input
-            className={styles.nameInput}
+            aria-label="Screen name"
+            className="-mx-1.5 max-w-[min(32rem,60vw)] rounded-button border border-transparent px-1.5 hover:border-border focus-visible:border-accent focus-visible:bg-surface focus-visible:outline-none"
+            size={Math.max(name.length + 1, 8)}
             value={name}
             maxLength={64}
             required
             placeholder="Name this screen"
             onChange={(event) => setName(event.target.value)}
           />
-        </label>
-        <span className={styles.status} data-dirty={dirty || undefined} role="status">
-          {status}
-        </span>
-        <div className={styles.headActions}>
-          {screen && !confirmDelete && (
-            <button className="button" data-variant="danger" type="button" onClick={() => setConfirmDelete(true)}>
-              Delete
-            </button>
-          )}
-          <button
-            className="button"
-            data-variant="primary"
-            type="button"
-            disabled={!canSave}
-            onClick={() => save.mutate()}
-            title="Ctrl+S"
+        }
+        meta={
+          <span
+            role="status"
+            className={classes(
+              "inline-flex items-center gap-1.5 text-sm",
+              dirty ? "text-text-secondary" : "text-text-muted",
+            )}
           >
-            {screen ? "Save" : "Save screen"}
-          </button>
-        </div>
-      </header>
-
-      {confirmDelete && screen && (
-        <div className={styles.confirm} role="alert">
-          <p>
-            Delete {screen.name}?{" "}
-            {shownOn.length > 0
-              ? `It leaves the playlists of ${shownOn.map((device) => device.name).join(", ")}, and those displays move on to their other screens.`
-              : "No display shows it."}
-          </p>
-          <button className="button" data-variant="danger-solid" type="button" onClick={() => remove.mutate()} disabled={remove.isPending}>
-            {remove.isPending ? "Deleting" : "Delete screen"}
-          </button>
-          <button className="button" data-variant="quiet" type="button" onClick={() => setConfirmDelete(false)}>
-            Keep it
-          </button>
-          {remove.isError && <p className="error-text">{messageOf(remove.error)}</p>}
-        </div>
-      )}
-      {save.isError && (
-        <p className={`${styles.saveError} error-text`} role="alert">
-          {messageOf(save.error)}
-        </p>
-      )}
-
-      {!screen && !touched && (
-        <section className={styles.starters} aria-labelledby="starters-title">
-          <h2 id="starters-title" className={styles.startersTitle}>
-            Start from an example
-          </h2>
-          <ul>
-            {STARTERS.map((candidate) => (
-              <li key={candidate.id}>
-                <button
-                  type="button"
-                  className={styles.starter}
-                  aria-pressed={text === candidate.yaml}
-                  onClick={() => {
-                    editor.current?.setText(candidate.yaml);
-                    setName(candidate.name);
-                  }}
-                >
-                  <strong>{candidate.name}</strong>
-                  <span>{candidate.summary}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <div
-        className={styles.bench}
-        style={model ? ({ "--display-width": `${model.width}px` } as CSSProperties) : undefined}
+            {dirty && <span aria-hidden="true" className="size-1.5 rounded-full bg-warn" />}
+            {status}
+          </span>
+        }
       >
-        <div className={styles.source}>
-          <Editor
-            ref={editor}
-            initial={initialText}
-            label="Screen document, YAML"
-            problems={inText}
-            onChange={(next) => {
-              setText(next);
-              if (!touched && !STARTERS.some((candidate) => candidate.yaml === next)) setTouched(true);
-            }}
-          />
-        </div>
+        {screen && (
+          <Button variant="destructive" disabled={remove.isPending} onClick={() => setConfirmDelete(true)}>
+            {remove.isPending ? "Deleting" : "Delete"}
+          </Button>
+        )}
+        <Button variant="primary" disabled={!canSave} onClick={() => save.mutate()} title="Ctrl+S">
+          {save.isPending ? "Saving" : screen ? "Save" : "Save screen"}
+        </Button>
+      </TopBar>
 
-        <aside
-          className={styles.previewColumn}
-          aria-label="Preview"
-        >
-          <div className={styles.toolbar}>
-            <label className={styles.target}>
-              <span className={styles.targetLabel}>Preview on</span>
-              <select className="select" value={chosenTarget} onChange={(event) => setTarget(event.target.value)}>
-                {devices?.map((device) => (
-                  <option key={device.id} value={`device:${device.id}`}>
-                    {device.name}
-                  </option>
-                ))}
-                <option value="model">A display model…</option>
-              </select>
-            </label>
-            {chosenTarget === "model" && (
-              <>
-                <label className={styles.target}>
-                  <span className="visually-hidden">Display model</span>
-                  <select
-                    className="select"
-                    value={chosenDisplay?.model}
-                    onChange={(event) => {
-                      const next = models?.find((candidate) => candidate.name === event.target.value);
+      <div className={classes(WIDE_COLUMN_CLASS, "flex min-h-0 flex-1 flex-col gap-3 py-3")}>
+        {save.isError && (
+          <p role="alert" className="max-w-3xl text-sm text-danger">
+            {messageOf(save.error)}
+          </p>
+        )}
+
+        {!screen && !touched && (
+          <section aria-labelledby="starters-title" className="grid gap-2">
+            <h2 id="starters-title" className="text-sm font-medium text-text-secondary">
+              Start from an example
+            </h2>
+            <ul className="flex gap-2 overflow-x-auto pb-1">
+              {STARTERS.map((candidate) => {
+                const chosen = text === candidate.yaml;
+                return (
+                  <li key={candidate.id} className="shrink-0">
+                    <button
+                      type="button"
+                      aria-pressed={chosen}
+                      onClick={() => {
+                        editor.current?.setText(candidate.yaml);
+                        setName(candidate.name);
+                      }}
+                      className={classes(
+                        "grid h-full w-60 cursor-pointer content-start gap-0.5 rounded-button border px-3 py-2 text-left",
+                        chosen
+                          ? "border-accent bg-accent-weak"
+                          : "border-border-strong bg-surface hover:border-accent hover:bg-accent-weak",
+                      )}
+                    >
+                      <span className={classes("text-sm font-medium", chosen && "text-accent")}>{candidate.name}</span>
+                      <span className="text-xs text-text-secondary">{candidate.summary}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
+        <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(24rem,1fr)_minmax(0,calc(var(--display-width,50%)+0.5rem))]">
+          <div className="min-h-0 min-w-0 max-lg:h-[60dvh]">
+            <Editor
+              ref={editor}
+              initial={initialText}
+              label="Screen document, YAML"
+              problems={inText}
+              onChange={(next) => {
+                setText(next);
+                if (!touched && !STARTERS.some((candidate) => candidate.yaml === next)) setTouched(true);
+              }}
+            />
+          </div>
+
+          <aside
+            aria-label="Preview"
+            className="grid min-h-0 min-w-0 content-start gap-4 max-lg:w-[min(100%,var(--display-width,100%))] max-lg:justify-self-center lg:overflow-y-auto lg:pr-2"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-text-secondary">Preview on</span>
+              <CellSelect
+                aria-label="Preview on"
+                className="max-w-64"
+                choices={[
+                  ...(devices ?? []).map((device) => ({ value: `device:${device.id}`, label: device.name })),
+                  { value: "model", label: "A display model" },
+                ]}
+                value={chosenTarget}
+                onValueChange={setTarget}
+              />
+              {chosenTarget === "model" && (
+                <>
+                  <CellSelect
+                    aria-label="Display model"
+                    className="max-w-64"
+                    choices={[...(models ?? [])]
+                      .sort((a, b) => a.label.localeCompare(b.label))
+                      .map((candidate) => ({ value: candidate.name, label: candidate.label }))}
+                    value={chosenDisplay?.model ?? ""}
+                    onValueChange={(value) => {
+                      const next = models?.find((candidate) => candidate.name === value);
                       const first = next?.palettes[0];
                       if (next && first) setDisplay({ model: next.name, palette: first.id });
                     }}
-                  >
-                    {[...(models ?? [])]
-                      .sort((a, b) => a.label.localeCompare(b.label))
-                      .map((candidate) => (
-                        <option key={candidate.name} value={candidate.name}>
-                          {candidate.label}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <label className={styles.target}>
-                  <span className="visually-hidden">Colors</span>
-                  <select
-                    className="select"
-                    value={chosenDisplay?.palette}
-                    onChange={(event) => chosenDisplay && setDisplay({ model: chosenDisplay.model, palette: event.target.value })}
-                  >
-                    {model?.palettes.map((candidate) => (
-                      <option key={candidate.id} value={candidate.id}>
-                        {candidate.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </>
+                  />
+                  <CellSelect
+                    aria-label="Colors"
+                    className="max-w-64"
+                    choices={(model?.palettes ?? []).map((candidate) => ({
+                      value: candidate.id,
+                      label: candidate.name,
+                    }))}
+                    value={chosenDisplay?.palette ?? ""}
+                    onValueChange={(value) =>
+                      chosenDisplay && setDisplay({ model: chosenDisplay.model, palette: value })
+                    }
+                  />
+                </>
+              )}
+              <IconButton
+                aria-label="Layout grid"
+                aria-pressed={grid}
+                title="Layout grid"
+                className={classes(
+                  grid && "border-accent bg-accent-weak text-accent hover:border-accent hover:bg-accent-weak",
+                )}
+                onClick={() => setGrid((on) => !on)}
+              >
+                <Grid3x3 aria-hidden="true" className="size-4" />
+              </IconButton>
+              <span aria-live="polite" className="text-sm text-text-muted">
+                {preview.drawing
+                  ? "Drawing"
+                  : preview.stale && preview.image
+                    ? "The last preview that drew; see the problems below"
+                    : ""}
+              </span>
+            </div>
+
+            <Panel
+              src={preview.image}
+              alt="The screen as the display will show it"
+              width={model?.width}
+              height={model?.height}
+              colors={palette?.colors}
+              paletteName={palette?.name}
+              empty={parsed.value === undefined ? "Fix the YAML to draw" : "Drawing"}
+              busy={preview.drawing}
+              overlay={grid && model ? <LayoutGrid width={model.width} height={model.height} /> : undefined}
+            />
+
+            {(preview.failure || parsed.errors.length > 0 || located.length > 0) && (
+              <section aria-labelledby="problems-title" className="grid gap-2">
+                <h3 id="problems-title" className="text-sm font-semibold text-danger">
+                  Problems
+                </h3>
+                <ul className="overflow-hidden rounded-button border border-[color-mix(in_oklab,var(--color-danger)_30%,var(--color-border))] bg-surface text-sm">
+                  {parsed.errors.map((error, index) => (
+                    <li key={`yaml-${index}`} className="border-t border-border first:border-t-0">
+                      <button
+                        type="button"
+                        className="w-full cursor-pointer px-3 py-2 text-left hover:bg-danger/6"
+                        onClick={() => editor.current?.select(error.from, error.to)}
+                      >
+                        <Where>YAML</Where> {error.message}
+                      </button>
+                    </li>
+                  ))}
+                  {preview.failure && (
+                    <li className="border-t border-border px-3 py-2 text-danger first:border-t-0">{preview.failure}</li>
+                  )}
+                  {located.map((problem, index) => (
+                    <li key={index} className="border-t border-border first:border-t-0">
+                      <button
+                        type="button"
+                        disabled={problem.to <= problem.from}
+                        className="w-full cursor-pointer px-3 py-2 text-left enabled:hover:bg-danger/6 disabled:cursor-default"
+                        onClick={() => editor.current?.select(problem.from, problem.to)}
+                      >
+                        {problem.path && <Where>{problem.path}</Where>} {problem.message}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
-            <button
-              type="button"
-              className="icon-button"
-              aria-pressed={grid}
-              aria-label="Layout grid"
-              title="Layout grid"
-              data-on={grid || undefined}
-              onClick={() => setGrid((on) => !on)}
-            >
-              <Grid3x3 size={18} />
-            </button>
-            <span className={styles.drawing} aria-live="polite">
-              {preview.drawing
-                ? "Drawing"
-                : preview.stale && preview.image
-                  ? "The last preview that drew; see the problems below"
-                  : ""}
-            </span>
-          </div>
 
-          <Panel
-            src={preview.image}
-            alt="The screen as the display will show it"
-            width={model?.width}
-            height={model?.height}
-            colors={palette?.colors}
-            paletteName={palette?.name}
-            empty={parsed.value === undefined ? "Fix the YAML to draw" : "Drawing"}
-            busy={preview.drawing}
-            overlay={grid && model ? <LayoutGrid width={model.width} height={model.height} /> : undefined}
-          />
-
-          {(preview.failure || parsed.errors.length > 0 || located.length > 0) && (
-            <section className={styles.problems} aria-labelledby="problems-title">
-              <h3 id="problems-title" className={styles.problemsTitle}>
-                Problems
-              </h3>
-              <ul>
-                {parsed.errors.map((error, index) => (
-                  <li key={`yaml-${index}`}>
-                    <button type="button" onClick={() => editor.current?.select(error.from, error.to)}>
-                      <span className={styles.where}>YAML</span> {error.message}
-                    </button>
-                  </li>
-                ))}
-                {preview.failure && <li className="error-text">{preview.failure}</li>}
-                {located.map((problem, index) => (
-                  <li key={index}>
-                    <button
-                      type="button"
-                      disabled={problem.to <= problem.from}
-                      onClick={() => editor.current?.select(problem.from, problem.to)}
-                    >
-                      {problem.path && <span className={styles.where}>{problem.path}</span>} {problem.message}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          <SourcesPanel sources={preview.sources} secretNames={secretNames} />
-        </aside>
+            <SourcesPanel sources={preview.sources} secretNames={secretNames} />
+          </aside>
+        </div>
       </div>
+
+      {screen && (
+        <ConfirmDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          title={`Delete ${screen.name}?`}
+          detail={
+            shownOn.length > 0
+              ? `It leaves the playlists of ${shownOn.map((device) => device.name).join(", ")}, and those displays move on to their other screens.`
+              : "No display shows it."
+          }
+          confirmLabel="Delete screen"
+          destructive
+          onConfirm={() => remove.mutate()}
+        />
+      )}
+      <ConfirmDialog
+        open={blocker.state === "blocked"}
+        onOpenChange={(open) => {
+          if (open || leaving.current) return;
+          blocker.reset?.();
+        }}
+        title="Leave without saving?"
+        detail="The changes to this screen since it was last saved are lost."
+        confirmLabel="Leave"
+        destructive
+        onConfirm={() => {
+          leaving.current = true;
+          blocker.proceed?.();
+        }}
+      />
     </div>
   );
+}
+
+/** Where in the document a problem arose. */
+function Where({ children }: { children: string }) {
+  return <span className="mr-1 font-mono text-xs text-danger">{children}</span>;
 }
 
 /** Guides over the preview: every 40 device pixels, stronger every 200, and the
@@ -389,14 +434,14 @@ function LayoutGrid({ width, height }: { width: number; height: number }) {
   const cell = (step: number, size: number) => `${(step / size) * 100}%`;
   return (
     <div
-      className={styles.grid}
       aria-hidden="true"
+      className="layout-grid pointer-events-none absolute inset-0"
       style={{
         backgroundSize: `${cell(40, width)} ${cell(40, height)}, ${cell(40, width)} ${cell(40, height)}, ${cell(200, width)} ${cell(200, height)}, ${cell(200, width)} ${cell(200, height)}`,
       }}
     >
-      <span className={styles.centerX} />
-      <span className={styles.centerY} />
+      <span data-axis="x" className="layout-centre absolute inset-y-0 left-1/2 w-px" />
+      <span data-axis="y" className="layout-centre absolute inset-x-0 top-1/2 h-px" />
     </div>
   );
 }

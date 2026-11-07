@@ -1,11 +1,12 @@
 import type { Account } from "@afterimage/management-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { arrive, Button, buttonClass, classes, TextField } from "linen";
+import { m } from "motion/react";
 import { useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { accountQuery, client, messageOf, queryClient, signInOptionsQuery } from "../app/client";
 import { Wordmark } from "../app/Wordmark";
-import styles from "./SignIn.module.css";
 
 const providerErrors: Record<string, string> = {
   refused: "The sign-in provider refused the sign-in.",
@@ -19,39 +20,54 @@ export function SignIn() {
   const providerError = search.get("signInError");
 
   return (
-    <main className={styles.page}>
-      <div className={styles.sheet}>
-        <header className={styles.header}>
-          <h1 className={styles.wordmark}>
+    <main className="grid min-h-dvh place-items-center px-4 py-8">
+      <m.div
+        {...arrive()}
+        className="grid w-full max-w-sm gap-8 rounded-dialog border border-border bg-surface p-6 sm:p-8"
+      >
+        <header className="grid gap-2">
+          <h1 className="text-lg">
             <Wordmark />
           </h1>
-          <p className={styles.tagline}>A server for TRMNL e-paper displays.</p>
+          <p className="text-sm text-text-secondary">A server for TRMNL e-paper displays.</p>
         </header>
-        {options.isPending && <p className="muted">Loading</p>}
-        {options.isError && <p className="error-text">{messageOf(options.error)}</p>}
+        {options.isPending && <p className="text-sm text-text-muted">Reading the server</p>}
+        {options.isError && (
+          <p role="alert" className="text-sm text-danger">
+            {messageOf(options.error)}
+          </p>
+        )}
         {options.data && (
-          <div className={styles.forms}>
+          <div className="grid gap-6">
             {providerError && (
-              <p className="error-text" role="alert">
+              <p role="alert" className="text-sm text-danger">
                 {providerErrors[providerError] ?? "Signing in did not finish. Try again."}
               </p>
             )}
-            {options.data.password &&
-              (options.data.firstAccount ? <FirstAccountForm /> : <PasswordForm />)}
+            {options.data.password && (options.data.firstAccount ? <FirstAccountForm /> : <PasswordForm />)}
             {options.data.oidc && (
-              <div className={styles.oidc}>
-                {options.data.password && <span className={styles.or}>or</span>}
-                <a className="button" data-variant={options.data.password ? undefined : "primary"} href="/manage/auth/oidc">
+              <div className="grid gap-3">
+                {options.data.password && (
+                  <span className="flex items-center gap-3 text-sm text-text-muted before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+                    or
+                  </span>
+                )}
+                <a
+                  className={classes(buttonClass(options.data.password ? "default" : "primary"), "w-full")}
+                  href="/manage/auth/oidc"
+                >
                   Sign in with {options.data.oidc.name}
                 </a>
                 {options.data.firstAccount && (
-                  <p className="hint">The first person to sign in creates the server's first account.</p>
+                  <p className="text-xs text-text-secondary">
+                    The first person to sign in creates the server's first account.
+                  </p>
                 )}
               </div>
             )}
           </div>
         )}
-      </div>
+      </m.div>
     </main>
   );
 }
@@ -60,7 +76,7 @@ function useSignedIn() {
   const navigate = useNavigate();
   return (account: Account) => {
     queryClient.setQueryData(accountQuery.queryKey, account);
-    void navigate("/");
+    void navigate("/devices");
   };
 }
 
@@ -77,41 +93,35 @@ function PasswordForm() {
     signIn.mutate();
   };
   return (
-    <form className={styles.form} onSubmit={submit}>
-      <h2 className={styles.formTitle}>Sign in</h2>
-      <label className="field">
-        <span>Username</span>
-        <input
-          className="input"
-          name="username"
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          required
-          value={username}
-          onChange={(event) => setUsername(event.target.value.toLowerCase())}
-        />
-      </label>
-      <label className="field">
-        <span>Password</span>
-        <input
-          className="input"
-          type="password"
-          name="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-      </label>
+    <form className="grid" onSubmit={submit}>
+      <h2 className="mb-4 text-md font-semibold">Sign in</h2>
+      <TextField
+        label="Username"
+        name="username"
+        autoComplete="username"
+        autoCapitalize="none"
+        spellCheck={false}
+        required
+        value={username}
+        onChange={(event) => setUsername(event.target.value.toLowerCase())}
+      />
+      <TextField
+        label="Password"
+        type="password"
+        name="password"
+        autoComplete="current-password"
+        required
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+      />
       {signIn.isError && (
-        <p className="error-text" role="alert">
+        <p role="alert" className="mb-4 text-sm text-danger">
           {messageOf(signIn.error)}
         </p>
       )}
-      <button className="button" data-variant="primary" type="submit" disabled={signIn.isPending}>
+      <Button type="submit" variant="primary" className="w-full" disabled={signIn.isPending}>
         {signIn.isPending ? "Signing in" : "Sign in"}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -130,64 +140,55 @@ function FirstAccountForm() {
     create.mutate();
   };
   return (
-    <form className={styles.form} onSubmit={submit}>
-      <h2 className={styles.formTitle}>Create the first account</h2>
-      <p className="hint">
-        This server has no accounts yet. The first one signs in with a password; later ones come
-        from the sign-in provider, when the server has one.
+    <form className="grid" onSubmit={submit}>
+      <h2 className="text-md font-semibold">Create the first account</h2>
+      <p className="mt-1 mb-4 text-sm text-text-secondary">
+        This server has no accounts yet. The first one signs in with a password; later ones come from the sign-in
+        provider, when the server has one.
       </p>
-      <label className="field">
-        <span>Your name</span>
-        <input
-          className="input"
-          name="name"
-          autoComplete="name"
-          required
-          maxLength={64}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
-      <label className="field">
-        <span>Username</span>
-        <input
-          className="input"
-          name="username"
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          required
-          minLength={2}
-          maxLength={64}
-          pattern="[a-z0-9][a-z0-9._\-]{1,63}"
-          title="Lowercase letters, digits, dots, dashes and underscores"
-          value={username}
-          onChange={(event) => setUsername(event.target.value.toLowerCase())}
-        />
-      </label>
-      <label className="field">
-        <span>Password</span>
-        <input
-          className="input"
-          type="password"
-          name="password"
-          autoComplete="new-password"
-          required
-          minLength={10}
-          maxLength={256}
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-        <span className="hint">At least 10 characters.</span>
-      </label>
+      <TextField
+        label="Your name"
+        name="name"
+        autoComplete="name"
+        required
+        maxLength={64}
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+      />
+      <TextField
+        label="Username"
+        name="username"
+        autoComplete="username"
+        autoCapitalize="none"
+        spellCheck={false}
+        required
+        minLength={2}
+        maxLength={64}
+        pattern="[a-z0-9][a-z0-9._\-]{1,63}"
+        title="Lowercase letters, digits, dots, dashes and underscores"
+        value={username}
+        onChange={(event) => setUsername(event.target.value.toLowerCase())}
+      />
+      <TextField
+        label="Password"
+        hint="At least 10 characters."
+        type="password"
+        name="password"
+        autoComplete="new-password"
+        required
+        minLength={10}
+        maxLength={256}
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+      />
       {create.isError && (
-        <p className="error-text" role="alert">
+        <p role="alert" className="mb-4 text-sm text-danger">
           {messageOf(create.error)}
         </p>
       )}
-      <button className="button" data-variant="primary" type="submit" disabled={create.isPending}>
+      <Button type="submit" variant="primary" className="w-full" disabled={create.isPending}>
         {create.isPending ? "Creating" : "Create account"}
-      </button>
+      </Button>
     </form>
   );
 }

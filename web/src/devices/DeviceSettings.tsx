@@ -1,11 +1,10 @@
 import type { Device, DisplayModel } from "@afterimage/management-client";
 import { useMutation } from "@tanstack/react-query";
+import { Actions, Button, Card, CardBody, CardHead, Select, TextField, useToast } from "linen";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
 import { minutesLabel } from "../app/format";
-import { Section } from "../app/Section";
-import styles from "./DeviceSettings.module.css";
 import { deviceQuery, devicesQuery } from "./queries";
 
 const REFRESH_CHOICES = [5, 10, 15, 30, 60, 120, 240, 720, 1440];
@@ -16,11 +15,16 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
   const [model, setModel] = useState(device.display.model);
   const [palette, setPalette] = useState(device.display.palette);
   const [refresh, setRefresh] = useState(device.refreshMinutes);
-  const [saved, setSaved] = useState(false);
+  const toast = useToast();
 
   // Settings saved elsewhere replace the fields this form has not touched, as the
   // playlist does.
-  const stored = { name: device.name, model: device.display.model, palette: device.display.palette, refresh: device.refreshMinutes };
+  const stored = {
+    name: device.name,
+    model: device.display.model,
+    palette: device.display.palette,
+    refresh: device.refreshMinutes,
+  };
   const previous = useRef(stored);
   useEffect(() => {
     const before = previous.current;
@@ -51,7 +55,7 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
     onSuccess: ({ device: updated }) => {
       queryClient.setQueryData(deviceQuery(updated.id).queryKey, updated);
       void queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
-      setSaved(true);
+      toast.show({ text: `${updated.name} saved. The display takes it at its next check-in.` });
     },
   });
 
@@ -60,80 +64,62 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
     save.mutate();
   };
 
+  const modelChoices = [
+    ...(chosen ? [] : [{ value: model, label: model }]),
+    ...sorted.map((candidate) => ({
+      value: candidate.name,
+      label: `${candidate.label} · ${candidate.width} × ${candidate.height}`,
+    })),
+  ];
+  const paletteChoices =
+    palettes.length === 0
+      ? [{ value: palette, label: palette }]
+      : palettes.map((candidate) => ({ value: candidate.id, label: candidate.name }));
+
   return (
-    <Section title="Name and display">
-      <form className={styles.form} onSubmit={submit} onChange={() => setSaved(false)}>
-        <label className="field">
-          <span>Name</span>
-          <input
-            className="input"
+    <Card>
+      <CardHead title="Name and display" />
+      <CardBody>
+        <form onSubmit={submit} className="grid max-w-2xl gap-x-4 sm:grid-cols-2">
+          <TextField
+            label="Name"
             value={name}
             required
             maxLength={64}
             onChange={(event) => setName(event.target.value)}
           />
-        </label>
-        <label className="field">
-          <span>Display</span>
-          <select
-            className="select"
+          <Select
+            label="Display"
+            choices={modelChoices}
             value={model}
-            onChange={(event) => {
-              const next = sorted.find((candidate) => candidate.name === event.target.value);
-              setModel(event.target.value);
+            onValueChange={(value) => {
+              const next = sorted.find((candidate) => candidate.name === value);
+              setModel(value);
               if (next && !next.palettes.some((candidate) => candidate.id === palette)) {
                 setPalette(next.palettes[0]?.id ?? palette);
               }
             }}
-          >
-            {!chosen && <option value={model}>{model}</option>}
-            {sorted.map((candidate) => (
-              <option key={candidate.name} value={candidate.name}>
-                {candidate.label} · {candidate.width} × {candidate.height}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Colors</span>
-          <select className="select" value={palette} onChange={(event) => setPalette(event.target.value)}>
-            {palettes.length === 0 && <option value={palette}>{palette}</option>}
-            {palettes.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Wakes at least every</span>
-          <select className="select" value={refresh} onChange={(event) => setRefresh(Number(event.target.value))}>
-            {refreshChoices.map((minutes) => (
-              <option key={minutes} value={minutes}>
-                {minutesLabel(minutes)}
-              </option>
-            ))}
-          </select>
-          <span className="hint">
-            Sooner when its playlist changes. Waking more often drains the battery faster.
-          </span>
-        </label>
-        <div className={styles.actions}>
-          <button className="button" data-variant="primary" type="submit" disabled={!changed || save.isPending}>
-            {save.isPending ? "Saving" : "Save settings"}
-          </button>
-          {saved && !changed && (
-            <span className="hint" role="status">
-              Saved. The display takes them at its next check-in.
-            </span>
-          )}
-          {save.isError && (
-            <span className="error-text" role="alert">
-              {messageOf(save.error)}
-            </span>
-          )}
-        </div>
-      </form>
-    </Section>
+          />
+          <Select label="Colors" choices={paletteChoices} value={palette} onValueChange={setPalette} />
+          <Select
+            label="Wakes at least every"
+            hint="Sooner when its playlist changes. Waking more often drains the battery faster."
+            choices={refreshChoices.map((minutes) => ({ value: String(minutes), label: minutesLabel(minutes) }))}
+            value={String(refresh)}
+            onValueChange={(value) => setRefresh(Number(value))}
+          />
+          <Actions className="sm:col-span-2">
+            <Button type="submit" variant="primary" disabled={!changed || save.isPending}>
+              {save.isPending ? "Saving" : "Save"}
+            </Button>
+            {save.isError && (
+              <span role="alert" className="text-sm text-danger">
+                {messageOf(save.error)}
+              </span>
+            )}
+          </Actions>
+        </form>
+      </CardBody>
+    </Card>
   );
 }

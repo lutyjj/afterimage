@@ -1,7 +1,7 @@
 import type { PlaylistEntry, Weekday } from "@afterimage/management-client";
+import { classes } from "linen";
 
 import { DAY_MINUTES, spansOn } from "./schedule";
-import styles from "./DayStrip.module.css";
 
 export interface DayStripProps {
   entries: Array<{ entry: PlaylistEntry; name: string }>;
@@ -19,47 +19,63 @@ export interface DayStripProps {
 const percent = (minute: number) => `${(minute / DAY_MINUTES) * 100}%`;
 
 /** One day as a track from midnight to midnight, each playlist entry a lane whose
- * marks are as long as the time it is current, its name at its start. */
+ * marks are as long as the time it is current, its name at its start. The strip
+ * reports; it never takes the ink. */
 export function DayStrip({ entries, day, now, hours = true, names = true, label }: DayStripProps) {
   return (
-    <div className={styles.strip} role="img" aria-label={label} data-named={names || undefined}>
+    <div
+      role="img"
+      aria-label={label}
+      className={classes(
+        "grid gap-x-3 gap-y-1 text-xs",
+        names ? "grid-cols-[6.5rem_minmax(0,1fr)]" : "grid-cols-[minmax(0,1fr)]",
+      )}
+    >
       {names && (
-        <ol className={styles.names} aria-hidden="true">
+        <ol aria-hidden="true" className="grid auto-rows-[1.25rem] text-text-secondary">
           {entries.map(({ name }, lane) => (
-            <li key={lane} title={name}>
+            <li key={lane} title={name} className="truncate leading-5">
               {name}
             </li>
           ))}
         </ol>
       )}
-      <div className={styles.track}>
+      <div className="relative grid auto-rows-[1.25rem] rounded-input bg-sunken">
         {[3, 6, 9, 12, 15, 18, 21].map((hour) => (
           <span
             key={hour}
-            className={styles.hour}
-            data-major={hour % 6 === 0 || undefined}
+            className={classes("absolute inset-y-0 w-px", hour % 6 === 0 ? "bg-border-strong" : "bg-border/60")}
             style={{ left: percent(hour * 60) }}
           />
         ))}
         {entries.map(({ entry, name }, lane) => (
-          <div key={lane} className={styles.lane}>
+          <div key={lane} className="relative">
             {spansOn(entry, day).map(([start, end]) => (
               <span
                 key={start}
-                className={styles.span}
+                className="absolute inset-y-[5px] min-w-0.5 rounded-full bg-[color-mix(in_oklch,var(--color-text-muted)_70%,var(--color-surface))]"
                 style={{ left: percent(start), width: percent(end - start) }}
                 title={name || undefined}
               />
             ))}
           </div>
         ))}
-        {entries.length === 0 && <div className={styles.lane} />}
-        {now !== undefined && <span className={styles.now} style={{ left: percent(now) }} />}
+        {entries.length === 0 && <div />}
+        {now !== undefined && (
+          <span className="absolute -inset-y-1 -ml-px w-0.5 rounded-[1px] bg-text" style={{ left: percent(now) }} />
+        )}
       </div>
       {hours && (
-        <div className={styles.scale} aria-hidden="true">
-          {[0, 6, 12, 18, 24].map((hour) => (
-            <span key={hour} style={{ left: percent(hour * 60) }}>
+        <div aria-hidden="true" className="relative col-[-2/-1] h-4 text-text-muted tabular-nums">
+          {[0, 6, 12, 18, 24].map((hour, index, all) => (
+            <span
+              key={hour}
+              className={classes(
+                "absolute",
+                index === 0 ? "" : index === all.length - 1 ? "-translate-x-full" : "-translate-x-1/2",
+              )}
+              style={{ left: percent(hour * 60) }}
+            >
               {String(hour).padStart(2, "0")}
             </span>
           ))}

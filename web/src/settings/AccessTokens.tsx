@@ -1,13 +1,35 @@
+import { Dialog } from "@base-ui/react/dialog";
 import type { AccessToken } from "@afterimage/management-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Check, Copy } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHead,
+  Checkbox,
+  Chip,
+  ConfirmDialog,
+  CopyValue,
+  Count,
+  DialogCancel,
+  DialogLayout,
+  DialogRoot,
+  DialogShell,
+  Field,
+  Nothing,
+  SettingRow,
+  SettlingRows,
+  ShownOnce,
+  Swap,
+  TextField,
+  useToast,
+} from "linen";
+import { Plus } from "lucide-react";
+import { type FormEvent, useState } from "react";
 
 import { client, messageOf, queryClient, serverQuery } from "../app/client";
 import { ago, moment } from "../app/format";
-import { Section } from "../app/Section";
 import { tokensQuery } from "./queries";
-import styles from "./Settings.module.css";
 
 type Created = { token: AccessToken; secret: string };
 
@@ -16,223 +38,200 @@ type Created = { token: AccessToken; secret: string };
 export function AccessTokens() {
   const timeZone = useQuery(serverQuery).data?.timeZone;
   const tokens = useQuery(tokensQuery);
-  const [created, setCreated] = useState<Created | undefined>();
+  const [creating, setCreating] = useState(false);
 
   return (
     <>
-      <Section
-        title="Access tokens"
-        intro={
-          <>
-            Scripts and agents send a token instead of signing in, as <code>Authorization: Bearer</code> and the
-            token. It acts as you until you revoke it; give each its own, so you can revoke one alone.
-          </>
-        }
-      >
-        {created ? (
-          <ShownOnce created={created} onDone={() => setCreated(undefined)} />
-        ) : (
-          <CreateToken onCreated={setCreated} />
-        )}
-        {tokens.isPending && <p className="muted">Loading tokens</p>}
+      <Card>
+        <CardHead
+          title="Access tokens"
+          aside={<Count>{tokens.data?.length}</Count>}
+          description={
+            <>
+              Scripts and agents send a token instead of signing in, as{" "}
+              <code className="font-mono text-xs">Authorization: Bearer</code> and the token. It acts as you until you
+              revoke it; give each its own, so you can revoke one alone.
+            </>
+          }
+        >
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            <Plus aria-hidden="true" className="size-4" />
+            New token
+          </Button>
+        </CardHead>
+        {tokens.isPending && <Nothing>Reading tokens</Nothing>}
         {tokens.isError && (
-          <p className="error-text" role="alert">
-            {messageOf(tokens.error)}
-          </p>
+          <CardBody>
+            <p role="alert" className="text-sm text-danger">
+              {messageOf(tokens.error)}
+            </p>
+          </CardBody>
         )}
-        {tokens.data?.length === 0 && <p className="muted">No tokens yet.</p>}
-        {tokens.data && tokens.data.length > 0 && (
-          <ul className={styles.tokens}>
-            {tokens.data.map((token) => (
-              <TokenRow key={token.id} token={token} timeZone={timeZone} />
-            ))}
-          </ul>
-        )}
-      </Section>
-      <Agents secret={created?.secret} />
+        {tokens.data?.length === 0 && <Nothing>No tokens yet.</Nothing>}
+        <SettlingRows scope="tokens" marksArrivals>
+          {tokens.data?.map((token) => (
+            <TokenRow key={token.id} token={token} timeZone={timeZone} />
+          ))}
+        </SettlingRows>
+      </Card>
+      <Agents />
+      <NewToken open={creating} onOpenChange={setCreating} />
     </>
   );
 }
 
 /** How an agent reaches the MCP endpoint: its address, and the token in its
  * `Authorization` header. */
-function Agents({ secret }: { secret: string | undefined }) {
+function Agents() {
   const endpoint = `${window.location.origin}/mcp`;
-  const command = `claude mcp add --transport http afterimage ${endpoint} --header "Authorization: Bearer ${secret ?? "<token>"}"`;
+  const command = `claude mcp add --transport http afterimage ${endpoint} --header "Authorization: Bearer <token>"`;
   return (
-    <Section
-      title="Agents"
-      intro="An agent that speaks MCP writes screens, previews them and arranges playlists with a token, through the same API as this page."
-    >
-      <dl className={styles.facts}>
-        <div>
-          <dt>Address</dt>
-          <dd>
-            <CopyText text={endpoint} />
-          </dd>
-        </div>
-        <div>
-          <dt>Transport</dt>
-          <dd>Streamable HTTP, with the token as a bearer token</dd>
-        </div>
-        <div>
-          <dt>Claude Code</dt>
-          <dd>
-            <CopyText text={command} />
-          </dd>
-        </div>
-      </dl>
-      <p className="hint">A read-only token gives an agent everything to read and nothing to change.</p>
-    </Section>
+    <Card>
+      <CardHead
+        title="Agents"
+        description="An agent that speaks MCP connects over streamable HTTP with a token, and writes screens, previews them and arranges playlists through the same API as this page."
+      />
+      <CardBody>
+        <Field label="Address">
+          <CopyValue label="MCP address" value={endpoint} />
+        </Field>
+        <Field
+          label="Claude Code"
+          hint="Put a token in place of <token>. A read-only token gives an agent everything to read and nothing to change."
+          className="mb-0"
+        >
+          <CopyValue label="Claude Code command" value={command} />
+        </Field>
+      </CardBody>
+    </Card>
   );
 }
 
-/** A value to copy whole. Where the browser refuses the clipboard, as a page
- * served without TLS on a network address is refused, it says so: the value
- * may be a secret shown once. */
-function CopyText({ text }: { text: string }) {
-  const [copied, setCopied] = useState<boolean | "failed">(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-    } catch {
-      setCopied("failed");
-    }
-  };
-  return (
-    <span className={styles.copy}>
-      <span className={styles.copyText}>
-        <code tabIndex={0} onFocus={(event) => window.getSelection()?.selectAllChildren(event.currentTarget)}>
-          {text}
-        </code>
-        <button type="button" className="icon-button" onClick={() => void copy()} aria-label="Copy" title="Copy">
-          {copied === true ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
-        </button>
-      </span>
-      {copied === "failed" && (
-        <span className="error-text" role="alert">
-          The browser did not allow copying. Select the text and copy it yourself.
-        </span>
-      )}
-    </span>
-  );
-}
-
-function CreateToken({ onCreated }: { onCreated: (created: Created) => void }) {
+/** Making a token: its name and reach, then its secret, which the server shows
+ * this once. The dialog turns from the one to the other in place. */
+function NewToken({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [name, setName] = useState("");
   const [readOnly, setReadOnly] = useState(false);
+  const [created, setCreated] = useState<Created>();
   const create = useMutation({
     mutationFn: () => client.createAccessToken({ name: name.trim(), scope: readOnly ? "read_only" : undefined }),
-    onSuccess: (created) => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: tokensQuery.queryKey });
-      setName("");
-      setReadOnly(false);
-      onCreated(created);
+      setCreated(result);
     },
   });
+  const change = (next: boolean) => {
+    onOpenChange(next);
+    if (next) return;
+    // Forgotten as the dialog closes; it keeps its words while it leaves.
+    setName("");
+    setReadOnly(false);
+    setCreated(undefined);
+    create.reset();
+  };
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    create.mutate();
+    if (name.trim() && !create.isPending) create.mutate();
   };
 
   return (
-    <form className={styles.create} onSubmit={submit}>
-      <label className="field">
-        <span>Name</span>
-        <input
-          className="input"
-          value={name}
-          required
-          maxLength={64}
-          placeholder="Provisioning script"
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
-      <label className={styles.check}>
-        <input type="checkbox" checked={readOnly} onChange={(event) => setReadOnly(event.target.checked)} />
-        <span>
-          Read only
-          <span className="hint">It can read devices, screens and playlists, and change nothing.</span>
-        </span>
-      </label>
-      <div className={styles.actions}>
-        <button className="button" data-variant="primary" type="submit" disabled={!name.trim() || create.isPending}>
-          {create.isPending ? "Creating" : "Create token"}
-        </button>
-        {create.isError && (
-          <span className="error-text" role="alert">
-            {messageOf(create.error)}
-          </span>
-        )}
-      </div>
-    </form>
-  );
-}
-
-/** The new token's secret, which the server never shows again. */
-function ShownOnce({ created, onDone }: { created: Created; onDone: () => void }) {
-  return (
-    <div className={styles.shownOnce} role="status">
-      <p>
-        <strong>{created.token.name}</strong> is ready. Copy its token now: Afterimage keeps only a fingerprint of it
-        and cannot show it again.
-      </p>
-      <CopyText text={created.secret} />
-      <div className={styles.actions}>
-        <button className="button" data-variant="primary" type="button" onClick={onDone}>
-          Done
-        </button>
-      </div>
-    </div>
+    <DialogRoot open={open} onOpenChange={change}>
+      <DialogShell open={open} width="30rem">
+        <Swap view={created ? "secret" : "form"}>
+          {created ? (
+            <DialogLayout
+              title={`${created.token.name} is ready`}
+              actions={<Dialog.Close render={<Button variant="primary">Done</Button>} />}
+            >
+              <ShownOnce what="Token" label="Access token" secret={created.secret} copyLabel="Copy token">
+                Give it to the script or agent that will use it.
+              </ShownOnce>
+            </DialogLayout>
+          ) : (
+            <form onSubmit={submit}>
+              <DialogLayout
+                title="New access token"
+                description="It acts as you until you revoke it."
+                actions={
+                  <>
+                    <DialogCancel />
+                    <Button type="submit" variant="primary" disabled={!name.trim() || create.isPending}>
+                      {create.isPending ? "Creating" : "Create token"}
+                    </Button>
+                  </>
+                }
+              >
+                <TextField
+                  label="Name"
+                  hint="What will hold it, so you know which to revoke."
+                  value={name}
+                  required
+                  maxLength={64}
+                  autoFocus
+                  placeholder="Backup script"
+                  onChange={(event) => setName(event.target.value)}
+                />
+                <Checkbox checked={readOnly} onCheckedChange={setReadOnly}>
+                  <span className="grid">
+                    Read only
+                    <span className="text-xs text-text-secondary">
+                      It can read devices, screens and playlists, and change nothing.
+                    </span>
+                  </span>
+                </Checkbox>
+                {create.isError && (
+                  <p role="alert" className="mt-3 text-sm text-danger">
+                    {messageOf(create.error)}
+                  </p>
+                )}
+              </DialogLayout>
+            </form>
+          )}
+        </Swap>
+      </DialogShell>
+    </DialogRoot>
   );
 }
 
 function TokenRow({ token, timeZone }: { token: AccessToken; timeZone: string | undefined }) {
+  const toast = useToast();
   const [confirming, setConfirming] = useState(false);
   const revoke = useMutation({
     mutationFn: () => client.revokeAccessToken({ tokenId: token.id }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: tokensQuery.queryKey }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: tokensQuery.queryKey });
+      toast.show({ text: `${token.name} revoked` });
+    },
+    onError: (error) => toast.show({ text: `${token.name} was not revoked. ${messageOf(error)}`, sticky: true }),
   });
 
   return (
-    <li className={styles.token}>
-      <div className={styles.tokenFacts}>
-        <span className={styles.tokenName}>
+    <SettingRow
+      title={
+        <span className="flex flex-wrap items-center gap-2">
           {token.name}
-          <span className={styles.tag}>{token.scope === "read_only" ? "Read only" : "Full access"}</span>
+          <Chip size="row">{token.scope === "read_only" ? "Read only" : "Full access"}</Chip>
         </span>
-        <span className="muted">
+      }
+      description={
+        <>
           Created {timeZone ? moment(token.createdAt, timeZone) : ago(token.createdAt)},{" "}
           {token.lastUsedAt ? `last used ${ago(token.lastUsedAt)}` : "never used"}
-        </span>
-      </div>
-      {!confirming ? (
-        <button className="button" data-variant="danger" type="button" onClick={() => setConfirming(true)}>
-          Revoke…
-        </button>
-      ) : (
-        <div className={styles.actions}>
-          <span className="hint">Whatever uses it stops working at once.</span>
-          <button
-            className="button"
-            data-variant="danger-solid"
-            type="button"
-            disabled={revoke.isPending}
-            onClick={() => revoke.mutate()}
-          >
-            {revoke.isPending ? "Revoking" : "Revoke"}
-          </button>
-          <button className="button" data-variant="quiet" type="button" onClick={() => setConfirming(false)}>
-            Keep it
-          </button>
-        </div>
-      )}
-      {revoke.isError && (
-        <p className="error-text" role="alert">
-          {messageOf(revoke.error)}
-        </p>
-      )}
-    </li>
+        </>
+      }
+    >
+      <Button variant="destructive" disabled={revoke.isPending} onClick={() => setConfirming(true)}>
+        {revoke.isPending ? "Revoking" : "Revoke"}
+      </Button>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={`Revoke ${token.name}?`}
+        detail="Whatever uses it stops working at once. This cannot be undone."
+        confirmLabel="Revoke"
+        destructive
+        onConfirm={() => revoke.mutate()}
+      />
+    </SettingRow>
   );
 }

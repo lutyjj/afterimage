@@ -1,12 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router";
+import { buttonClass, Card, Content, EmptyState, TopBar } from "linen";
+import { Link, useParams } from "react-router";
 
 import { displayModelsQuery, messageOf, serverQuery } from "../app/client";
-import { Page } from "../app/Page";
 import { Panel } from "../panel/Panel";
 import { screensQuery } from "../screens/queries";
-import styles from "./DeviceDetail.module.css";
 import { Aside, DeviceFacts, Fact } from "./DeviceFacts";
 import { DeviceFirmware } from "./DeviceFirmware";
 import { DeviceSettings } from "./DeviceSettings";
@@ -16,84 +14,71 @@ import { RemoveDevice } from "./RemoveDevice";
 import { deviceStates, useShownStates } from "./states";
 import { StateBadge } from "./StateBadge";
 
+const BACK = { to: "/devices", label: "Devices" };
+
 export function DeviceDetail() {
   const deviceId = Number(useParams().deviceId);
-  const location = useLocation();
-  const navigate = useNavigate();
-  // The claim's notice shows once: the history entry forgets it, so a reload or a
-  // return to this page does not claim again.
-  const [claimed] = useState(() => (location.state as { claimed?: boolean; replaced?: boolean } | null) ?? null);
-  useEffect(() => {
-    if (location.state) void navigate(".", { replace: true, state: null });
-  }, []);
   const device = useQuery(deviceQuery(deviceId));
   const models = useQuery(displayModelsQuery).data;
   const screens = useQuery(screensQuery).data;
   const timeZone = useQuery(serverQuery).data?.timeZone;
   const states = useShownStates(device.data && timeZone ? deviceStates(device.data, timeZone) : []);
-  const back = { to: "/", label: "Devices" };
 
   if (device.isPending) {
-    return (
-      <Page back={back} title="Loading">
-        <p className="muted">Loading the display</p>
-      </Page>
-    );
+    return <TopBar back={BACK} title="Display" />;
   }
   if (device.isError) {
     return (
-      <Page back={back} title="This display could not load">
-        <p className="error-text">{messageOf(device.error)}</p>
-        <Link to="/">Back to devices</Link>
-      </Page>
+      <>
+        <TopBar back={BACK} title="Display" />
+        <Content>
+          <EmptyState title="This display could not load" detail={messageOf(device.error)}>
+            <Link to="/devices" className={buttonClass()}>
+              Back to devices
+            </Link>
+          </EmptyState>
+        </Content>
+      </>
     );
   }
   const data = device.data;
   const { model, palette } = findDisplay(models, data);
 
   return (
-    <Page
-      back={back}
-      title={
-        <span className={styles.title}>
-          {data.name}
-          {states.map((state) => (
-            <StateBadge key={state.key} ended={state.ended} title={state.title}>
-              {state.label}
-            </StateBadge>
-          ))}
-        </span>
-      }
-    >
-      {claimed?.claimed && (
-        <p className={styles.notice} role="status">
-          {claimed.replaced
-            ? "This display set up again; it now uses its new code and keeps its name, settings and playlist."
-            : "Claimed. The display shows its first screen at its next check-in. Give it a playlist below."}
-        </p>
-      )}
-
-      <div className={styles.top}>
-        <Panel
-          src={imageUrl(data)}
-          alt={`What ${data.name} shows`}
-          width={model?.width}
-          height={model?.height}
-          colors={palette?.colors}
-          paletteName={palette?.name}
-        />
-        <DeviceFacts device={data} screens={screens} timeZone={timeZone}>
-          <Fact label="Hardware">
-            {data.firmwareModel}
-            <Aside> {data.mac}</Aside>
-          </Fact>
-        </DeviceFacts>
-      </div>
-
-      <PlaylistEditor device={data} screens={screens} timeZone={timeZone} />
-      <DeviceSettings device={data} models={models} />
-      <DeviceFirmware device={data} timeZone={timeZone} />
-      <RemoveDevice device={data} />
-    </Page>
+    <>
+      <TopBar
+        back={BACK}
+        title={data.name}
+        meta={states.map((state) => (
+          <StateBadge key={state.key} ended={state.ended} title={state.title}>
+            {state.label}
+          </StateBadge>
+        ))}
+      />
+      <Content>
+        <div className="grid gap-4">
+          <Card className="grid items-start gap-6 p-gutter min-[72rem]:grid-cols-[minmax(0,800px)_minmax(15rem,1fr)]">
+            <Panel
+              src={imageUrl(data)}
+              alt={`What ${data.name} shows`}
+              width={model?.width}
+              height={model?.height}
+              colors={palette?.colors}
+              paletteName={palette?.name}
+            />
+            <DeviceFacts device={data} screens={screens} timeZone={timeZone}>
+              <Fact label="Hardware">
+                {data.firmwareModel}
+                <Aside> {data.mac}</Aside>
+              </Fact>
+            </DeviceFacts>
+          </Card>
+          <PlaylistEditor device={data} screens={screens} timeZone={timeZone} />
+          <DeviceSettings device={data} models={models} />
+          <DeviceFirmware device={data} timeZone={timeZone} />
+          <RemoveDevice device={data} />
+        </div>
+      </Content>
+    </>
   );
 }

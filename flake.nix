@@ -7,6 +7,11 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # The design language the web UI wears, as source the web UI's build compiles.
+    linen = {
+      url = "github:lutyjj/linen";
+      flake = false;
+    };
   };
 
   outputs =
@@ -14,6 +19,7 @@
       self,
       nixpkgs,
       rust-overlay,
+      linen,
     }:
     let
       inherit (nixpkgs) lib;
@@ -25,6 +31,7 @@
         system:
         import ./deploy/nix {
           inherit lib;
+          linenSource = linen;
           pkgs = nixpkgs.legacyPackages.${system}.extend rust-overlay.overlays.default;
         }
       );
@@ -32,7 +39,7 @@
     {
       packages = forSystems (system: {
         default = scope.${system}.afterimage;
-        inherit (scope.${system}) contract design server web tokens;
+        inherit (scope.${system}) contract design linen server web tokens;
       });
 
       # The server's build runs every Rust test; lint runs clippy and rustfmt; the

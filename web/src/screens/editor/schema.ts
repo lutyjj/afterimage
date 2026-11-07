@@ -26,7 +26,10 @@ function closed(schema: unknown): unknown {
   if (schema && typeof schema === "object") {
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(schema)) {
-      out[key] = key === "properties" ? Object.fromEntries(Object.entries(value as object).map(([name, member]) => [name, closed(member)])) : closed(value);
+      out[key] =
+        key === "properties"
+          ? Object.fromEntries(Object.entries(value as object).map(([name, member]) => [name, closed(member)]))
+          : closed(value);
     }
     if ("properties" in out && !("additionalProperties" in out)) out.additionalProperties = false;
     return out;
@@ -60,7 +63,10 @@ function defaultOf(schema: Schema | undefined): unknown {
 
 /** The document without the members that equal their defaults, which the server
  * fills in when it stores a document: what the person wrote, give or take. */
-export function withoutDefaults(value: unknown, schema: Schema | undefined = { $ref: "#/components/schemas/ScreenDocument" }): unknown {
+export function withoutDefaults(
+  value: unknown,
+  schema: Schema | undefined = { $ref: "#/components/schemas/ScreenDocument" },
+): unknown {
   const resolved = resolve(schema);
   if (!resolved) return value;
   if (Array.isArray(value)) return value.map((item) => withoutDefaults(item, resolved.items));

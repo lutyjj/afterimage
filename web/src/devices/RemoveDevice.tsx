@@ -1,11 +1,10 @@
 import type { Device } from "@afterimage/management-client";
 import { useMutation } from "@tanstack/react-query";
+import { Button, Card, ConfirmDialog, OptionCards, SettingRow, useToast } from "linen";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { client, messageOf, queryClient } from "../app/client";
-import { Section } from "../app/Section";
-import styles from "./RemoveDevice.module.css";
 import { deviceQuery, devicesQuery } from "./queries";
 
 type Choice = "release" | "reset";
@@ -14,78 +13,71 @@ type Choice = "release" | "reset";
  * happens. */
 export function RemoveDevice({ device }: { device: Device }) {
   const navigate = useNavigate();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState<Choice>("release");
   const remove = useMutation({
-    mutationFn: () => client.deleteDevice({ deviceId: device.id, reset: choice === "reset" }),
-    onSuccess: async () => {
+    mutationFn: (reset: boolean) => client.deleteDevice({ deviceId: device.id, reset }),
+    onSuccess: async (_, reset) => {
       queryClient.removeQueries({ queryKey: deviceQuery(device.id).queryKey });
       await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
-      void navigate("/");
+      toast.show({
+        text: reset
+          ? `${device.name} removed. It erases its setup at its next check-in.`
+          : `${device.name} removed. It shows a claim code at its next check-in.`,
+      });
+      void navigate("/devices");
     },
+    onError: (error) => toast.show({ text: `${device.name} was not removed. ${messageOf(error)}`, sticky: true }),
   });
 
   return (
-    <Section title="Remove">
-      {!open ? (
-        <div className={styles.closed}>
-          <p className="hint">Take {device.name} off this server, keeping or erasing its Wi-Fi setup.</p>
-          <button className="button" data-variant="danger" type="button" onClick={() => setOpen(true)}>
-            Remove {device.name}…
-          </button>
-        </div>
-      ) : (
-        <div className={styles.open}>
-          <fieldset className={styles.choices}>
-            <legend className="visually-hidden">How to remove {device.name}</legend>
-            <label className={styles.choice}>
-              <input
-                type="radio"
-                name="remove"
-                checked={choice === "release"}
-                onChange={() => setChoice("release")}
-              />
-              <span>
-                <strong>Remove</strong>
-                <span className="hint">
-                  At its next check-in the display shows a claim code again. It keeps its Wi-Fi and
-                  this server, so anyone signed in here can claim it.
-                </span>
-              </span>
-            </label>
-            <label className={styles.choice}>
-              <input type="radio" name="remove" checked={choice === "reset"} onChange={() => setChoice("reset")} />
-              <span>
-                <strong>Remove and reset</strong>
-                <span className="hint">
-                  At its next check-in the display erases its Wi-Fi networks and settings and starts
-                  over at its setup portal. Someone has to set it up again at the device.
-                </span>
-              </span>
-            </label>
-          </fieldset>
-          <p className="hint">Its playlist and settings go either way. Screens stay.</p>
-          <div className={styles.actions}>
-            <button
-              className="button"
-              data-variant="danger-solid"
-              type="button"
-              disabled={remove.isPending}
-              onClick={() => remove.mutate()}
-            >
-              {remove.isPending ? "Removing" : choice === "reset" ? "Remove and reset" : "Remove"}
-            </button>
-            <button className="button" data-variant="quiet" type="button" onClick={() => setOpen(false)}>
-              Keep it
-            </button>
-          </div>
-          {remove.isError && (
-            <p className="error-text" role="alert">
-              {messageOf(remove.error)}
-            </p>
-          )}
-        </div>
-      )}
-    </Section>
+    <Card>
+      <SettingRow
+        title={`Remove ${device.name}`}
+        description="Take it off this server, keeping or erasing its Wi-Fi setup. Its playlist and settings go either way; screens stay."
+      >
+        <Button
+          variant="destructive"
+          disabled={remove.isPending}
+          onClick={() => {
+            setChoice("release");
+            setOpen(true);
+          }}
+        >
+          {remove.isPending ? "Removing" : "Remove"}
+        </Button>
+      </SettingRow>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={`Remove ${device.name}?`}
+        detail="Its playlist and settings go either way. Screens stay."
+        confirmLabel={choice === "reset" ? "Remove and reset" : "Remove"}
+        destructive
+        width="34rem"
+        onConfirm={() => remove.mutate(choice === "reset")}
+      >
+        <OptionCards
+          label={`How to remove ${device.name}`}
+          value={choice}
+          onChoose={setChoice}
+          options={[
+            {
+              value: "release",
+              label: "Remove",
+              detail:
+                "At its next check-in it shows a claim code again. It keeps its Wi-Fi and this server, so anyone signed in here can claim it.",
+            },
+            {
+              value: "reset",
+              label: "Remove and reset",
+              detail:
+                "At its next check-in it erases its Wi-Fi networks and settings and starts over at its setup portal. Someone has to set it up again at the device.",
+            },
+          ]}
+        />
+      </ConfirmDialog>
+    </Card>
   );
 }

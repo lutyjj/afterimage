@@ -40,7 +40,7 @@ async function requireAccount({ request }: { request: Request }) {
 }
 
 async function signedOutOnly() {
-  if (await account()) throw redirect("/");
+  if (await account()) throw redirect("/devices");
   return null;
 }
 
@@ -66,7 +66,8 @@ export const router = createBrowserRouter([
     HydrateFallback: Starting,
     ErrorBoundary: RouteError,
     children: [
-      { index: true, Component: DeviceList },
+      { index: true, element: <Navigate to="devices" replace /> },
+      { path: "devices", Component: DeviceList },
       { path: "devices/:deviceId", Component: DeviceDetail },
       { path: "screens", Component: ScreenList },
       { path: "screens/new", lazy: screenEditor },

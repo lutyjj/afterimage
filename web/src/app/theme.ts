@@ -1,44 +1,16 @@
-import { useSyncExternalStore } from "react";
+import { createThemeStore, type ThemePreference } from "linen";
 
-/** The colour scheme a person chose; `auto` follows the system's. */
-export type Theme = "auto" | "light" | "dark";
-
-export const THEMES: readonly Theme[] = ["auto", "light", "dark"];
-
-/** Where the choice is kept in this browser; index.html reads it too, to set the
+/** Where this browser keeps the theme; index.html reads it too, to set the
  * theme before the first paint. */
 export const THEME_KEY = "afterimage.theme";
-const listeners = new Set<() => void>();
 
-/** Puts the scheme on the root element, which the stylesheet's light-dark()
- * colours resolve against. */
-function apply(theme: Theme) {
-  if (theme === "auto") document.documentElement.removeAttribute("data-theme");
-  else document.documentElement.dataset.theme = theme;
-}
+/** The page's ground in each scheme, for the browser's own chrome. */
+const BAR = { light: "#f7fafb", dark: "#0d1113" } as const;
 
-/** Chooses a scheme, kept in this browser where it allows. */
-export function setTheme(theme: Theme) {
-  try {
-    if (theme === "auto") localStorage.removeItem(THEME_KEY);
-    else localStorage.setItem(THEME_KEY, theme);
-  } catch {
-    // The choice holds for this page only.
-  }
-  apply(theme);
-  for (const listener of listeners) listener();
-}
+export const { useTheme } = createThemeStore({ key: THEME_KEY, bar: BAR });
 
-/** The scheme in force: what the root element carries, which index.html sets
- * from the stored choice before the first paint. */
-function current(): Theme {
-  const theme = document.documentElement.dataset.theme;
-  return theme === "light" || theme === "dark" ? theme : "auto";
-}
-
-export function useTheme(): Theme {
-  return useSyncExternalStore((listener) => {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  }, current);
-}
+export const THEME_OPTIONS: readonly { value: ThemePreference; label: string }[] = [
+  { value: "system", label: "Auto" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];

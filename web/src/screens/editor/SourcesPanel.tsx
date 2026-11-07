@@ -1,8 +1,7 @@
 import type { SourceResult } from "@afterimage/management-client";
 import { ChevronRight } from "lucide-react";
+import { classes } from "linen";
 import { useState } from "react";
-
-import styles from "./SourcesPanel.module.css";
 
 /** What each data source answered, as a tree whose leaves copy the template that
  * reads them. */
@@ -24,44 +23,53 @@ export function SourcesPanel({
   const entries = Object.entries(sources ?? {});
 
   return (
-    <section className={styles.panel} aria-labelledby="sources-title">
-      <h3 id="sources-title" className={styles.title}>
+    <section className="grid min-w-0 gap-2" aria-labelledby="sources-title">
+      <h3 id="sources-title" className="text-sm font-medium text-text-secondary">
         Data sources
       </h3>
       {entries.length === 0 && (
-        <p className="hint">
-          This screen reads no data. Add <code>sources:</code> with a name and a <code>url</code>; its JSON
-          appears here.
+        <p className="text-sm text-text-secondary">
+          This screen reads no data. Add <code className="font-mono text-xs">sources:</code> with a name and a{" "}
+          <code className="font-mono text-xs">url</code>; its JSON appears here.
         </p>
       )}
       {entries.map(([name, result]) => (
-        <details key={name} className={styles.source} open={entries.length === 1}>
-          <summary>
-            <ChevronRight size={14} className={styles.chevron} aria-hidden="true" />
-            <code>{name}</code>
-            {result.error !== undefined && <span className={styles.failed}>no data</span>}
+        <details key={name} className="group/source border-t border-border" open={entries.length === 1}>
+          <summary className="flex cursor-pointer list-none items-center gap-2 py-2 text-sm [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              aria-hidden="true"
+              className="size-3.5 [transition:rotate_var(--motion-state)] group-open/source:rotate-90"
+            />
+            <code className="font-mono text-xs">{name}</code>
+            {result.error !== undefined && <span className="text-xs font-semibold text-danger">no data</span>}
           </summary>
           {result.error !== undefined ? (
-            <p className="error-text">{result.error}</p>
+            <p className="pb-2 text-sm text-danger">{result.error}</p>
           ) : (
-            <div className={styles.tree}>
+            <div className="mb-2 max-h-88 overflow-auto rounded-button border border-border bg-surface px-3 py-2 font-mono text-xs/[1.6]">
               <Node value={result.data} path={name} depth={0} onCopy={copy} />
             </div>
           )}
         </details>
       ))}
       {copied && (
-        <p className={styles.copied} role="status">
-          {copied.done ? "Copied" : "Copy"} <code data-select={!copied.done || undefined}>{copied.expression}</code>
+        <p role="status" className="text-xs">
+          {copied.done ? "Copied" : "Copy"}{" "}
+          <code className={classes("font-mono", !copied.done && "select-all")}>{copied.expression}</code>
         </p>
       )}
       {secretNames.length > 0 && (
-        <div className={styles.secrets}>
-          <span className={styles.title}>Secrets</span>
-          <p className="hint">
+        <div className="grid gap-1 border-t border-border pt-2">
+          <span className="text-sm font-medium text-text-secondary">Secrets</span>
+          <p className="text-sm text-text-secondary">
             Data source requests read them; screens never show them.{" "}
             {secretNames.map((name) => (
-              <button key={name} type="button" className={styles.leaf} onClick={() => copy(`{{ secrets.${name} }}`)}>
+              <button
+                key={name}
+                type="button"
+                className={classes(LEAF_CLASS, "font-mono text-xs text-text")}
+                onClick={() => copy(`{{ secrets.${name} }}`)}
+              >
                 secrets.{name}
               </button>
             ))}
@@ -71,6 +79,9 @@ export function SourcesPanel({
     </section>
   );
 }
+
+/** A value or a branch that copies the template reading it. */
+const LEAF_CLASS = "cursor-copy rounded-input px-1 text-left [overflow-wrap:anywhere] hover:bg-accent-weak";
 
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -94,10 +105,8 @@ function Node({
 }) {
   if (value === null || typeof value !== "object") {
     return (
-      <button type="button" className={styles.leaf} onClick={() => onCopy(`{{ ${path} }}`)} title={`Copy {{ ${path} }}`}>
-        <span className={styles.value} data-type={value === null ? "null" : typeof value}>
-          {JSON.stringify(value)}
-        </span>
+      <button type="button" className={LEAF_CLASS} onClick={() => onCopy(`{{ ${path} }}`)} title={`Copy {{ ${path} }}`}>
+        <span className={typeof value === "string" ? "text-text" : "text-text-secondary"}>{JSON.stringify(value)}</span>
       </button>
     );
   }
@@ -106,12 +115,15 @@ function Node({
     : Object.entries(value);
   const shown = items.slice(0, MAX_CHILDREN);
   return (
-    <details className={styles.branch} open={depth < 2}>
-      <summary>
-        <ChevronRight size={12} className={styles.chevron} aria-hidden="true" />
+    <details className="group/branch basis-full" open={depth < 2}>
+      <summary className="flex cursor-pointer list-none items-center gap-0.5 [&::-webkit-details-marker]:hidden">
+        <ChevronRight
+          aria-hidden="true"
+          className="size-3 shrink-0 [transition:rotate_var(--motion-state)] group-open/branch:rotate-90"
+        />
         <button
           type="button"
-          className={styles.copyBranch}
+          className={classes(LEAF_CLASS, "text-text-secondary")}
           onClick={(event) => {
             // Copies without opening or closing the branch.
             event.preventDefault();
@@ -122,14 +134,14 @@ function Node({
           {Array.isArray(value) ? `list of ${items.length}` : `${items.length} members`}
         </button>
       </summary>
-      <ul>
+      <ul className="ml-2 border-l border-border pl-3">
         {shown.map(([key, item]) => (
-          <li key={key}>
-            <span className={styles.key}>{typeof key === "number" ? `[${key}]` : key}</span>
+          <li key={key} className="flex flex-wrap items-baseline gap-x-2">
+            <span className="text-text after:content-[':']">{typeof key === "number" ? `[${key}]` : key}</span>
             <Node value={item} path={child(path, key)} depth={depth + 1} onCopy={onCopy} />
           </li>
         ))}
-        {items.length > shown.length && <li className="hint">and {items.length - shown.length} more</li>}
+        {items.length > shown.length && <li className="text-text-secondary">and {items.length - shown.length} more</li>}
       </ul>
     </details>
   );

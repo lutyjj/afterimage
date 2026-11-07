@@ -1,11 +1,10 @@
 import type { Device, FirmwareBoard } from "@afterimage/management-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Actions, Button, Card, CardBody, CardHead, classes, ConfirmDialog, FieldRow, Select, useToast } from "linen";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
 import { moment } from "../app/format";
-import { Section } from "../app/Section";
-import styles from "./DeviceFirmware.module.css";
 import { nextCheckIn, updateSteps, type Step } from "./firmwareSteps";
 import { deviceQuery, devicesQuery, firmwareBoardsQuery } from "./queries";
 
@@ -28,11 +27,12 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
     queryClient.setQueryData(deviceQuery(updated.id).queryKey, updated);
     void queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
   };
+  const toast = useToast();
   const install = useMutation({
     mutationFn: (version: string) => client.installFirmware({ deviceId: device.id, version }),
-    onSuccess: ({ device: updated }) => {
+    onSuccess: ({ device: updated }, version) => {
       stored(updated);
-      setConfirming(false);
+      toast.show({ text: `${device.name} installs ${version} at its next check-in.` });
     },
   });
   const cancel = useMutation({
@@ -45,121 +45,96 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
   const offered =
     firmware.updateAvailable && latest !== undefined && !pending && update?.state !== "not_installed" && !choosing;
 
+  const due = timeZone && nextCheckIn(device) ? moment(nextCheckIn(device)!, timeZone) : undefined;
+
   return (
-    <Section title="Firmware" intro={lead(device)}>
+    <Card>
+      <CardHead title="Firmware" description={lead(device)}>
+        {offered && (
+          <Button variant="primary" disabled={install.isPending} onClick={() => setConfirming(true)}>
+            {install.isPending ? `Fetching ${latest} from TRMNL` : `Install ${latest}`}
+          </Button>
+        )}
+      </CardHead>
+      <CardBody className="grid gap-5">
+        <BoardChoice
+          device={device}
+          boards={boards.data}
+          board={board}
+          locked={install.isPending}
+          onChange={setBoard}
+          onSaved={stored}
+        />
+        {boards.isError && (
+          <p role="alert" className="text-sm text-danger">
+            {messageOf(boards.error)}
+          </p>
+        )}
 
-      <BoardChoice
-        device={device}
-        boards={boards.data}
-        board={board}
-        locked={install.isPending}
-        onChange={setBoard}
-        onSaved={stored}
-      />
-      {boards.isError && (
-        <p className="error-text" role="alert">
-          {messageOf(boards.error)}
-        </p>
-      )}
-
-      {update && (
-        <div className={styles.request}>
-          <p className={styles.requestTitle}>Update to {update.version}</p>
-          <ol className={styles.steps}>
-            {updateSteps(update, device).map((step) => (
-              <StepItem key={step.label} step={step} timeZone={timeZone} />
-            ))}
-          </ol>
-          {update.state === "sent" && (
-            <p className="hint">
-              The display has the request and installs {update.version}. Its next check-in shows whether it runs
-              the new release.
-            </p>
-          )}
-          {update.state === "not_installed" && (
-            <p className="hint">
-              The display checked in on {installed ?? "another release"} after it had the request. Firmware 1.8
-              waits a day after a failed update before it tries again, and its log on the server says why it
-              failed.
-            </p>
-          )}
-          <div className={styles.actions}>
-            {update.state === "requested" && (
-              <button
-                className="button"
-                data-variant="quiet"
-                type="button"
-                disabled={cancel.isPending}
-                onClick={() => cancel.mutate()}
-              >
-                {cancel.isPending ? "Withdrawing" : "Withdraw the request"}
-              </button>
+        {update && (
+          <div className="grid max-w-2xl gap-3">
+            <p className="text-sm font-semibold">Update to {update.version}</p>
+            <ol className="grid grid-cols-3 gap-2">
+              {updateSteps(update, device).map((step) => (
+                <StepItem key={step.label} step={step} timeZone={timeZone} />
+              ))}
+            </ol>
+            {update.state === "sent" && (
+              <p className="text-sm text-text-secondary">
+                The display has the request and installs {update.version}. Its next check-in shows whether it runs the
+                new release.
+              </p>
             )}
-            {update.state === "not_installed" && !choosing && (
-              <button
-                className="button"
-                type="button"
-                disabled={install.isPending}
-                onClick={() => install.mutate(update.version)}
-              >
-                {install.isPending ? `Fetching ${update.version} from TRMNL` : "Try again"}
-              </button>
+            {update.state === "not_installed" && (
+              <p className="text-sm text-text-secondary">
+                The display checked in on {installed ?? "another release"} after it had the request. Firmware 1.8 waits
+                a day after a failed update before it tries again, and its log on the server says why it failed.
+              </p>
+            )}
+            {(update.state === "requested" || (update.state === "not_installed" && !choosing)) && (
+              <Actions>
+                {update.state === "requested" && (
+                  <Button disabled={cancel.isPending} onClick={() => cancel.mutate()}>
+                    {cancel.isPending ? "Withdrawing" : "Withdraw the request"}
+                  </Button>
+                )}
+                {update.state === "not_installed" && !choosing && (
+                  <Button disabled={install.isPending} onClick={() => install.mutate(update.version)}>
+                    {install.isPending ? `Fetching ${update.version} from TRMNL` : "Try again"}
+                  </Button>
+                )}
+              </Actions>
+            )}
+            {cancel.isError && (
+              <p role="alert" className="text-sm text-danger">
+                {messageOf(cancel.error)}
+              </p>
             )}
           </div>
-          {cancel.isError && (
-            <p className="error-text" role="alert">
-              {messageOf(cancel.error)}
-            </p>
-          )}
-        </div>
+        )}
+        {install.isError && (
+          <p role="alert" className="text-sm text-danger">
+            {messageOf(install.error)}
+          </p>
+        )}
+      </CardBody>
+      {latest !== undefined && (
+        <ConfirmDialog
+          open={confirming}
+          onOpenChange={setConfirming}
+          title={`Install ${latest} on ${device.name}?`}
+          detail={
+            <>
+              At its next check-in{due ? `, by about ${due},` : ""} the display downloads {latest} from this server,
+              shows that it is updating and installs it. It keeps its Wi-Fi, its settings and its playlist. Afterimage
+              first fetches the release from TRMNL and checks it, which takes a few seconds.
+            </>
+          }
+          confirmLabel={`Install ${latest}`}
+          onConfirm={() => install.mutate(latest)}
+        />
       )}
-
-      {offered &&
-        (!confirming ? (
-          <div className={styles.offer}>
-            <button className="button" type="button" onClick={() => setConfirming(true)}>
-              Install {latest}…
-            </button>
-          </div>
-        ) : (
-          <div className={styles.confirm}>
-            <p>
-              At its next check-in
-              {timeZone && nextCheckIn(device) ? `, by about ${moment(nextCheckIn(device)!, timeZone)},` : ""} the
-              display downloads {latest} from this server, shows that it is updating and installs it. It keeps its
-              Wi-Fi, its settings and its playlist.
-            </p>
-            <p className="hint">
-              Afterimage first fetches the release from TRMNL and checks it, which takes a few seconds.
-            </p>
-            <div className={styles.actions}>
-              <button
-                className="button"
-                data-variant="primary"
-                type="button"
-                disabled={install.isPending}
-                onClick={() => install.mutate(latest)}
-              >
-                {install.isPending ? `Fetching ${latest} from TRMNL` : `Install ${latest}`}
-              </button>
-              <button
-                className="button"
-                data-variant="quiet"
-                type="button"
-                disabled={install.isPending}
-                onClick={() => setConfirming(false)}
-              >
-                Not now
-              </button>
-            </div>
-          </div>
-        ))}
-      {install.isError && (
-        <p className="error-text" role="alert">
-          {messageOf(install.error)}
-        </p>
-      )}
-    </Section>
+    </Card>
   );
 }
 
@@ -179,9 +154,32 @@ function lead(device: Device): string {
 function StepItem({ step, timeZone }: { step: Step; timeZone: string | undefined }) {
   const when = step.at && timeZone ? moment(step.at, timeZone) : undefined;
   return (
-    <li className={styles.step} data-state={step.state} aria-current={step.state === "current" ? "step" : undefined}>
-      <span className={styles.stepLabel}>{step.label}</span>
-      <span className={styles.stepWhen}>
+    <li
+      aria-current={step.state === "current" ? "step" : undefined}
+      className={classes(
+        "grid content-start gap-0.5 border-t-3 pt-2",
+        step.state === "done" && "border-accent",
+        step.state === "current" &&
+          "border-dashed border-[color-mix(in_oklch,var(--color-accent)_45%,var(--color-border))]",
+        step.state === "waiting" && "border-border",
+        step.state === "failed" && "border-danger",
+      )}
+    >
+      <span
+        className={classes(
+          "text-sm font-medium",
+          step.state === "waiting" && "text-text-muted",
+          step.state === "failed" && "font-semibold text-danger",
+        )}
+      >
+        {step.label}
+      </span>
+      <span
+        className={classes(
+          "text-xs",
+          step.state === "current" || step.state === "waiting" ? "text-text-muted" : "text-text-secondary",
+        )}
+      >
         {step.state === "current" && step.note ? (when ? `${step.note}, by ${when}` : step.note) : (when ?? step.note)}
       </span>
     </li>
@@ -235,41 +233,32 @@ function BoardChoice({
     if (changed) save.mutate();
   };
 
+  const choices = [
+    ...(board !== "" && !sorted.some((candidate) => candidate.name === board) ? [{ value: board, label: board }] : []),
+    ...sorted.map((candidate) => ({ value: candidate.name, label: `${candidate.label} · ${candidate.chipFamily}` })),
+  ];
+
   return (
-    <form className={styles.board} onSubmit={submit}>
-      <label className="field">
-        <span>Board</span>
-        <select
-          className="select"
+    <form onSubmit={submit} className="grid max-w-2xl gap-2">
+      <FieldRow>
+        <Select
+          label="Board"
+          width={104}
+          placeholder={board === "" ? (boards ? "Choose a board" : "Reading TRMNL's list") : undefined}
+          choices={choices}
           value={board}
           disabled={!boards || locked}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {board === "" && (
-            <option value="" disabled>
-              {boards ? "Choose a board" : "Reading TRMNL's list"}
-            </option>
-          )}
-          {board !== "" && !sorted.some((candidate) => candidate.name === board) && (
-            <option value={board}>{board}</option>
-          )}
-          {sorted.map((candidate) => (
-            <option key={candidate.name} value={candidate.name}>
-              {candidate.label} · {candidate.chipFamily}
-            </option>
-          ))}
-        </select>
-        <span className="hint">{boardHint(device, board === "" || changed)}</span>
-      </label>
-      {changed && (
-        <div className={styles.actions}>
-          <button className="button" data-variant="primary" type="submit" disabled={save.isPending}>
+          onValueChange={onChange}
+        />
+        {changed && (
+          <Button type="submit" variant="primary" disabled={save.isPending}>
             {save.isPending ? "Saving" : "Use this board"}
-          </button>
-        </div>
-      )}
+          </Button>
+        )}
+      </FieldRow>
+      <p className="text-xs text-text-secondary">{boardHint(device, board === "" || changed)}</p>
       {save.isError && (
-        <p className="error-text" role="alert">
+        <p role="alert" className="text-sm text-danger">
           {messageOf(save.error)}
         </p>
       )}

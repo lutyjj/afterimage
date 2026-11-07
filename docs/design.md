@@ -36,7 +36,7 @@ Each component builds on its own and depends on the others only through generate
 | `crates/render-typst/` | The render operation in Typst, with a component library that reads design tokens |
 | `crates/mcp/` | The MCP endpoint: the management API's tagged operations as tools |
 | `tools/tokens/` | Build-time generator of design tokens per render profile |
-| `web/` | Web UI on the generated TypeScript client |
+| `web/` | Web UI on the generated TypeScript client, wearing linen, the design language pinned in `flake.lock` |
 | `deploy/nix/` | Nix packages, the development shell and the NixOS module |
 
 ## Devices
