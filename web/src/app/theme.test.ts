@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { setTheme } from "./theme";
+import { setTheme, THEME_KEY, THEMES } from "./theme";
 
 /** A root element with the one attribute the theme uses. */
 function root() {
@@ -46,5 +48,15 @@ describe("setTheme", () => {
     });
     setTheme("dark");
     expect(element.dataset.theme).toBe("dark");
+  });
+});
+
+describe("the shell's early script", () => {
+  it("reads the key and the schemes the theme module writes", () => {
+    const shell = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+    expect(shell).toContain(`localStorage.getItem("${THEME_KEY}")`);
+    for (const theme of THEMES.filter((theme) => theme !== "auto")) {
+      expect(shell).toContain(`theme === "${theme}"`);
+    }
   });
 });

@@ -8,8 +8,10 @@
     <meta name="theme-color" content="#0b0f12" media="(prefers-color-scheme: dark)" />
     <title>Afterimage</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <!-- The theme a person chose (src/app/theme.ts owns the key), set before the
-         stylesheet paints so a chosen theme never flashes the system's. -->
+    <!-- The theme a person chose (src/app/theme.ts owns the key, and its test
+         holds this script to it), set before the stylesheet paints so a chosen
+         theme never flashes the system's. The browser's own chrome keeps the
+         system's scheme through the theme-color above. -->
     <script>
       try {
         const theme = localStorage.getItem("afterimage.theme");

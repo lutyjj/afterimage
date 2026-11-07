@@ -7,7 +7,7 @@ export const THEMES: readonly Theme[] = ["auto", "light", "dark"];
 
 /** Where the choice is kept in this browser; index.html reads it too, to set the
  * theme before the first paint. */
-const KEY = "afterimage.theme";
+export const THEME_KEY = "afterimage.theme";
 const listeners = new Set<() => void>();
 
 /** Puts the scheme on the root element, which the stylesheet's light-dark()
@@ -20,8 +20,8 @@ function apply(theme: Theme) {
 /** Chooses a scheme, kept in this browser where it allows. */
 export function setTheme(theme: Theme) {
   try {
-    if (theme === "auto") localStorage.removeItem(KEY);
-    else localStorage.setItem(KEY, theme);
+    if (theme === "auto") localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, theme);
   } catch {
     // The choice holds for this page only.
   }
