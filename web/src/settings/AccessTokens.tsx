@@ -69,8 +69,9 @@ export function AccessTokens() {
         )}
         {tokens.data?.length === 0 && <Nothing>No tokens yet.</Nothing>}
         {/* The list says what it answers once the tokens have come, so the
-            ones that load are where it starts and only a new one arrives. */}
-        <SettlingRows scope={tokens.isSuccess ? "tokens" : undefined} marksArrivals>
+            ones that load are where it starts and only a new one arrives. It
+            keeps its scope through a failed refetch, which keeps the tokens. */}
+        <SettlingRows scope={tokens.data === undefined ? undefined : "tokens"} marksArrivals>
           {tokens.data?.map((token) => (
             <TokenRow key={token.id} token={token} timeZone={timeZone} />
           ))}
