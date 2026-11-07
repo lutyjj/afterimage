@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Afterimage is a self-hosted server for TRMNL e-paper displays. [The design](docs/design.md) owns its scope, principles, components and open questions.
+Afterimage is a self-hosted server for TRMNL e-paper displays. [The design](docs/design.md) owns its scope, principles, contract and components.
 
 ## Maintenance rules
 
