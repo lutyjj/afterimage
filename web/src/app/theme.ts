@@ -5,7 +5,7 @@ import { createThemeStore, type ThemePreference } from "linen";
 export const THEME_KEY = "afterimage.theme";
 
 /** The page's ground in each scheme, for the browser's own chrome. */
-const BAR = { light: "#f7fafb", dark: "#0d1113" } as const;
+export const BAR = { light: "#f7fafb", dark: "#0d1113" } as const;
 
 export const { useTheme } = createThemeStore({ key: THEME_KEY, bar: BAR });
 

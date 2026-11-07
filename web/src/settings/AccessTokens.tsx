@@ -121,6 +121,9 @@ function NewToken({ open, onOpenChange }: { open: boolean; onOpenChange: (open: 
     },
   });
   const change = (next: boolean) => {
+    // A token being made would arrive after the dialog closed, its secret
+    // never shown; the dialog stays until it has.
+    if (!next && create.isPending) return;
     onOpenChange(next);
     if (next) return;
     // Forgotten as the dialog closes; it keeps its words while it leaves.

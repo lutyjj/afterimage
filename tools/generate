@@ -44,7 +44,11 @@ if wants design; then
 	cp -rL --no-preserve=mode build/design gen/design
 fi
 
-if wants linen; then
+# A gen/linen that links to a linen checkout stays for a plain run; asking for
+# the linen part by name puts the pinned copy back.
+if [ "$part" = all ] && [ -L gen/linen ]; then
+	echo "gen/linen links to $(readlink gen/linen); left as it is" >&2
+elif wants linen; then
 	nix build "$root#linen" --out-link build/linen
 	rm -rf gen/linen
 	cp -rL --no-preserve=mode build/linen gen/linen

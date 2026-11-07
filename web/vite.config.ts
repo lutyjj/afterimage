@@ -37,7 +37,7 @@ export default defineConfig({
     },
     // linen is a workspace package with copies of its peers for its own
     // development; the app's copies are the ones that run.
-    dedupe: ["react", "react-dom", "react-router", "motion", "@base-ui/react"],
+    dedupe: ["react", "react-dom", "react-router", "motion", "@base-ui/react", "lucide-react"],
   },
   build: {
     // The editor's chunk carries CodeMirror, the document schema's completion and

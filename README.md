@@ -55,11 +55,12 @@ The flake's `nixosModules.default` runs the server as `services.afterimage`, wit
 
 | Command | Does |
 |---|---|
-| `tools/generate` | Generates `gen/`: from `model/smithy/` both services' Rust server crates and OpenAPI documents and the management API's TypeScript client, the renderer's design tokens and fonts from the pinned release of TRMNL's design system (`tools/trmnl-release.json`), and the web UI's design language, linen, at the revision `flake.lock` pins. To work on linen beside the web UI, replace `gen/linen` with a link to a linen checkout |
+| `tools/generate` | Generates `gen/`: from `model/smithy/` both services' Rust server crates and OpenAPI documents and the management API's TypeScript client, the renderer's design tokens and fonts from the pinned release of TRMNL's design system (`tools/trmnl-release.json`), and the web UI's design language, linen, at the revision `flake.lock` pins. A `gen/linen` that links to a linen checkout stays; `tools/generate linen` puts the pinned copy back |
+| `nix flake update linen`, then `tools/generate linen` and `pnpm install` | Moves the web UI to linen's newest revision. Then set `hash = lib.fakeHash;` in `deploy/nix/web.nix`, run `nix build .#web` and copy the hash it reports |
 | `cargo test --workspace` | Runs every Rust test, the conformance test included |
 | `pnpm install` | Installs the web UI's dependencies, after `tools/generate` |
 | `pnpm --filter afterimage-web dev` | Serves the web UI with hot reload at `http://127.0.0.1:5173`, sending `/api`, `/manage` and `/mcp` to a server on port 8080, or to the one `AFTERIMAGE_SERVER` names (an OIDC sign-in returns to that server's own address, so sign in there with a password) |
-| `pnpm --filter afterimage-web check` | Type-checks the web UI with the generated client and runs its tests |
+| `pnpm --filter afterimage-web check` | Checks the web UI's formatting, type-checks it with the generated client and runs its tests; `format` fixes the formatting |
 | `nix run .#parity [CASE...]` | Draws the cases in `tools/parity/cases/` with TRMNL's framework and with a server of its own, writes them side by side to `build/parity/`, and fails where a case differs from TRMNL by more than its limit |
 | `tools/trmnl-excerpt` | Refreshes the excerpt of TRMNL's published device contract |
 | `tools/trmnl-catalog` | Refreshes the snapshot of TRMNL's display models and palettes |
