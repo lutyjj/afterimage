@@ -19,9 +19,10 @@ function screenOf(pathname: string): string {
   return pathname.startsWith("/settings") ? "/settings" : pathname;
 }
 
-/** The signed-in frame: the rail with the places and who is signed in, a tab
- * bar on a phone. The screen editor holds the rail at its icons, so its YAML
- * and the preview at the display's own pixels share the width. */
+/** The signed-in frame: the rail with the places and who is signed in, and on
+ * a phone a bar along the top, which leaves the foot of the screen to the
+ * content. The screen editor holds the rail at its icons, so its YAML and the
+ * preview at the display's own pixels share the width. */
 export function Shell() {
   const { pathname } = useLocation();
   const editing = /^\/screens\/[^/]+/.test(pathname);
@@ -35,6 +36,7 @@ export function Shell() {
       mark={<Mark />}
       foot={<Account />}
       folded={editing}
+      phoneNav="top"
       screen={screenOf(pathname)}
     >
       <Outlet />

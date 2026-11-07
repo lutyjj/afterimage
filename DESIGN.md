@@ -141,7 +141,7 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 
 ## Layout
 
-- linen's `Shell` holds every signed-in screen: the rail on a desk, the tab bar on a phone. The screen editor holds the rail folded so the YAML and a 1:1 preview share the width.
+- linen's `Shell` holds every signed-in screen: the rail on a desk, and on a phone a bar along the top with the wordmark and the places, which scrolls away and leaves the whole screen to the content. The screen editor holds the rail folded so the YAML and a 1:1 preview share the width.
 - A display's card sets its screen beside its facts (at least 15rem) from 72rem, stacked below.
 - The editor is `wide`: its YAML (at least 24rem) beside a preview column as wide as the display, each scrolling on its own; below 64rem they stack.
 
