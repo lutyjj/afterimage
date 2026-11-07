@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use afterimage_management_api::model::RefreshMinutes;
 use rumqttc::tokio_rustls::rustls;
 use rumqttc::{
     AsyncClient, ConnectionError, Event, LastWill, MqttOptions, Outgoing, Packet, QoS,
@@ -252,14 +253,19 @@ enum Incoming {
     },
 }
 
-/// What the publisher last published of a device, to publish again only what
-/// changed.
+/// What the publisher last published on a device's topics, which belong to a
+/// MAC: the device that held them, its image, whether it counted as not seen
+/// lately, and the "Showing" options Home Assistant was given, which a command
+/// names.
 struct Published {
+    device: i64,
     image: Option<String>,
     overdue: bool,
+    options: Vec<(String, i64)>,
 }
 
 /// A setting a command changes.
+#[derive(Debug, PartialEq)]
 enum Setting {
     Held(bool),
     /// An option of the "Showing" select.
@@ -279,8 +285,8 @@ struct Publisher {
     /// Its own way in, for changes it causes.
     telemetry: Telemetry,
     connected: bool,
-    /// By device id, for this connection.
-    published: HashMap<i64, Published>,
+    /// By topic key, for this connection.
+    published: HashMap<String, Published>,
 }
 
 impl Publisher {
@@ -306,7 +312,7 @@ impl Publisher {
         true
     }
 
-    async fn clear_all(&self) {
+    async fn clear_all(&mut self) {
         match self.devices.all().await {
             Ok(devices) => {
                 for key in devices.iter().filter_map(|device| key(&device.mac)) {
@@ -451,7 +457,7 @@ impl Publisher {
     }
 
     /// Clears a key's topics when no device holds its MAC any more.
-    async fn clear_if_gone(&self, key: &str) {
+    async fn clear_if_gone(&mut self, key: &str) {
         let Some(mac) = mac_of(key) else {
             return;
         };
@@ -461,7 +467,8 @@ impl Publisher {
     }
 
     /// Empties a device's retained topics, which takes it out of Home Assistant.
-    async fn clear(&self, key: &str) {
+    async fn clear(&mut self, key: &str) {
+        self.published.remove(key);
         for topic in [
             self.discovery_topic(key),
             self.device_topic(key, "state"),
@@ -478,11 +485,13 @@ impl Publisher {
         };
         let now = self.clock.now();
         let screen = self.screen_name(device).await;
+        // Without its screens the select would offer and report the wrong
+        // thing, so the device waits for its next change instead.
         let options = match self.screens.list(device.account_id).await {
             Ok(screens) => screen_options(&screens),
             Err(error) => {
                 tracing::error!(%error, device = device.id, "the screens to offer could not be read");
-                Vec::new()
+                return;
             }
         };
         let config = discovery(&self.settings, &key, device, &options);
@@ -499,18 +508,22 @@ impl Publisher {
         )
         .await;
         let image = device.showing.as_ref().map(|showing| showing.image.clone());
+        // The image topic is the MAC's, so what it carries may be another
+        // device's that held the MAC. Images are named by their content.
         let before = self
             .published
-            .get(&device.id)
+            .get(&key)
             .and_then(|published| published.image.clone());
         if image.is_some() && image != before {
             self.publish_image(device.id, &key, image.as_deref()).await;
         }
         self.published.insert(
-            device.id,
+            key,
             Published {
+                device: device.id,
                 image,
                 overdue: overdue(device, now),
+                options,
             },
         );
     }
@@ -538,24 +551,23 @@ impl Publisher {
             return;
         }
         let now = self.clock.now();
-        let turned: Vec<(i64, bool)> = self
+        let checked: Vec<(i64, bool)> = self
             .published
-            .iter()
-            .map(|(id, published)| (*id, published.overdue))
+            .values()
+            .map(|published| (published.device, published.overdue))
             .collect();
-        for (id, was) in turned {
+        for (id, was) in checked {
             let device = match self.devices.any(id).await {
                 Ok(Some(device)) => device,
-                Ok(None) => {
-                    self.published.remove(&id);
-                    continue;
-                }
+                Ok(None) => continue,
                 Err(error) => {
                     tracing::error!(%error, device = id, "a device to check could not be read");
                     continue;
                 }
             };
-            if overdue(&device, now) != was {
+            // Only the device that holds its MAC's topics now speaks on them.
+            let holds = matches!(self.live(&device.mac).await, Ok(Some(live)) if live.id == id);
+            if holds && overdue(&device, now) != was {
                 let boards = self.firmware.boards_on_hand();
                 self.publish_device(&device, boards.as_deref()).await;
             }
@@ -563,13 +575,50 @@ impl Publisher {
     }
 
     /// Applies a command to the device with this key, as the web UI would, in a
-    /// task of its own, and publishes the device again.
+    /// task of its own, and publishes the device again. A "Showing" option is
+    /// read against the options Home Assistant was given, so it names the screen
+    /// it named there.
     fn set(&self, key: &str, setting: Setting) {
         let Some(mac) = mac_of(key) else {
             return;
         };
+        let published = self.published.get(key);
+        let changes = match setting {
+            Setting::Held(held) => Changes {
+                sleep_held: Some(held),
+                ..Changes::default()
+            },
+            Setting::Refresh(minutes) => Changes {
+                refresh_minutes: Some(minutes),
+                ..Changes::default()
+            },
+            Setting::Showing(option) => {
+                let shows = if option == PLAYLIST {
+                    Some(Shows::Playlist)
+                } else {
+                    published.and_then(|published| {
+                        published
+                            .options
+                            .iter()
+                            .find(|(name, _)| *name == option)
+                            .map(|(_, id)| Shows::Screen(*id))
+                    })
+                };
+                let Some(shows) = shows else {
+                    tracing::warn!(key, option, "no screen has that option");
+                    // Home Assistant shows the option it sent until told.
+                    if let Some(published) = published {
+                        self.telemetry.device(published.device);
+                    }
+                    return;
+                };
+                Changes {
+                    shows: Some(shows),
+                    ..Changes::default()
+                }
+            }
+        };
         let devices = Arc::clone(&self.devices);
-        let screens = Arc::clone(&self.screens);
         let telemetry = self.telemetry.clone();
         tokio::spawn(async move {
             let device = match devices.with_mac(&mac).await {
@@ -580,42 +629,8 @@ impl Publisher {
                     return;
                 }
             };
-            let changes = match setting {
-                Setting::Held(held) => Changes {
-                    sleep_held: Some(held),
-                    ..Changes::default()
-                },
-                Setting::Refresh(minutes) => Changes {
-                    refresh_minutes: Some(minutes),
-                    ..Changes::default()
-                },
-                Setting::Showing(option) => {
-                    let shows = if option == PLAYLIST {
-                        Some(Shows::Playlist)
-                    } else {
-                        match screens.list(device.account_id).await {
-                            Ok(screens) => screen_options(&screens)
-                                .into_iter()
-                                .find(|(name, _)| *name == option)
-                                .map(|(_, id)| Shows::Screen(id)),
-                            Err(error) => {
-                                tracing::error!(%error, "the screens to pin from could not be read");
-                                return;
-                            }
-                        }
-                    };
-                    let Some(shows) = shows else {
-                        tracing::warn!(device = device.id, option, "no screen has that option");
-                        // Home Assistant shows the option it sent until told.
-                        telemetry.device(device.id);
-                        return;
-                    };
-                    Changes {
-                        shows: Some(shows),
-                        ..Changes::default()
-                    }
-                }
-            };
+            // A screen of another account, as when the MAC changed hands since
+            // the options went out, is refused.
             if let Err(error) = devices.update(device.account_id, device.id, changes).await {
                 tracing::warn!(%error, device = device.id, "a setting over MQTT was refused");
             }
@@ -710,13 +725,64 @@ fn setting<'a>(base: &str, topic: &'a str, payload: &[u8]) -> Option<(&'a str, S
         return Some((key, Setting::Showing(text.to_owned())));
     }
     if let Some(key) = device_key(base, topic, "refresh/set") {
-        // Home Assistant's number entity may send a whole number as `15.0`.
-        let minutes = text.parse::<f64>().ok()?.round();
-        if !(1.0..=f64::from(1440)).contains(&minutes) {
+        // Home Assistant's number entity may send a whole number as `15.0`; the
+        // model's own type decides the range.
+        let minutes = text.parse::<f64>().ok()?;
+        if minutes.fract() != 0.0 || !minutes.is_finite() {
             return None;
         }
         #[allow(clippy::cast_possible_truncation)]
-        return Some((key, Setting::Refresh(minutes as i64)));
+        let minutes = RefreshMinutes::try_from(minutes as i32).ok()?;
+        return Some((key, Setting::Refresh(i64::from(minutes.into_inner()))));
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Setting, setting};
+
+    fn parsed(leaf: &str, payload: &str) -> Option<Setting> {
+        setting(
+            "afterimage",
+            &format!("afterimage/41b41039a101/{leaf}"),
+            payload.as_bytes(),
+        )
+        .map(|(key, setting)| {
+            assert_eq!(key, "41b41039a101");
+            setting
+        })
+    }
+
+    #[test]
+    fn a_command_carries_a_setting_the_model_accepts() {
+        assert_eq!(parsed("held/set", "ON"), Some(Setting::Held(true)));
+        assert_eq!(parsed("held/set", "OFF"), Some(Setting::Held(false)));
+        assert_eq!(parsed("refresh/set", "15"), Some(Setting::Refresh(15)));
+        assert_eq!(parsed("refresh/set", "15.0"), Some(Setting::Refresh(15)));
+        assert_eq!(parsed("refresh/set", "1440"), Some(Setting::Refresh(1440)));
+        assert_eq!(
+            parsed("showing/set", "Kitchen"),
+            Some(Setting::Showing("Kitchen".to_owned()))
+        );
+    }
+
+    #[test]
+    fn a_malformed_command_carries_none() {
+        for (leaf, payload) in [
+            ("held/set", "on"),
+            ("held/set", "maybe"),
+            ("refresh/set", "0"),
+            ("refresh/set", "1441"),
+            ("refresh/set", "15.5"),
+            ("refresh/set", "-15"),
+            ("refresh/set", "NaN"),
+            ("refresh/set", "inf"),
+            ("refresh/set", "soon"),
+            ("refresh/set", "99999999999"),
+            ("firmware/set", "ON"),
+        ] {
+            assert_eq!(parsed(leaf, payload), None, "{leaf} {payload}");
+        }
+    }
 }

@@ -493,6 +493,22 @@ async fn home_assistant_holds_sleep_pins_a_screen_and_sets_the_wake() {
         device(&server, id).await["shows"],
         json!({ "screenId": night })
     );
+    // An option no screen has changes nothing, and the state goes out again so
+    // Home Assistant's select shows what the device does.
+    let sent = observer.seen(STATE).len();
+    observer
+        .publish(&format!("{DEVICE}/showing/set"), "Nowhere", false)
+        .await;
+    common::until(
+        || observer.seen(STATE).len() > sent,
+        "the state never went out again",
+    )
+    .await;
+    assert_eq!(observer.seen(STATE).last().unwrap()["showing"], "Night");
+    assert_eq!(
+        device(&server, id).await["shows"],
+        json!({ "screenId": night })
+    );
     observer
         .publish(&format!("{DEVICE}/showing/set"), "Playlist", false)
         .await;
@@ -567,4 +583,92 @@ async fn device(server: &Server, id: i64) -> Value {
         .await
         .1["device"]
         .clone()
+}
+
+/// A command left retained on the broker reaches the server again whenever it
+/// subscribes; it changes nothing, as it was not sent now.
+#[tokio::test]
+async fn a_retained_command_changes_nothing() {
+    let broker = Broker::start().await;
+    let observer = Observer::start(&broker);
+    let offline = common::start().await;
+    offline.sign_up().await;
+    let (claimed, _) = offline.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    observer
+        .publish(&format!("{DEVICE}/held/set"), "ON", true)
+        .await;
+
+    let url = broker.url();
+    let _server = offline
+        .again(&[
+            "--mqtt-url",
+            &url,
+            "--public-url",
+            "https://afterimage.example",
+        ])
+        .await;
+    observer.wait(STATE, |_| true).await;
+    // Commands are taken in the order they arrive, so once a later one is
+    // applied, the retained one has been passed over.
+    observer
+        .publish(&format!("{DEVICE}/refresh/set"), "20", false)
+        .await;
+    observer.wait(STATE, |state| state["refresh"] == 20).await;
+    assert_eq!(device(&offline, id).await["sleepHeld"], false);
+}
+
+#[tokio::test]
+async fn the_image_topic_follows_the_device_that_holds_the_mac() {
+    let broker = Broker::start().await;
+    let observer = Observer::start(&broker);
+    let server = start(&broker).await;
+    publish_og(&server);
+    server.sign_up().await;
+    let (adas, ada_key) = server.claim(&mac(1)).await;
+    server.display(&ada_key, &READINGS).await;
+    let ada_image = server
+        .http
+        .get(format!(
+            "{}/manage/devices/{}/image",
+            server.url, adas["id"]
+        ))
+        .send()
+        .await
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap();
+    let as_published = |bytes: &[u8]| Value::String(String::from_utf8_lossy(bytes).into_owned());
+    observer
+        .wait(IMAGE, |image| *image == as_published(&ada_image))
+        .await;
+
+    let eve = server.second_account().await;
+    server.clock.advance(60);
+    let (key, code) = server.register(&mac(1)).await;
+    server.display(&key, &READINGS).await;
+    let (_, claimed) = eve
+        .call(
+            "POST",
+            "/manage/devices",
+            Some(json!({ "code": code, "name": "Eve's display" })),
+        )
+        .await;
+    server.display(&key, &READINGS).await;
+    observer
+        .wait(IMAGE, |image| *image != as_published(&ada_image))
+        .await;
+
+    let (status, _) = eve
+        .call(
+            "DELETE",
+            &format!("/manage/devices/{}", claimed["device"]["id"]),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    observer
+        .wait(IMAGE, |image| *image == as_published(&ada_image))
+        .await;
 }

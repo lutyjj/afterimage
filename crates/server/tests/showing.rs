@@ -1044,3 +1044,53 @@ async fn a_device_held_asleep_checks_in_hourly_until_let_go() {
     assert_eq!(awake["showing"]["asleep"], false);
     assert_eq!(awake["showing"]["screenId"], first);
 }
+
+#[tokio::test]
+async fn a_device_held_asleep_names_no_wake_even_in_a_window() {
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, key) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    let image = || async {
+        server
+            .http
+            .get(format!("{}/manage/devices/{id}/image", server.url))
+            .send()
+            .await
+            .unwrap()
+            .bytes()
+            .await
+            .unwrap()
+    };
+
+    update(&server, id, json!({ "sleepHeld": true })).await;
+    server.display(&key, &READINGS).await;
+    let held = image().await;
+
+    // The clock stands at 08:00, an hour before this window ends.
+    let (status, body) = set_sleep(
+        &server,
+        id,
+        json!({ "windows": [{ "from": "08:00", "until": "09:00" }] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    server.display(&key, &READINGS).await;
+    assert_eq!(
+        image().await,
+        held,
+        "held in a window, it names no wake it would not keep"
+    );
+
+    update(&server, id, json!({ "sleepHeld": false })).await;
+    assert_eq!(
+        server.display(&key, &READINGS).await["refresh_rate"],
+        60 * 60,
+        "it sleeps until the window ends"
+    );
+    assert_ne!(
+        image().await,
+        held,
+        "in a window alone, it says when it wakes"
+    );
+}

@@ -181,8 +181,8 @@ async fn asleep(
         }
     }
     let (model, palette) = display(device);
-    // Held asleep outside its windows, the device does not know when it wakes.
-    let wakes = in_window.then(|| {
+    // Held asleep, the device does not know when it wakes, in a window or not.
+    let wakes = (in_window && !device.sleep_held).then(|| {
         at.checked_add(jiff::SignedDuration::from_secs(shown.wait))
             .unwrap_or_else(|_| at.clone())
     });

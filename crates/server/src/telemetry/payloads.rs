@@ -16,6 +16,11 @@ use crate::screens::Summary;
 /// The option of the "Showing" select that follows the playlist.
 pub(super) const PLAYLIST: &str = "Playlist";
 
+/// The "Wakes every" number's bounds, which the model's `RefreshMinutes` sets
+/// (a test holds them to it).
+const FEWEST_MINUTES: i32 = 1;
+const MOST_MINUTES: i32 = 1440;
+
 /// The account's screens as the "Showing" select names them, after its
 /// playlist: each by its name, a name two screens share numbered by age, so an
 /// option names one screen.
@@ -285,8 +290,8 @@ fn controls(base: &str, key: &str, options: &[(String, i64)]) -> serde_json::Map
             "unique_id": id("refresh"),
             "entity_category": "config",
             "unit_of_measurement": "min",
-            "min": 1,
-            "max": 1440,
+            "min": FEWEST_MINUTES,
+            "max": MOST_MINUTES,
             "step": 1,
             "mode": "box",
             "state_topic": state_topic,
@@ -317,6 +322,15 @@ fn controls(base: &str, key: &str, options: &[(String, i64)]) -> serde_json::Map
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_wake_bounds_are_the_models() {
+        use afterimage_management_api::model::RefreshMinutes;
+        assert!(RefreshMinutes::try_from(FEWEST_MINUTES).is_ok());
+        assert!(RefreshMinutes::try_from(FEWEST_MINUTES - 1).is_err());
+        assert!(RefreshMinutes::try_from(MOST_MINUTES).is_ok());
+        assert!(RefreshMinutes::try_from(MOST_MINUTES + 1).is_err());
+    }
 
     #[test]
     fn every_screen_option_names_one_screen() {
