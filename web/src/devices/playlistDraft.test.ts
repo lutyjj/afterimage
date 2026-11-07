@@ -26,4 +26,11 @@ describe("playlist drafts", () => {
     const [entry] = draftOf(saved);
     expect(entry && sameAs([{ ...entry, until: "10:00" }], saved)).toBe(false);
   });
+
+  it("keep each row's key when they are made again from the playlist they saved", () => {
+    const before = draftOf([{ screenId: 1 }, { screenId: 2 }]);
+    const again = draftOf([{ screenId: 1 }, { screenId: 2 }, { screenId: 3 }], before);
+    expect(again.slice(0, 2).map((entry) => entry.key)).toEqual(before.map((entry) => entry.key));
+    expect(before.map((entry) => entry.key)).not.toContain(again[2]?.key);
+  });
 });

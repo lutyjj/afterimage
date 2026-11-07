@@ -16,8 +16,11 @@ export function newKey(): number {
   return nextKey++;
 }
 
-export function draftOf(entries: PlaylistEntry[]): Draft[] {
-  return entries.map((entry) => ({ ...entry, key: newKey(), allDay: isAllDay(entry) }));
+/** The draft of a playlist. Made again from a playlist the draft became, as a
+ * save returns it in the draft's order, each row keeps its key, so the rows on
+ * the page stay the same rows rather than all arriving anew. */
+export function draftOf(entries: PlaylistEntry[], before: readonly Draft[] = []): Draft[] {
+  return entries.map((entry, index) => ({ ...entry, key: before[index]?.key ?? newKey(), allDay: isAllDay(entry) }));
 }
 
 /** The entry a draft saves as: an all-day one without its times. */

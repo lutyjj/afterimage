@@ -50,7 +50,7 @@ export function PlaylistEditor({
   useEffect(() => {
     const before = previous.current;
     previous.current = saved;
-    setDraft((current) => (sameAs(current, before) ? draftOf(saved) : current));
+    setDraft((current) => (sameAs(current, before) ? draftOf(saved, current) : current));
   }, [saved]);
 
   const toast = useToast();
@@ -59,7 +59,7 @@ export function PlaylistEditor({
     onSuccess: ({ device: updated }) => {
       queryClient.setQueryData(deviceQuery(updated.id).queryKey, updated);
       void queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
-      setDraft(draftOf(updated.playlist));
+      setDraft((current) => draftOf(updated.playlist, current));
       toast.show({ text: "Playlist saved. The display takes it at its next check-in." });
     },
   });
