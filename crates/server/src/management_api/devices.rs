@@ -5,7 +5,7 @@ use afterimage_management_api::server::Extension;
 use afterimage_management_api::{error, input, output};
 
 use super::firmware::unavailable;
-use super::{Caller, Shared, State, internal, wire};
+use super::{Caller, Shared, State, internal, invalid, wire};
 use crate::devices::{self, Changes, Claim, Device};
 
 /// The device as the API shows it, with what TRMNL's firmware list says of its
@@ -20,15 +20,6 @@ pub(super) fn shown(
 pub(super) fn not_found() -> error::NotFound {
     error::NotFound {
         message: "This device does not exist.".to_owned(),
-    }
-}
-
-/// The model's validation error, for a request that is well formed but names
-/// something the server cannot use.
-fn invalid(message: String) -> error::ValidationException {
-    error::ValidationException {
-        message,
-        field_list: None,
     }
 }
 

@@ -283,6 +283,7 @@ async fn a_retained_install_command_is_ignored() {
     publish_og(&server);
     server.sign_up().await;
     let (device, _) = server.claim(&mac(1)).await;
+    let (other, _) = server.claim(&mac(2)).await;
     observer.wait(CONFIG, |_| true).await;
 
     drop(broker);
@@ -291,22 +292,30 @@ async fn a_retained_install_command_is_ignored() {
     observer
         .publish("afterimage/41b41039a101/firmware/install", "install", true)
         .await;
-    // The server's republish shows it subscribed again; the announcement after
-    // it arrives behind the retained command.
+    // The server's republish shows it subscribed again, so the retained command
+    // has reached it. A live command for the other device follows it through
+    // the same subscription: once that one is handled, so is the retained one.
     observer.wait(CONFIG, |_| true).await;
-    observer.settle(CONFIG).await;
-    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-    assert_eq!(
-        server
-            .trmnl
-            .flash_requests
-            .load(std::sync::atomic::Ordering::SeqCst),
-        0
-    );
-    let (_, body) = server
-        .call("GET", &format!("/manage/devices/{}", device["id"]), None)
+    observer
+        .publish("afterimage/41b41039a102/firmware/install", "install", false)
         .await;
-    assert!(body["device"]["firmware"]["update"].is_null(), "{body}");
+    let update = |device: &Value| {
+        let path = format!("/manage/devices/{}", device["id"]);
+        let server = &server;
+        async move {
+            let (_, body) = server.call("GET", &path, None).await;
+            body["device"]["firmware"]["update"].clone()
+        }
+    };
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+    while update(&other).await.is_null() {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the live command was not handled"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert!(update(&device).await.is_null());
 }
 
 #[tokio::test]

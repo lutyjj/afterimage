@@ -3,7 +3,7 @@
 use afterimage_management_api::server::Extension;
 use afterimage_management_api::{error, input, model, output};
 
-use super::{Caller, Shared, internal, wire};
+use super::{Caller, Shared, internal, invalid, wire};
 use crate::screens::TEMPLATE_NAMES;
 use crate::{drawing, showing};
 
@@ -15,13 +15,10 @@ fn check(document: &model::ScreenDocument) -> Result<(), error::ValidationExcept
         .flat_map(|sources| sources.inner().keys())
         .find(|name| TEMPLATE_NAMES.contains(&name.as_str()));
     match taken {
-        Some(name) => Err(error::ValidationException {
-            message: format!(
-                "A data source cannot be named `{}`: templates read that name already.",
-                name.as_str()
-            ),
-            field_list: None,
-        }),
+        Some(name) => Err(invalid(format!(
+            "A data source cannot be named `{}`: templates read that name already.",
+            name.as_str()
+        ))),
         None => Ok(()),
     }
 }
@@ -188,11 +185,8 @@ pub async fn preview_screen(
 }
 
 fn invalid_display(display: &crate::devices::Display) -> error::ValidationException {
-    error::ValidationException {
-        message: format!(
-            "{} with {} is not a display Afterimage can draw: TRMNL's catalogue does not list the pair, or its model takes an image format the renderer does not write.",
-            display.model, display.palette
-        ),
-        field_list: None,
-    }
+    invalid(format!(
+        "{} with {} is not a display Afterimage can draw: TRMNL's catalogue does not list the pair, or its model takes an image format the renderer does not write.",
+        display.model, display.palette
+    ))
 }

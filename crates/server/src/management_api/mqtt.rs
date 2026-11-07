@@ -6,7 +6,7 @@ use afterimage_management_api::server::Extension;
 use afterimage_management_api::{error, input, model, output};
 
 use super::wire::fit;
-use super::{Caller, Shared, State, internal};
+use super::{Caller, Shared, State, internal, invalid};
 use crate::telemetry::{self, Connection, SavedBroker};
 
 /// The topic and discovery prefix a broker saved without them takes, as the
@@ -29,13 +29,6 @@ fn same_broker(saved: &str, given: &str) -> bool {
     match (telemetry::broker_url(saved), telemetry::broker_url(given)) {
         (Ok(saved), Ok(given)) => telemetry::same_broker(&saved, &given),
         _ => false,
-    }
-}
-
-fn invalid(message: String) -> error::ValidationException {
-    error::ValidationException {
-        message,
-        field_list: None,
     }
 }
 

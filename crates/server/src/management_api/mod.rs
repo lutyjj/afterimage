@@ -405,6 +405,15 @@ where
     response
 }
 
+/// The model's validation error, for a request that is well formed but names
+/// something the server cannot use.
+fn invalid(message: String) -> error::ValidationException {
+    error::ValidationException {
+        message,
+        field_list: None,
+    }
+}
+
 /// Logs a failure and answers it as the model's `InternalFailure`.
 fn internal(error: &dyn std::fmt::Display) -> error::InternalFailure {
     tracing::error!(%error, "management API request failed");
