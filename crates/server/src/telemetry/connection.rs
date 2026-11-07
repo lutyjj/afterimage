@@ -486,11 +486,19 @@ impl Publisher {
         let now = self.clock.now();
         let screen = self.screen_name(device).await;
         // Without its screens the select would offer and report the wrong
-        // thing, so the device waits for its next change instead.
+        // thing, so the device waits for its next change instead, and the
+        // topics hold no other device's facts meanwhile, as after a removal.
         let options = match self.screens.list(device.account_id).await {
             Ok(screens) => screen_options(&screens),
             Err(error) => {
                 tracing::error!(%error, device = device.id, "the screens to offer could not be read");
+                if self
+                    .published
+                    .get(&key)
+                    .is_some_and(|published| published.device != device.id)
+                {
+                    self.clear(&key).await;
+                }
                 return;
             }
         };
@@ -508,14 +516,22 @@ impl Publisher {
         )
         .await;
         let image = device.showing.as_ref().map(|showing| showing.image.clone());
-        // The image topic is the MAC's, so what it carries may be another
-        // device's that held the MAC. Images are named by their content.
-        let before = self
+        // The image topic is the MAC's, so it may carry another device's image
+        // or, before this connection published there, anything. Images are
+        // named by their content.
+        let changed = self
             .published
             .get(&key)
-            .and_then(|published| published.image.clone());
-        if image.is_some() && image != before {
-            self.publish_image(device.id, &key, image.as_deref()).await;
+            .is_none_or(|published| published.image != image);
+        if changed {
+            match &image {
+                Some(name) => self.publish_image(device.id, &key, name).await,
+                // Home Assistant then has no image of the device, which has none.
+                None => {
+                    self.send(&self.device_topic(&key, "image"), Vec::new(), true)
+                        .await;
+                }
+            }
         }
         self.published.insert(
             key,
@@ -528,10 +544,7 @@ impl Publisher {
         );
     }
 
-    async fn publish_image(&self, id: i64, key: &str, image: Option<&str>) {
-        let Some(image) = image else {
-            return;
-        };
+    async fn publish_image(&self, id: i64, key: &str, image: &str) {
         match self.images.read(id, image) {
             Ok(Some(bytes)) => {
                 self.send(&self.device_topic(key, "image"), bytes, true)

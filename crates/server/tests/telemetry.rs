@@ -655,9 +655,14 @@ async fn the_image_topic_follows_the_device_that_holds_the_mac() {
             Some(json!({ "code": code, "name": "Eve's display" })),
         )
         .await;
+    // Claimed, Eve's display has drawn nothing yet, and shows none of Ada's.
+    observer.wait_gone(IMAGE).await;
     server.display(&key, &READINGS).await;
     observer
-        .wait(IMAGE, |image| *image != as_published(&ada_image))
+        .wait(IMAGE, |image| {
+            image.as_str().is_some_and(|png| png.contains("PNG"))
+                && *image != as_published(&ada_image)
+        })
         .await;
 
     let (status, _) = eve
