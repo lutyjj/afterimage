@@ -3,11 +3,11 @@
     "linen": {
       "flake": false,
       "locked": {
-        "lastModified": 1794060065,
-        "narHash": "sha256-hAMnRXkOk8Z7yTqx0QoixUbxKtbUKwLw86awM0FX3mo=",
+        "lastModified": 1794060451,
+        "narHash": "sha256-w2rrey4SfckFpB1w0TAJ+NP8SwAnuZvz3Xa/fUEm9Y0=",
         "owner": "lutyjj",
         "repo": "linen",
-        "rev": "d34508478c04270aa6ba6a5698960407e02883ed",
+        "rev": "d2f1d92885457bc2d2fc36b893152aa2ac1b302a",
         "type": "github"
       },
       "original": {
