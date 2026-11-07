@@ -667,3 +667,198 @@ async fn a_display_that_can_no_longer_be_drawn_falls_back_by_the_panel_size() {
     assert_eq!((info.width, info.height), (800, 480));
     assert_eq!(info.bit_depth, png::BitDepth::Two);
 }
+
+async fn set_sleep(server: &common::Server, device: i64, sleep: Value) -> (StatusCode, Value) {
+    server
+        .call(
+            "PUT",
+            &format!("/manage/devices/{device}/sleep"),
+            Some(json!({ "sleep": sleep })),
+        )
+        .await
+}
+
+async fn device(server: &common::Server, id: i64) -> Value {
+    server
+        .call("GET", &format!("/manage/devices/{id}"), None)
+        .await
+        .1["device"]
+        .clone()
+}
+
+/// The harness clock's start, Friday 2027-01-15 08:00 UTC, the server's zone.
+const EIGHT: i64 = 1_800_000_000;
+
+#[tokio::test]
+async fn a_device_sleeps_through_its_window_and_wakes_where_its_playlist_was() {
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, key) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    let text = |label: &str| json!({ "content": { "title": { "text": label } } });
+    let first = screen(&server, "First", text("First")).await;
+    let second = screen(&server, "Second", text("Second")).await;
+    play(
+        &server,
+        id,
+        json!([{ "screenId": first }, { "screenId": second }]),
+    )
+    .await;
+    server.display(&key, &READINGS).await;
+    assert_eq!(device(&server, id).await["showing"]["screenId"], first);
+
+    let (status, body) = set_sleep(
+        &server,
+        id,
+        json!({ "windows": [{ "from": "08:00", "until": "09:00" }] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        body["device"]["sleep"],
+        json!({ "windows": [{ "from": "08:00", "until": "09:00" }] })
+    );
+
+    let answer = server.display(&key, &READINGS).await;
+    assert_eq!(answer["refresh_rate"], 60 * 60, "sleeps until 09:00");
+    assert_eq!(
+        download(&server, &answer, &key).await.status(),
+        StatusCode::OK
+    );
+    let asleep = device(&server, id).await;
+    assert_eq!(asleep["showing"]["asleep"], true);
+    assert!(asleep["showing"].get("screenId").is_none(), "{asleep}");
+    assert_eq!(asleep["wakesAt"], EIGHT + 60 * 60);
+
+    server.clock.advance(60 * 60);
+    let answer = server.display(&key, &READINGS).await;
+    assert_eq!(answer["refresh_rate"], 15 * 60);
+    let awake = device(&server, id).await;
+    assert_eq!(awake["showing"]["asleep"], false);
+    assert_eq!(
+        awake["showing"]["screenId"], second,
+        "the playlist goes on from the entry shown before it slept"
+    );
+}
+
+#[tokio::test]
+async fn an_awake_device_wakes_in_time_to_fall_asleep() {
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, key) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    let first = screen(
+        &server,
+        "First",
+        json!({ "content": { "title": { "text": "First" } } }),
+    )
+    .await;
+    play(&server, id, json!([{ "screenId": first }])).await;
+    set_sleep(
+        &server,
+        id,
+        json!({ "windows": [{ "days": ["friday"], "from": "08:10", "until": "07:00" }] }),
+    )
+    .await;
+    assert_eq!(
+        server.display(&key, &READINGS).await["refresh_rate"],
+        10 * 60,
+        "wakes at 08:10 to fall asleep, before its quarter hour is up"
+    );
+    server.clock.advance(10 * 60);
+    assert_eq!(
+        server.display(&key, &READINGS).await["refresh_rate"],
+        (22 * 60 + 50) * 60,
+        "Friday's window runs past midnight to Saturday 07:00"
+    );
+}
+
+#[tokio::test]
+async fn a_sleep_screen_shows_while_asleep_and_gives_way_when_it_fails() {
+    let source = Source::default();
+    let url = source.serve().await;
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, key) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    let night = screen(
+        &server,
+        "Night",
+        json!({
+            "sources": { "sky": { "url": url } },
+            "content": { "title": { "text": "{{ sky.moon }}" } }
+        }),
+    )
+    .await;
+    source.set(Some(json!({ "moon": "Waxing" })));
+    set_sleep(&server, id, json!({ "windows": [{}], "screenId": night })).await;
+
+    server.display(&key, &READINGS).await;
+    let shown = device(&server, id).await;
+    assert_eq!(shown["showing"]["screenId"], night);
+    assert_eq!(shown["showing"]["asleep"], true);
+
+    source.set(None);
+    server.display(&key, &READINGS).await;
+    let shown = device(&server, id).await;
+    assert!(
+        shown["showing"].get("screenId").is_none(),
+        "the server's own sleep screen: {shown}"
+    );
+    assert_eq!(shown["showing"]["asleep"], true);
+}
+
+#[tokio::test]
+async fn sleep_takes_only_the_accounts_screens_and_loses_a_deleted_one() {
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, _) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    assert_eq!(
+        device(&server, id).await["sleep"],
+        json!({ "windows": [] }),
+        "a new device never sleeps"
+    );
+
+    let eve = server.second_account().await;
+    let theirs = screen(
+        &eve,
+        "Theirs",
+        json!({ "content": { "title": { "text": "Theirs" } } }),
+    )
+    .await;
+    let (status, _) = set_sleep(&server, id, json!({ "windows": [], "screenId": theirs })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    let night = screen(
+        &server,
+        "Night",
+        json!({ "content": { "title": { "text": "Night" } } }),
+    )
+    .await;
+    let windows = json!([
+        { "days": ["saturday", "sunday"], "from": "23:30", "until": "09:00" },
+        { "days": ["monday", "tuesday", "wednesday", "thursday", "friday"], "from": "23:00", "until": "07:00" }
+    ]);
+    let (status, body) = set_sleep(
+        &server,
+        id,
+        json!({ "windows": windows, "screenId": night }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        device(&server, id).await["sleep"],
+        json!({ "windows": windows, "screenId": night })
+    );
+
+    let (status, _) = server
+        .call("DELETE", &format!("/manage/screens/{night}"), None)
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(
+        device(&server, id).await["sleep"],
+        json!({ "windows": windows }),
+        "the server's own screen stands in"
+    );
+}

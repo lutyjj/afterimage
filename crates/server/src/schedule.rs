@@ -1,19 +1,25 @@
-//! Which playlist entry a device shows at a check-in, and when it checks in next.
+//! Which playlist entry a device shows at a check-in, whether it sleeps, and
+//! when it checks in next.
 //!
-//! An entry is current on its days, from its `from` time until its `until` time,
-//! in the server's time zone. An entry whose `until` comes before its `from` runs
-//! past midnight and belongs to the day it starts; one whose times are equal is
-//! current all day. Each check-in shows the current entry after the one shown
-//! last, in playlist order, and starts over at the first.
+//! A playlist entry and a sleep window are current on their days, from their
+//! `from` time until their `until` time, in the server's time zone. One whose
+//! `until` comes before its `from` runs past midnight and belongs to the day it
+//! starts; one whose times are equal is current all day. Each check-in shows the
+//! current entry after the one shown last, in playlist order, and starts over at
+//! the first. A device sleeps while any of its sleep windows is current.
 
 use std::cmp::Ordering;
 
 use jiff::civil::Weekday;
 use jiff::{ToSpan, Zoned};
 
-use crate::devices::Entry;
+use crate::devices::{Entry, Hours};
 
 const DAY_MINUTES: u16 = 24 * 60;
+
+/// The longest a device sleeps at once, so one asleep around the clock still
+/// checks in, and takes a change, once a day.
+pub const LONGEST_SLEEP_MINUTES: i64 = 24 * 60;
 
 fn day_bit(weekday: Weekday) -> u8 {
     1 << weekday.to_monday_zero_offset()
@@ -23,12 +29,12 @@ fn minute_of_day(at: &Zoned) -> u16 {
     u16::try_from(i32::from(at.hour()) * 60 + i32::from(at.minute())).unwrap_or(0)
 }
 
-/// Whether the entry is current at `at`.
+/// Whether the hours include `at`.
 #[must_use]
-pub fn is_current(entry: &Entry, at: &Zoned) -> bool {
-    let on = |weekday: Weekday| entry.days.is_none_or(|days| days & day_bit(weekday) != 0);
-    let from = entry.from_minute.unwrap_or(0);
-    let until = entry.until_minute.unwrap_or(DAY_MINUTES);
+pub fn is_current(hours: &Hours, at: &Zoned) -> bool {
+    let on = |weekday: Weekday| hours.days.is_none_or(|days| days & day_bit(weekday) != 0);
+    let from = hours.from_minute.unwrap_or(0);
+    let until = hours.until_minute.unwrap_or(DAY_MINUTES);
     let now = minute_of_day(at);
     match from.cmp(&until) {
         Ordering::Equal => on(at.weekday()),
@@ -39,9 +45,15 @@ pub fn is_current(entry: &Entry, at: &Zoned) -> bool {
     }
 }
 
+/// Whether the device sleeps at `at`.
+#[must_use]
+pub fn asleep(windows: &[Hours], at: &Zoned) -> bool {
+    windows.iter().any(|window| is_current(window, at))
+}
+
 fn current(playlist: &[Entry], at: &Zoned) -> Vec<usize> {
     (0..playlist.len())
-        .filter(|&position| is_current(&playlist[position], at))
+        .filter(|&position| is_current(&playlist[position].hours, at))
         .collect()
 }
 
@@ -57,12 +69,24 @@ pub fn next(playlist: &[Entry], last: Option<usize>, at: &Zoned) -> Option<usize
         .or_else(|| current.first().copied())
 }
 
-/// Seconds until the device should check in again: its refresh interval, or less
-/// when the set of current entries changes sooner.
+/// Seconds until the device should check in again. Awake, its refresh interval,
+/// or less when the set of current entries changes or it falls asleep sooner.
+/// Asleep, until no sleep window is current, a day at most.
 #[must_use]
-pub fn wait(playlist: &[Entry], refresh_minutes: i64, at: &Zoned) -> i64 {
-    let refresh = refresh_minutes.max(1);
-    let now = current(playlist, at);
+pub fn wait(playlist: &[Entry], sleep: &[Hours], refresh_minutes: i64, at: &Zoned) -> i64 {
+    if asleep(sleep, at) {
+        until_change(at, LONGEST_SLEEP_MINUTES, |later| asleep(sleep, later))
+    } else {
+        until_change(at, refresh_minutes.max(1), |later| {
+            (current(playlist, later), asleep(sleep, later))
+        })
+    }
+}
+
+/// Seconds from `at` to the first whole minute, at most `limit` minutes on,
+/// where `state` differs from what it is at `at`; the limit when it never does.
+fn until_change<T: PartialEq>(at: &Zoned, limit: i64, state: impl Fn(&Zoned) -> T) -> i64 {
+    let now = state(at);
     let minute = at
         .round(
             jiff::ZonedRound::new()
@@ -70,16 +94,16 @@ pub fn wait(playlist: &[Entry], refresh_minutes: i64, at: &Zoned) -> i64 {
                 .mode(jiff::RoundMode::Trunc),
         )
         .unwrap_or_else(|_| at.clone());
-    for step in 1..=refresh {
+    for step in 1..=limit {
         let Ok(later) = minute.checked_add(step.minutes()) else {
             break;
         };
-        if current(playlist, &later) != now {
+        if state(&later) != now {
             let seconds = later.timestamp().as_second() - at.timestamp().as_second();
             return seconds.max(1);
         }
     }
-    refresh * 60
+    limit * 60
 }
 
 #[cfg(test)]
@@ -93,12 +117,18 @@ mod tests {
         format!("2026-11-04T{time}[Europe/Berlin]").parse().unwrap()
     }
 
-    fn entry(days: Option<u8>, from: Option<u16>, until: Option<u16>) -> Entry {
-        Entry {
-            screen_id: 1,
+    fn hours(days: Option<u8>, from: Option<u16>, until: Option<u16>) -> Hours {
+        Hours {
             days,
             from_minute: from,
             until_minute: until,
+        }
+    }
+
+    fn entry(days: Option<u8>, from: Option<u16>, until: Option<u16>) -> Entry {
+        Entry {
+            screen_id: 1,
+            hours: hours(days, from, until),
         }
     }
 
@@ -107,26 +137,26 @@ mod tests {
 
     #[test]
     fn an_entry_without_days_or_times_is_always_current() {
-        assert!(is_current(&entry(None, None, None), &wednesday("00:00")));
-        assert!(is_current(&entry(None, None, None), &wednesday("23:59")));
+        assert!(is_current(&hours(None, None, None), &wednesday("00:00")));
+        assert!(is_current(&hours(None, None, None), &wednesday("23:59")));
     }
 
     #[test]
     fn times_are_a_half_open_range_of_the_day() {
-        let morning = entry(Some(WEDNESDAY), Some(7 * 60), Some(9 * 60 + 30));
+        let morning = hours(Some(WEDNESDAY), Some(7 * 60), Some(9 * 60 + 30));
         assert!(!is_current(&morning, &wednesday("06:59")));
         assert!(is_current(&morning, &wednesday("07:00")));
         assert!(is_current(&morning, &wednesday("09:29")));
         assert!(!is_current(&morning, &wednesday("09:30")));
         assert!(!is_current(
-            &entry(Some(TUESDAY), Some(7 * 60), None),
+            &hours(Some(TUESDAY), Some(7 * 60), None),
             &wednesday("08:00")
         ));
     }
 
     #[test]
     fn a_range_past_midnight_belongs_to_the_day_it_starts() {
-        let tuesday_night = entry(Some(TUESDAY), Some(22 * 60), Some(2 * 60));
+        let tuesday_night = hours(Some(TUESDAY), Some(22 * 60), Some(2 * 60));
         assert!(is_current(&tuesday_night, &wednesday("01:59")));
         assert!(!is_current(&tuesday_night, &wednesday("02:00")));
         assert!(
@@ -137,10 +167,10 @@ mod tests {
 
     #[test]
     fn equal_times_are_the_whole_day() {
-        let all_day = entry(Some(WEDNESDAY), Some(8 * 60), Some(8 * 60));
+        let all_day = hours(Some(WEDNESDAY), Some(8 * 60), Some(8 * 60));
         assert!(is_current(&all_day, &wednesday("03:00")));
         assert!(!is_current(
-            &entry(Some(TUESDAY), Some(8 * 60), Some(8 * 60)),
+            &hours(Some(TUESDAY), Some(8 * 60), Some(8 * 60)),
             &wednesday("03:00")
         ));
     }
@@ -167,9 +197,13 @@ mod tests {
     fn wakes_at_the_next_change_when_it_comes_before_the_refresh() {
         let playlist = [entry(None, Some(12 * 60 + 10), Some(13 * 60))];
         let at: Zoned = "2026-11-04T12:00:30[Europe/Berlin]".parse().unwrap();
-        assert_eq!(wait(&playlist, 15, &at), 9 * 60 + 30);
-        assert_eq!(wait(&playlist, 5, &at), 5 * 60, "the refresh comes first");
-        assert_eq!(wait(&[], 15, &at), 15 * 60);
+        assert_eq!(wait(&playlist, &[], 15, &at), 9 * 60 + 30);
+        assert_eq!(
+            wait(&playlist, &[], 5, &at),
+            5 * 60,
+            "the refresh comes first"
+        );
+        assert_eq!(wait(&[], &[], 15, &at), 15 * 60);
     }
 
     #[test]
@@ -182,9 +216,51 @@ mod tests {
             .to_zoned(TimeZone::get("Europe/Berlin").unwrap());
         assert_eq!(at.hour(), 2);
         assert_eq!(
-            wait(&playlist, 24 * 60, &at),
+            wait(&playlist, &[], 24 * 60, &at),
             2 * 60 * 60,
             "two real hours to 03:00 winter time"
+        );
+    }
+
+    #[test]
+    fn sleeps_while_a_window_is_current() {
+        let nights = [hours(None, Some(23 * 60), Some(7 * 60))];
+        assert!(asleep(&nights, &wednesday("23:30")));
+        assert!(asleep(&nights, &wednesday("06:59")));
+        assert!(!asleep(&nights, &wednesday("07:00")));
+        assert!(!asleep(&[], &wednesday("03:00")));
+    }
+
+    #[test]
+    fn sleeps_until_no_window_is_current() {
+        // Two windows that meet: 23:00 to 01:00, then 01:00 to 07:00.
+        let nights = [
+            hours(None, Some(23 * 60), Some(60)),
+            hours(None, Some(60), Some(7 * 60)),
+        ];
+        let at: Zoned = "2026-11-04T23:00:00[Europe/Berlin]".parse().unwrap();
+        assert_eq!(
+            wait(&[entry(None, None, None)], &nights, 15, &at),
+            8 * 60 * 60,
+            "through both windows, past the refresh"
+        );
+    }
+
+    #[test]
+    fn sleeps_a_day_at_most() {
+        let always = [hours(None, None, None)];
+        let at = wednesday("12:00");
+        assert_eq!(wait(&[], &always, 15, &at), LONGEST_SLEEP_MINUTES * 60);
+    }
+
+    #[test]
+    fn wakes_in_time_to_fall_asleep() {
+        let nights = [hours(None, Some(23 * 60), Some(7 * 60))];
+        let at: Zoned = "2026-11-04T22:50:00[Europe/Berlin]".parse().unwrap();
+        assert_eq!(
+            wait(&[entry(None, None, None)], &nights, 60, &at),
+            10 * 60,
+            "at 23:00, before its hour is up"
         );
     }
 }

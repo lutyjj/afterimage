@@ -10,7 +10,7 @@ use afterimage_trmnl::catalog::Catalog;
 use aws_smithy_types::DateTime;
 
 use crate::accounts::Account;
-use crate::devices::{self, Device, Entry};
+use crate::devices::{self, Device, Entry, Hours, Sleep};
 use crate::drawing;
 use crate::firmware::{self, Board, Firmware};
 use crate::screens::{Screen, Summary};
@@ -72,6 +72,7 @@ pub fn device(device: Device, boards: Option<&[Board]>) -> Result<model::Device,
             .into_iter()
             .map(entry)
             .collect::<Result<Vec<_>, _>>()?)?,
+        sleep: sleep(device.sleep)?,
         readings: model::Readings {
             battery_voltage: device.readings.battery_voltage,
             battery_percent: device.readings.battery_percent,
@@ -79,12 +80,14 @@ pub fn device(device: Device, boards: Option<&[Board]>) -> Result<model::Device,
             firmware_version: device.readings.firmware_version,
         },
         seen_at: device.seen_at.map(DateTime::from_secs),
+        wakes_at: device.wakes_at.map(DateTime::from_secs),
         showing: device
             .showing
             .map(|showing| -> Result<_, InternalFailure> {
                 Ok(model::Showing {
                     screen_id: showing.screen_id.map(fit).transpose()?,
                     rendered_at: DateTime::from_secs(showing.rendered_at),
+                    asleep: showing.asleep,
                 })
             })
             .transpose()?,
@@ -125,8 +128,15 @@ const WEEK: [model::Weekday; 7] = [
     model::Weekday::Sunday,
 ];
 
-fn entry(entry: Entry) -> Result<model::PlaylistEntry, InternalFailure> {
-    let days = entry
+/// Hours in the model's terms: days by name, times as `HH:MM`.
+struct WireHours {
+    days: Option<model::Weekdays>,
+    from: Option<model::TimeOfDay>,
+    until: Option<model::TimeOfDay>,
+}
+
+fn wire_hours(hours: Hours) -> Result<WireHours, InternalFailure> {
+    let days = hours
         .days
         .map(|bits| {
             WEEK.iter()
@@ -142,33 +152,90 @@ fn entry(entry: Entry) -> Result<model::PlaylistEntry, InternalFailure> {
             .map(|minute| fit(format!("{:02}:{:02}", minute / 60, minute % 60)))
             .transpose()
     };
-    Ok(model::PlaylistEntry {
-        screen_id: fit(entry.screen_id)?,
+    Ok(WireHours {
         days,
-        from: time(entry.from_minute)?,
-        until: time(entry.until_minute)?,
+        from: time(hours.from_minute)?,
+        until: time(hours.until_minute)?,
     })
 }
 
-/// A playlist entry as the store keeps it. The model's patterns guarantee the
-/// times parse.
-pub fn stored_entry(entry: &model::PlaylistEntry) -> Entry {
-    let minute = |time: &Option<model::TimeOfDay>| {
-        time.as_ref().and_then(|time| {
+/// Hours as the store keeps them. The model's patterns guarantee the times parse.
+fn stored_hours(
+    days: Option<&model::Weekdays>,
+    from: Option<&model::TimeOfDay>,
+    until: Option<&model::TimeOfDay>,
+) -> Hours {
+    let minute = |time: Option<&model::TimeOfDay>| {
+        time.and_then(|time| {
             let (hours, minutes) = time.as_str().split_once(':')?;
             Some(hours.parse::<u16>().ok()? * 60 + minutes.parse::<u16>().ok()?)
         })
     };
-    Entry {
-        screen_id: *entry.screen_id.inner(),
-        days: entry.days.as_ref().map(|days| {
+    Hours {
+        days: days.map(|days| {
             days.inner().iter().fold(0, |bits, day| {
                 let bit = WEEK.iter().position(|week| week == day).unwrap_or(0);
                 bits | (1 << bit)
             })
         }),
-        from_minute: minute(&entry.from),
-        until_minute: minute(&entry.until),
+        from_minute: minute(from),
+        until_minute: minute(until),
+    }
+}
+
+fn entry(entry: Entry) -> Result<model::PlaylistEntry, InternalFailure> {
+    let WireHours { days, from, until } = wire_hours(entry.hours)?;
+    Ok(model::PlaylistEntry {
+        screen_id: fit(entry.screen_id)?,
+        days,
+        from,
+        until,
+    })
+}
+
+/// A playlist entry as the store keeps it.
+pub fn stored_entry(entry: &model::PlaylistEntry) -> Entry {
+    Entry {
+        screen_id: *entry.screen_id.inner(),
+        hours: stored_hours(
+            entry.days.as_ref(),
+            entry.from.as_ref(),
+            entry.until.as_ref(),
+        ),
+    }
+}
+
+fn sleep(sleep: Sleep) -> Result<model::Sleep, InternalFailure> {
+    let windows = sleep
+        .windows
+        .into_iter()
+        .map(|window| {
+            let WireHours { days, from, until } = wire_hours(window)?;
+            Ok(model::SleepWindow { days, from, until })
+        })
+        .collect::<Result<Vec<_>, InternalFailure>>()?;
+    Ok(model::Sleep {
+        windows: fit(windows)?,
+        screen_id: sleep.screen_id.map(fit).transpose()?,
+    })
+}
+
+/// A device's sleep as the store keeps it.
+pub fn stored_sleep(sleep: &model::Sleep) -> Sleep {
+    Sleep {
+        windows: sleep
+            .windows
+            .inner()
+            .iter()
+            .map(|window| {
+                stored_hours(
+                    window.days.as_ref(),
+                    window.from.as_ref(),
+                    window.until.as_ref(),
+                )
+            })
+            .collect(),
+        screen_id: sleep.screen_id.as_ref().map(|id| *id.inner()),
     }
 }
 

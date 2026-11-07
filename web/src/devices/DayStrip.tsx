@@ -1,10 +1,24 @@
-import type { PlaylistEntry, Weekday } from "@afterimage/management-client";
+import type { Weekday } from "@afterimage/management-client";
 import { classes } from "linen";
 
-import { DAY_MINUTES, spansOn } from "./schedule";
+import { DAY_MINUTES, type Hours, spansOn } from "./schedule";
+
+/** One lane: a playlist entry's hours, or every sleep window's. */
+export interface Lane {
+  hours: readonly Hours[];
+  name: string;
+}
+
+/** A device's day: a lane for each playlist entry, then one for its sleep. */
+export function dayLanes(entries: ReadonlyArray<{ hours: Hours; name: string }>, sleep: readonly Hours[]): Lane[] {
+  return [
+    ...entries.map(({ hours, name }) => ({ hours: [hours], name })),
+    ...(sleep.length > 0 ? [{ hours: sleep, name: "Asleep" }] : []),
+  ];
+}
 
 export interface DayStripProps {
-  entries: Array<{ entry: PlaylistEntry; name: string }>;
+  lanes: readonly Lane[];
   day: Weekday;
   /** The minute of the day to mark as now, when the strip shows today. */
   now?: number | undefined;
@@ -18,10 +32,10 @@ export interface DayStripProps {
 
 const percent = (minute: number) => `${(minute / DAY_MINUTES) * 100}%`;
 
-/** One day as a track from midnight to midnight, each playlist entry a lane whose
- * marks are as long as the time it is current, its name at its start. The strip
- * reports; it never takes the ink. */
-export function DayStrip({ entries, day, now, hours = true, names = true, label }: DayStripProps) {
+/** One day as a track from midnight to midnight, each playlist entry a lane, and
+ * sleep one more, whose marks are as long as the time it is current, its name at
+ * its start. The strip reports; it never takes the ink. */
+export function DayStrip({ lanes, day, now, hours = true, names = true, label }: DayStripProps) {
   return (
     <div
       role="img"
@@ -33,7 +47,7 @@ export function DayStrip({ entries, day, now, hours = true, names = true, label 
     >
       {names && (
         <ol aria-hidden="true" className="grid auto-rows-[1.25rem] text-text-secondary">
-          {entries.map(({ name }, lane) => (
+          {lanes.map(({ name }, lane) => (
             <li key={lane} title={name} className="truncate leading-5">
               {name}
             </li>
@@ -48,19 +62,21 @@ export function DayStrip({ entries, day, now, hours = true, names = true, label 
             style={{ left: percent(hour * 60) }}
           />
         ))}
-        {entries.map(({ entry, name }, lane) => (
+        {lanes.map(({ hours: windows, name }, lane) => (
           <div key={lane} className="relative">
-            {spansOn(entry, day).map(([start, end]) => (
-              <span
-                key={start}
-                className="absolute inset-y-[5px] min-w-0.5 rounded-full bg-[color-mix(in_oklch,var(--color-text-muted)_70%,var(--color-surface))]"
-                style={{ left: percent(start), width: percent(end - start) }}
-                title={name || undefined}
-              />
-            ))}
+            {windows
+              .flatMap((window) => spansOn(window, day))
+              .map(([start, end]) => (
+                <span
+                  key={`${start}-${end}`}
+                  className="absolute inset-y-[5px] min-w-0.5 rounded-full bg-[color-mix(in_oklch,var(--color-text-muted)_70%,var(--color-surface))]"
+                  style={{ left: percent(start), width: percent(end - start) }}
+                  title={name || undefined}
+                />
+              ))}
           </div>
         ))}
-        {entries.length === 0 && <div />}
+        {lanes.length === 0 && <div />}
         {now !== undefined && (
           <span className="absolute -inset-y-1 -ml-px w-0.5 rounded-[1px] bg-text" style={{ left: percent(now) }} />
         )}

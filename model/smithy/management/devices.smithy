@@ -121,8 +121,17 @@ structure Device {
     @required
     readings: Readings
 
+    /// When the device sleeps, and what it shows meanwhile.
+    @required
+    sleep: Sleep
+
     /// The last check-in; absent until the claimed device checks in.
     seenAt: Instant
+
+    /// When the server asked the device to check in next; absent until the
+    /// claimed device checks in. A device quiet long past it may be off or out
+    /// of range.
+    wakesAt: Instant
 
     /// The screen the device shows now; absent before its first image.
     showing: Showing
@@ -137,11 +146,16 @@ list Devices {
 
 structure Showing {
     /// Absent when the device shows a screen of the server's own, such as the one
-    /// for an empty playlist.
+    /// for an empty playlist or the one that says when it wakes.
     screenId: Id
 
     @required
     renderedAt: Instant
+
+    /// Whether the image is the device's sleep screen, which it shows until
+    /// `wakesAt`.
+    @required
+    asleep: Boolean
 }
 
 @range(min: 1, max: 1440)
@@ -155,22 +169,48 @@ list Playlist {
     member: PlaylistEntry
 }
 
-structure PlaylistEntry {
+structure PlaylistEntry with [Hours] {
     @required
     screenId: Id
+}
 
-    /// Days the entry is current; absent means every day.
+/// When a playlist entry or a sleep window is current, in the server's time
+/// zone.
+@mixin
+structure Hours {
+    /// Days it is current; absent means every day.
     days: Weekdays
 
-    /// When the entry becomes current each day, `HH:MM` in the server's time zone;
-    /// absent means midnight.
+    /// When it becomes current each day, `HH:MM`; absent means midnight.
     from: TimeOfDay
 
-    /// When it stops being current, exclusive; absent means midnight at the end of
-    /// the day. An `until` before `from` runs past midnight; an `until` equal to
-    /// `from` makes the entry current all day.
+    /// When it stops being current, exclusive; absent means midnight at the end
+    /// of the day. An `until` before `from` runs past midnight and belongs to the
+    /// day it starts; an `until` equal to `from` makes it current all day.
     until: TimeOfDay
 }
+
+/// When a device sleeps. While a window is current the device shows its sleep
+/// screen and does not wake until no window is, or for a day at most; its
+/// playlist waits where it was. Awake, it wakes again at the next window's
+/// start at the latest.
+structure Sleep {
+    /// Empty for a device that never sleeps.
+    @required
+    windows: SleepWindows
+
+    /// The screen shown while the device sleeps; absent for the server's own,
+    /// which says when it wakes. A sleep screen that cannot be drawn gives way to
+    /// the server's own.
+    screenId: Id
+}
+
+@length(max: 14)
+list SleepWindows {
+    member: SleepWindow
+}
+
+structure SleepWindow with [Hours] {}
 
 @uniqueItems
 @length(min: 1, max: 7)
@@ -314,6 +354,32 @@ operation SetPlaylist {
 
         @required
         playlist: Playlist
+    }
+
+    output := {
+        @required
+        device: Device
+    }
+
+    errors: [
+        NotFound
+    ]
+}
+
+/// Replaces when the device sleeps and what it shows meanwhile. A device takes it
+/// at its next check-in, which a sleeping device makes when its sleep ends.
+@idempotent
+@http(method: "PUT", uri: "/manage/devices/{deviceId}/sleep")
+@optionalAuth
+@tags(["mcp"])
+operation SetSleep {
+    input := {
+        @required
+        @httpLabel
+        deviceId: Id
+
+        @required
+        sleep: Sleep
     }
 
     output := {

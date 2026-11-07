@@ -9,7 +9,7 @@ import { displayModelsQuery, messageOf, serverQuery } from "../app/client";
 import { Panel } from "../panel/Panel";
 import { screensQuery } from "../screens/queries";
 import { ClaimDialog } from "./ClaimDialog";
-import { DayStrip } from "./DayStrip";
+import { DayStrip, dayLanes } from "./DayStrip";
 import { DeviceFacts, Fact } from "./DeviceFacts";
 import { devicesQuery, findDisplay, imageUrl } from "./queries";
 import { nowIn } from "./schedule";
@@ -109,7 +109,10 @@ function DeviceCard({
               <DayStrip
                 day={now.day}
                 now={now.minute}
-                entries={device.playlist.map((entry) => ({ entry, name: screenName(entry.screenId) }))}
+                lanes={dayLanes(
+                  device.playlist.map((entry) => ({ hours: entry, name: screenName(entry.screenId) })),
+                  device.sleep.windows,
+                )}
                 label={`${device.name}'s playlist today`}
               />
             </div>

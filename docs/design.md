@@ -90,8 +90,8 @@ Only TRMNL X sends `Percent-Charged`. For every other board the server estimates
 
 Status 0 carries the device's next screen:
 
-- The image is the next current entry of the device's playlist, drawn at the check-in. With nothing current, the device shows a screen saying so.
-- `refresh_rate` wakes the device at its refresh interval or when the set of current entries changes, whichever comes first.
+- The image is the next current entry of the device's playlist, drawn at the check-in. With nothing current, the device shows a screen saying so. While the device [sleeps](#sleep), it is its sleep screen instead.
+- `refresh_rate` wakes the device at its refresh interval, when the set of current entries changes, or when it falls asleep, whichever comes first; a sleeping device wakes when its sleep ends. The server keeps that wake time, and a device quiet long past it may be off or out of range.
 - The image URL (`/api/images/<name>`) uses the host the device checked in at. The firmware downloads it with its `Access-Token`, and only that device may.
 - An image is named by a hash of its content, and the firmware caches by `filename`, so an unchanged screen costs no download.
 - A screen that cannot be drawn as written leaves the device on its last image, or shows what went wrong when it has none. The next check-in moves on to the entry after it.
@@ -144,7 +144,7 @@ With a broker configured, the server publishes each claimed device to Home Assis
 | Entity | Home Assistant kind | Note |
 |---|---|---|
 | Battery | Sensor | Estimated from the voltage, as under [Check-in](#check-in), where the firmware reports none |
-| Voltage, signal, last check-in, current screen | Sensor | |
+| Voltage, signal, last check-in, current screen | Sensor | The current screen reads "Asleep" while the device sleeps |
 | Firmware | Update | Its install command starts a [firmware update](#firmware-update) to the board's newest release |
 
 - A device is keyed by its MAC, so it stays the same Home Assistant device across setups. Its link back leads to its page in the web UI.
@@ -242,6 +242,18 @@ The components are those TRMNL's 30 published plugins use most. The design syste
 
 A device's playlist lists the screens it shows, each on some weekdays and between two times of day in the server's time zone. At each check-in the device shows the next current entry.
 
+### Sleep
+
+A device sleeps in its sleep windows, which take the same weekdays and times of day as playlist entries.
+
+| While a window is current | The device |
+|---|---|
+| Shows | Its sleep screen: one of the account's screens, or the server's own, which says when it wakes. A sleep screen that cannot be drawn gives way to the server's own, so a daytime image does not stand all night |
+| Wakes | When no window is current, a day at most, so a device asleep around the clock still takes changes daily |
+| Playlist | Waits where it was, and goes on from the same entry |
+
+A device cannot be woken from the server, so a change made while it sleeps reaches it when it wakes, or when someone presses its button.
+
 ## Rendering
 
 The server draws a screen at each check-in and for each preview, bounded by the time the firmware waits for the check-in's answer.
@@ -330,9 +342,9 @@ SQLite holds the server's records, and the data and cache directories hold its i
 |---|---|
 | Accounts, sessions, personal access tokens | Their secrets only as hashes (see [Sessions and tokens](#sessions-and-tokens)) |
 | Registrations | MAC, model, access key hash, friendly ID, end time, panel size, latest readings |
-| Devices | Owner, name, display, refresh interval, current registration, playlist position, the image it shows, the firmware board a user chose |
+| Devices | Owner, name, display, refresh interval, current registration, playlist position, sleep screen, the image it shows and whether it is the sleep screen, when it was asked to wake, the firmware board a user chose |
 | Firmware install requests | Each device's latest |
-| Screens and playlists | Screen documents and playlist entries |
+| Screens, playlists and sleep | Screen documents, playlist entries and sleep windows |
 | MQTT broker | The one the administrator saved (see [Broker settings](#broker-settings)) |
 
 | Files | Location | Lifecycle |

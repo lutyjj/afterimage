@@ -16,8 +16,10 @@ function device(change: Partial<Device>): Device {
     display: { model: "og_png", palette: "bw" },
     refreshMinutes: 15,
     playlist: [{ screenId: 1 }],
+    sleep: { windows: [] },
     readings: {},
     seenAt: new Date(NOW.getTime() - 60_000),
+    wakesAt: new Date(NOW.getTime() + 14 * 60_000),
     firmware: { boardChosen: false, updateAvailable: false },
     ...change,
   };
@@ -34,8 +36,11 @@ describe("deviceStates", () => {
     expect(keys(deviceStates(device({ seenAt: undefined }), ZONE, NOW))).toEqual(["never-seen"]);
   });
 
-  it("calls a device quiet past twice its interval and ten minutes not seen lately", () => {
-    const quiet = (minutes: number) => device({ seenAt: new Date(NOW.getTime() - minutes * 60_000) });
+  it("calls a device quiet past its wake by its interval and ten minutes not seen lately", () => {
+    const quiet = (minutes: number) => {
+      const seenAt = new Date(NOW.getTime() - minutes * 60_000);
+      return device({ seenAt, wakesAt: new Date(seenAt.getTime() + 15 * 60_000) });
+    };
     expect(keys(deviceStates(quiet(40), ZONE, NOW))).toEqual([]);
     expect(keys(deviceStates(quiet(41), ZONE, NOW))).toEqual(["not-seen"]);
   });
@@ -59,5 +64,16 @@ describe("endedStates", () => {
       "never-seen",
     ]);
     expect(keys(endedStates(ended, [], [state("never-seen")]))).toEqual([]);
+  });
+
+  it("lets a sleeping device be quiet, and finds nothing missing from its playlist", () => {
+    // Asleep since 23:00 Thursday, waking at 07:00 Friday; it is 12:00 Friday.
+    const sleeping = device({
+      seenAt: new Date("2026-11-05T22:00:00Z"),
+      wakesAt: new Date("2026-11-06T13:00:00Z"),
+      playlist: [],
+      sleep: { windows: [{ days: ["friday"], from: "11:00", until: "14:00" }] },
+    });
+    expect(keys(deviceStates(sleeping, ZONE, NOW))).toEqual([]);
   });
 });

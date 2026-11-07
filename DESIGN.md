@@ -152,7 +152,7 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 |---|---|
 | Display panel | The image as the display holds it: e-paper white, 6px corners, a 1px ring in `border-strong`, pixelated at 1:1. Beneath: palette swatches, palette name, size and scale. Empty: the mark at 40px over "No image yet". Busy: 60% opacity. |
 | Afterimage | When the image changes, the previous one is laid over it with `mix-blend-mode: multiply` and fades from 40% to none while blurring to 1.5px over 2000ms (`animate-afterimage`); 1ms under reduced motion. |
-| Day strip | A day from midnight to midnight on `sunken`: one lane per playlist entry, grey pills as long as the entry is current, a line at now in `text`. It reports; it never takes the ink. |
+| Day strip | A day from midnight to midnight on `sunken`: one lane per playlist entry and one, "Asleep", for the sleep windows, grey pills as long as each is current, a line at now in `text`. It reports; it never takes the ink. |
 | Claim code | Six 5:6 cells over one real input that takes typing and paste; the active cell takes the ink border and a 3px halo, an invalid code turns every cell red. |
 | Firmware legs | Requested, sent, installed as columns under 3px rules: done in ink, current dashed, waiting in `border`, failed in `danger`. |
 | State badge | A row chip in `warn` with a dot. A state that ends while the page is open stays, struck through at 55% opacity. |

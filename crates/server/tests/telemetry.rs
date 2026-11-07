@@ -100,6 +100,20 @@ async fn a_claimed_device_is_a_home_assistant_device() {
     assert_eq!(state["battery"], 75.0, "estimated from 3.9 V");
     assert_eq!(state["seen_at"], "2027-01-15T08:15:00Z");
     assert_eq!(state["screen"], "Afterimage's own screen");
+
+    let (status, _) = server
+        .call(
+            "PUT",
+            &format!("/manage/devices/{id}/sleep"),
+            Some(json!({ "sleep": { "windows": [{ "from": "08:00", "until": "09:00" }] } })),
+        )
+        .await;
+    assert_eq!(status, reqwest::StatusCode::OK);
+    server.display(&key, &weaker).await;
+    let state = observer
+        .wait(STATE, |state| state["screen"] == "Asleep")
+        .await;
+    assert_eq!(state["screen"], "Asleep");
 }
 
 #[tokio::test]

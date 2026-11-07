@@ -1,6 +1,7 @@
+import type { PlaylistEntry } from "@afterimage/management-client";
 import { describe, expect, it } from "vitest";
 
-import { draftOf, entryOf, sameAs } from "./playlistDraft";
+import { draftOf, entryOf, sameAs } from "./scheduleDraft";
 
 describe("playlist drafts", () => {
   it("match the playlist they were made from, equal times and all", () => {
@@ -28,8 +29,8 @@ describe("playlist drafts", () => {
   });
 
   it("keep each row's key when they are made again from the playlist they saved", () => {
-    const before = draftOf([{ screenId: 1 }, { screenId: 2 }]);
-    const again = draftOf([{ screenId: 1 }, { screenId: 2 }, { screenId: 3 }], before);
+    const before = draftOf<PlaylistEntry>([{ screenId: 1 }, { screenId: 2 }]);
+    const again = draftOf<PlaylistEntry>([{ screenId: 1 }, { screenId: 2 }, { screenId: 3 }], before);
     expect(again.slice(0, 2).map((entry) => entry.key)).toEqual(before.map((entry) => entry.key));
     expect(before.map((entry) => entry.key)).not.toContain(again[2]?.key);
   });

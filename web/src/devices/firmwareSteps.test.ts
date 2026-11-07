@@ -13,8 +13,10 @@ const device: Device = {
   display: { model: "og_plus", palette: "gray-4" },
   refreshMinutes: 15,
   playlist: [],
+  sleep: { windows: [] },
   readings: { firmwareVersion: "1.6.10" },
   seenAt: SEEN,
+  wakesAt: new Date(SEEN.getTime() + 15 * 60_000),
   firmware: { board: "seeed_OG_DIY_Kit", boardChosen: true, latestVersion: "1.8.18", updateAvailable: true },
 };
 
@@ -58,7 +60,8 @@ describe("updateSteps", () => {
 });
 
 describe("nextCheckIn", () => {
-  it("is unknown before the first check-in", () => {
-    expect(nextCheckIn({ ...device, seenAt: undefined })).toBeUndefined();
+  it("is when the server asked the device to wake, unknown before its first check-in", () => {
+    expect(nextCheckIn(device)).toEqual(new Date("2026-11-06T10:15:00Z"));
+    expect(nextCheckIn({ ...device, seenAt: undefined, wakesAt: undefined })).toBeUndefined();
   });
 });

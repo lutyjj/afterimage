@@ -1,10 +1,13 @@
-//! What a claimed device shows at a check-in: the next current entry of its
-//! playlist, drawn now, or one of the server's own screens.
+//! What a claimed device shows at a check-in: its sleep screen while it sleeps,
+//! else the next current entry of its playlist, drawn now, or one of the server's
+//! own screens.
 //!
-//! A screen that cannot be drawn as written (a data source down, a template
-//! error) leaves the device on the image it shows, so a passing outage does not
-//! blank the display; a device with no image yet shows what went wrong. With no
-//! current entry, the device shows a screen saying so.
+//! A playlist screen that cannot be drawn as written (a data source down, a
+//! template error) leaves the device on the image it shows, so a passing outage
+//! does not blank the display; a device with no image yet shows what went wrong.
+//! With no current entry, the device shows a screen saying so. A sleep screen
+//! that cannot be drawn gives way to the server's own, which says when the
+//! device wakes, so a daytime image does not stand all night.
 
 use afterimage_render_typst::Renderer;
 use afterimage_trmnl::catalog::{Catalog, Model, Palette};
@@ -75,31 +78,31 @@ pub async fn next(
     let at = jiff::Timestamp::from_second(now)
         .unwrap_or(jiff::Timestamp::UNIX_EPOCH)
         .to_zoned(drawing.time_zone().zone().clone());
-    let wait = schedule::wait(&device.playlist, device.refresh_minutes, &at);
+    let wait = schedule::wait(
+        &device.playlist,
+        &device.sleep.windows,
+        device.refresh_minutes,
+        &at,
+    );
+    let shown = Record {
+        device,
+        devices,
+        images,
+        now,
+        wait,
+    };
+    if schedule::asleep(&device.sleep.windows, &at) {
+        return asleep(&shown, screens, drawing, &at).await;
+    }
     // The server's own screens share the check-in's time with the screen drawn first.
     let places_by = Drawing::places_deadline();
     let (model, palette) = display(device);
     let position = schedule::next(&device.playlist, device.playlist_position, &at);
     let drawn = if let Some(position) = position {
         let screen_id = device.playlist[position].screen_id;
-        match screens.get(device.account_id, screen_id).await? {
-            Some(screen) => {
-                let document: Value = serde_json::from_str(&screen.document).unwrap_or(Value::Null);
-                let drawn = drawing
-                    .draw(
-                        &document,
-                        &context(&device.name, model),
-                        model,
-                        palette,
-                        now,
-                    )
-                    .await;
-                match (drawn.image, drawn.problems.as_slice()) {
-                    (Some(image), []) => Ok((image.bytes, Some(screen_id))),
-                    (_, problems) => Err((screen.name, problems.to_vec())),
-                }
-            }
-            None => Err((String::new(), Vec::new())),
+        match drawn_screen(device, screens, drawing, screen_id, now).await? {
+            Ok(bytes) => Ok((bytes, Some(screen_id))),
+            Err(failed) => Err(failed),
         }
     } else {
         let image = drawing
@@ -110,16 +113,8 @@ pub async fn next(
     };
     let (bytes, screen_id) = match drawn {
         Ok(drawn) => drawn,
-        Err((name, problems)) => {
-            for problem in problems.iter().take(LOGGED_PROBLEMS) {
-                tracing::warn!(
-                    device = device.id,
-                    screen = name,
-                    path = problem.path,
-                    "{}",
-                    problem.message
-                );
-            }
+        Err(Failed { name, problems }) => {
+            log_problems(device.id, &name, &problems);
             if let Some(showing) = device
                 .showing
                 .as_ref()
@@ -127,7 +122,9 @@ pub async fn next(
             {
                 // The device keeps its image, and the playlist moves past the entry
                 // that failed, so the next check-in shows the entry after it.
-                devices.show(device.id, position, showing).await?;
+                devices
+                    .show(device.id, position, showing, now + wait)
+                    .await?;
                 return Ok(Shown {
                     image: showing.image.clone(),
                     wait,
@@ -140,26 +137,149 @@ pub async fn next(
             (image.bytes, None)
         }
     };
-    let image = images.save(device.id, &bytes)?;
-    let changed = device
-        .showing
-        .as_ref()
-        .is_none_or(|showing| showing.image != image);
-    let rendered_at = if changed {
-        now
-    } else {
-        device
+    shown.record(&bytes, screen_id, position, false).await
+}
+
+/// The device's sleep screen, or the server's own when it has none or it
+/// cannot be drawn. The playlist stays where it was.
+async fn asleep(
+    shown: &Record<'_>,
+    screens: &Screens,
+    drawing: &Drawing,
+    at: &jiff::Zoned,
+) -> Result<Shown, Error> {
+    let device = shown.device;
+    if let Some(screen_id) = device.sleep.screen_id {
+        match drawn_screen(device, screens, drawing, screen_id, shown.now).await? {
+            Ok(bytes) => {
+                return shown
+                    .record(&bytes, Some(screen_id), device.playlist_position, true)
+                    .await;
+            }
+            Err(Failed { name, problems }) => log_problems(device.id, &name, &problems),
+        }
+    }
+    let (model, palette) = display(device);
+    let wakes = at
+        .checked_add(jiff::SignedDuration::from_secs(shown.wait))
+        .unwrap_or_else(|_| at.clone());
+    let image = drawing
+        .draw_resolved(
+            sleeping(&device.name, at, &wakes),
+            model,
+            palette,
+            Drawing::places_deadline(),
+        )
+        .await
+        .map_err(Error::Fallback)?;
+    shown
+        .record(&image.bytes, None, device.playlist_position, true)
+        .await
+}
+
+/// A screen that could not be drawn as written, and why.
+struct Failed {
+    name: String,
+    problems: Vec<Problem>,
+}
+
+/// Draws one of the account's screens for the device; `Err` names what failed.
+async fn drawn_screen(
+    device: &Device,
+    screens: &Screens,
+    drawing: &Drawing,
+    screen_id: i64,
+    now: i64,
+) -> Result<Result<Vec<u8>, Failed>, Error> {
+    let Some(screen) = screens.get(device.account_id, screen_id).await? else {
+        return Ok(Err(Failed {
+            name: String::new(),
+            problems: Vec::new(),
+        }));
+    };
+    let (model, palette) = display(device);
+    let document: Value = serde_json::from_str(&screen.document).unwrap_or(Value::Null);
+    let drawn = drawing
+        .draw(
+            &document,
+            &context(&device.name, model),
+            model,
+            palette,
+            now,
+        )
+        .await;
+    Ok(match (drawn.image, drawn.problems.as_slice()) {
+        (Some(image), []) => Ok(image.bytes),
+        (_, problems) => Err(Failed {
+            name: screen.name,
+            problems: problems.to_vec(),
+        }),
+    })
+}
+
+fn log_problems(device: i64, screen: &str, problems: &[Problem]) {
+    for problem in problems.iter().take(LOGGED_PROBLEMS) {
+        tracing::warn!(device, screen, path = problem.path, "{}", problem.message);
+    }
+}
+
+/// The check-in being answered, which records what the device shows.
+struct Record<'a> {
+    device: &'a Device,
+    devices: &'a Devices,
+    images: &'a Images,
+    now: i64,
+    /// Seconds until the device checks in again.
+    wait: i64,
+}
+
+impl Record<'_> {
+    /// Saves the image and records it as what the device shows until it wakes.
+    async fn record(
+        &self,
+        bytes: &[u8],
+        screen_id: Option<i64>,
+        position: Option<usize>,
+        asleep: bool,
+    ) -> Result<Shown, Error> {
+        let device = self.device;
+        let image = self.images.save(device.id, bytes)?;
+        let rendered_at = device
             .showing
             .as_ref()
-            .map_or(now, |showing| showing.rendered_at)
+            .filter(|showing| showing.image == image)
+            .map_or(self.now, |showing| showing.rendered_at);
+        let showing = Showing {
+            image: image.clone(),
+            screen_id,
+            rendered_at,
+            asleep,
+        };
+        self.devices
+            .show(device.id, position, &showing, self.now + self.wait)
+            .await?;
+        Ok(Shown {
+            image,
+            wait: self.wait,
+        })
+    }
+}
+
+/// The server's screen for a sleeping device: that it sleeps, and when it wakes.
+fn sleeping(device: &str, at: &jiff::Zoned, wakes: &jiff::Zoned) -> Value {
+    let time = wakes.strftime("%H:%M").to_string();
+    let when = if wakes.date() == at.date() {
+        format!("Wakes at {time}")
+    } else {
+        format!("Wakes tomorrow at {time}")
     };
-    let showing = Showing {
-        image: image.clone(),
-        screen_id,
-        rendered_at,
-    };
-    devices.show(device.id, position, &showing).await?;
-    Ok(Shown { image, wait })
+    json!({
+        "titleBar": { "title": "Afterimage", "instance": device },
+        "content": { "column": { "align": "center", "justify": "center", "gap": "medium", "grow": false, "children": [
+            { "title": { "text": "Asleep", "size": "large" } },
+            { "description": { "text": when } }
+        ] } }
+    })
 }
 
 /// The server's screen for a device whose playlist has nothing current.

@@ -11,6 +11,7 @@ import { DeviceSettings } from "./DeviceSettings";
 import { PlaylistEditor } from "./PlaylistEditor";
 import { deviceQuery, findDisplay, imageUrl } from "./queries";
 import { RemoveDevice } from "./RemoveDevice";
+import { SleepEditor } from "./SleepEditor";
 import { deviceStates, useShownStates } from "./states";
 import { StateBadge } from "./StateBadge";
 
@@ -74,6 +75,7 @@ export function DeviceDetail() {
             </DeviceFacts>
           </Card>
           <PlaylistEditor device={data} screens={screens} timeZone={timeZone} />
+          <SleepEditor device={data} screens={screens} timeZone={timeZone} />
           <DeviceSettings device={data} models={models} />
           <DeviceFirmware device={data} timeZone={timeZone} />
           <RemoveDevice device={data} />

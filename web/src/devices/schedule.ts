@@ -2,9 +2,13 @@ import type { PlaylistEntry, Weekday } from "@afterimage/management-client";
 
 import { timeOfDay } from "../app/format";
 
-/** The server's rule, in the server's time zone: an entry is current on its days,
- * from `from` until `until`; one whose `until` comes first runs past midnight and
- * belongs to the day it starts; one whose times are equal is current all day. */
+/** The server's rule, in the server's time zone, for a playlist entry and a sleep
+ * window alike: it is current on its days, from `from` until `until`; one whose
+ * `until` comes first runs past midnight and belongs to the day it starts; one
+ * whose times are equal is current all day. */
+
+/** When something is current: a playlist entry's and a sleep window's hours. */
+export type Hours = Pick<PlaylistEntry, "days" | "from" | "until">;
 
 export const WEEK: readonly Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
@@ -16,28 +20,33 @@ export function minuteOf(time: string | undefined): number | undefined {
   return (hours ?? 0) * 60 + (minutes ?? 0);
 }
 
-function on(entry: PlaylistEntry, day: Weekday) {
-  return !entry.days || entry.days.includes(day);
+function on(hours: Hours, day: Weekday) {
+  return !hours.days || hours.days.includes(day);
 }
 
 function previous(day: Weekday): Weekday {
   return WEEK[(WEEK.indexOf(day) + 6) % 7] ?? day;
 }
 
-/** The parts of `day` in which the entry is current, as minute ranges. */
-export function spansOn(entry: PlaylistEntry, day: Weekday): Array<[number, number]> {
-  const from = minuteOf(entry.from) ?? 0;
-  const until = minuteOf(entry.until) ?? DAY_MINUTES;
-  if (from === until) return on(entry, day) ? [[0, DAY_MINUTES]] : [];
-  if (from < until) return on(entry, day) ? [[from, until]] : [];
+/** The parts of `day` in which the hours are current, as minute ranges. */
+export function spansOn(hours: Hours, day: Weekday): Array<[number, number]> {
+  const from = minuteOf(hours.from) ?? 0;
+  const until = minuteOf(hours.until) ?? DAY_MINUTES;
+  if (from === until) return on(hours, day) ? [[0, DAY_MINUTES]] : [];
+  if (from < until) return on(hours, day) ? [[from, until]] : [];
   const spans: Array<[number, number]> = [];
-  if (on(entry, previous(day))) spans.push([0, until]);
-  if (on(entry, day)) spans.push([from, DAY_MINUTES]);
+  if (on(hours, previous(day))) spans.push([0, until]);
+  if (on(hours, day)) spans.push([from, DAY_MINUTES]);
   return spans;
 }
 
-export function isCurrent(entry: PlaylistEntry, day: Weekday, minute: number): boolean {
-  return spansOn(entry, day).some(([start, end]) => start <= minute && minute < end);
+export function isCurrent(hours: Hours, day: Weekday, minute: number): boolean {
+  return spansOn(hours, day).some(([start, end]) => start <= minute && minute < end);
+}
+
+/** Whether a device with these sleep windows sleeps at that minute. */
+export function isAsleep(windows: readonly Hours[], day: Weekday, minute: number): boolean {
+  return windows.some((window) => isCurrent(window, day, minute));
 }
 
 /** The weekday and minute of the day now, in `timeZone`. */
@@ -54,17 +63,17 @@ export function nowIn(timeZone: string, at: Date = new Date()): { day: Weekday; 
   return { day, minute: Number(part("hour")) * 60 + Number(part("minute")) };
 }
 
-/** Whether the entry is current all day on its days. */
-export function isAllDay(entry: PlaylistEntry): boolean {
-  const from = minuteOf(entry.from) ?? 0;
-  const until = minuteOf(entry.until) ?? DAY_MINUTES;
+/** Whether the hours are current all day on their days. */
+export function isAllDay(hours: Hours): boolean {
+  const from = minuteOf(hours.from) ?? 0;
+  const until = minuteOf(hours.until) ?? DAY_MINUTES;
   return from === until || (from === 0 && until === DAY_MINUTES);
 }
 
-/** How long the entry runs on one of its days, for a label such as "07:00–09:30". */
-export function windowLabel(entry: PlaylistEntry): string {
-  if (isAllDay(entry)) return "All day";
-  return `${timeOfDay(minuteOf(entry.from) ?? 0)}–${timeOfDay((minuteOf(entry.until) ?? DAY_MINUTES) % DAY_MINUTES)}`;
+/** How long the hours run on one of their days, for a label such as "07:00–09:30". */
+export function windowLabel(hours: Hours): string {
+  if (isAllDay(hours)) return "All day";
+  return `${timeOfDay(minuteOf(hours.from) ?? 0)}–${timeOfDay((minuteOf(hours.until) ?? DAY_MINUTES) % DAY_MINUTES)}`;
 }
 
 const SHORT_DAYS: Record<Weekday, string> = {

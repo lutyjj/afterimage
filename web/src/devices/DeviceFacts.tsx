@@ -20,13 +20,18 @@ export function DeviceFacts({
   className?: string | undefined;
   children?: ReactNode;
 }) {
-  const { showing, seenAt } = device;
+  const { showing, seenAt, wakesAt } = device;
   const { batteryVoltage, batteryPercent, signal, firmwareVersion } = device.readings;
-  const showingName = showing
-    ? showing.screenId !== undefined
-      ? (screens?.find((screen) => screen.id === showing.screenId)?.name ?? "A screen")
-      : "Afterimage's own screen"
-    : "Nothing yet";
+  const screenName = (id: number) => screens?.find((screen) => screen.id === id)?.name ?? "A screen";
+  const showingName = !showing
+    ? "Nothing yet"
+    : showing.asleep
+      ? showing.screenId !== undefined
+        ? `Asleep, showing ${screenName(showing.screenId)}`
+        : "Asleep"
+      : showing.screenId !== undefined
+        ? screenName(showing.screenId)
+        : "Afterimage's own screen";
 
   return (
     <dl className={classes("grid grid-cols-[max-content_minmax(0,1fr)] gap-x-6 gap-y-2 text-sm", className)}>
@@ -35,7 +40,15 @@ export function DeviceFacts({
         {showing && timeZone && (
           <Aside>
             {" "}
-            since <Moment at={showing.renderedAt} timeZone={timeZone} />
+            {showing.asleep && wakesAt ? (
+              <>
+                until <Moment at={wakesAt} timeZone={timeZone} />
+              </>
+            ) : (
+              <>
+                since <Moment at={showing.renderedAt} timeZone={timeZone} />
+              </>
+            )}
           </Aside>
         )}
       </Fact>

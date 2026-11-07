@@ -119,6 +119,7 @@ pub fn service(
         .get_device(devices::get_device)
         .update_device(devices::update_device)
         .set_playlist(devices::set_playlist)
+        .set_sleep(devices::set_sleep)
         .delete_device(devices::delete_device)
         .get_device_image(devices::get_device_image)
         .list_firmware_boards(firmware::list_firmware_boards)

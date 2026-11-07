@@ -21,8 +21,9 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { client, messageOf, queryClient } from "../app/client";
-import { DayStrip } from "./DayStrip";
-import { draftOf, entryOf, newKey, sameAs, type Draft } from "./playlistDraft";
+import { DayStrip, dayLanes } from "./DayStrip";
+import { HoursFields } from "./HoursFields";
+import { draftOf, entryOf, newKey, sameAs, type Draft } from "./scheduleDraft";
 import { daysLabel, isAllDay, nowIn, shortDay, WEEK, windowLabel } from "./schedule";
 import { deviceQuery, devicesQuery } from "./queries";
 
@@ -64,7 +65,7 @@ export function PlaylistEditor({
     },
   });
 
-  const update = (key: number, change: Partial<Draft>) =>
+  const update = (key: number, change: Partial<Draft<PlaylistEntry>>) =>
     setDraft((entries) => entries.map((entry) => (entry.key === key ? { ...entry, ...change } : entry)));
   const move = (index: number, by: number) =>
     setDraft((entries) => {
@@ -102,7 +103,10 @@ export function PlaylistEditor({
             <DayStrip
               day={now.day}
               now={now.minute}
-              entries={draft.map((entry) => ({ entry, name: name(entry.screenId) }))}
+              lanes={dayLanes(
+                draft.map((entry) => ({ hours: entryOf(entry), name: name(entry.screenId) })),
+                device.sleep.windows,
+              )}
               label="Today's playlist"
             />
           </div>
@@ -181,21 +185,15 @@ function EntryRow({
   onMove,
   onRemove,
 }: {
-  entry: Draft;
+  entry: Draft<PlaylistEntry>;
   index: number;
   count: number;
   screens: ScreenSummary[];
-  onChange: (change: Partial<Draft>) => void;
+  onChange: (change: Partial<Draft<PlaylistEntry>>) => void;
   onMove: (by: number) => void;
   onRemove: () => void;
 }) {
-  const days = entry.days ?? [...WEEK];
-  const toggle = (day: Weekday) => {
-    const next = days.includes(day) ? days.filter((d) => d !== day) : WEEK.filter((d) => d === day || days.includes(d));
-    onChange({ days: next.length === 7 ? undefined : next });
-  };
   const known = screens.some((screen) => screen.id === entry.screenId);
-  const { allDay } = entry;
   // The window alone, on any one of its days, for the strip.
   const window = { ...entryOf(entry), days: undefined };
 
@@ -223,61 +221,7 @@ function EntryRow({
           value={String(entry.screenId)}
           onValueChange={(value) => onChange({ screenId: Number(value) })}
         />
-        <fieldset className="m-0 inline-flex h-(--height-control) w-fit items-stretch gap-0.5 rounded-button border border-border-strong bg-surface p-0.5">
-          <legend className="sr-only">Days: {daysLabel(entry.days)}</legend>
-          {WEEK.map((day) => {
-            const on = days.includes(day);
-            return (
-              <button
-                key={day}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggle(day)}
-                title={day}
-                className={classes(
-                  "w-8 cursor-pointer rounded-input text-xs",
-                  on ? "bg-accent-weak font-semibold text-accent" : "text-text-secondary hover:text-text",
-                )}
-              >
-                {shortDay(day).slice(0, 2)}
-              </button>
-            );
-          })}
-        </fieldset>
-        <div className="flex flex-wrap items-center gap-2 lg:col-span-2 2xl:col-span-1">
-          <Checkbox
-            checked={allDay}
-            onCheckedChange={(checked) =>
-              onChange(checked ? { allDay: true } : { allDay: false, ...(isAllDay(entry) ? DAYTIME : {}) })
-            }
-            className="w-auto pr-2"
-          >
-            All day
-          </Checkbox>
-          {!allDay && (
-            <span className="inline-flex flex-wrap items-center gap-2">
-              <CellInput
-                aria-label="From"
-                className="w-32"
-                type="time"
-                step={60}
-                value={entry.from ?? "00:00"}
-                onChange={(event) => onChange({ from: event.target.value || undefined })}
-              />
-              <span aria-hidden="true" className="text-sm text-text-muted">
-                to
-              </span>
-              <CellInput
-                aria-label="Until"
-                className="w-32"
-                type="time"
-                step={60}
-                value={entry.until ?? "00:00"}
-                onChange={(event) => onChange({ until: event.target.value || undefined })}
-              />
-            </span>
-          )}
-        </div>
+        <HoursFields hours={entry} timed={DAYTIME} className="lg:col-span-2 2xl:col-span-1" onChange={onChange} />
       </div>
       <div className="col-start-2 flex gap-1 sm:col-start-auto">
         <IconButton aria-label="Move up" title="Move up" onClick={() => onMove(-1)} disabled={index === 0}>
@@ -293,7 +237,7 @@ function EntryRow({
       <div className="col-[2/-1] grid gap-1">
         <DayStrip
           day="monday"
-          entries={[{ entry: window, name: "" }]}
+          lanes={[{ hours: [window], name: "" }]}
           hours={index === count - 1}
           names={false}
           label={`${daysLabel(entry.days)}, ${windowLabel(entryOf(entry))}`}

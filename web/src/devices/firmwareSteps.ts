@@ -12,11 +12,10 @@ export interface Step {
   note?: string | undefined;
 }
 
-/** When the device checks in next at the latest: its last check-in and its
- * refresh interval. A playlist change can bring it sooner. */
+/** When the device checks in next: when the server asked it to wake, which
+ * counts its playlist and its sleep. */
 export function nextCheckIn(device: Device): Date | undefined {
-  if (!device.seenAt) return undefined;
-  return new Date(device.seenAt.getTime() + device.refreshMinutes * 60_000);
+  return device.wakesAt;
 }
 
 /** The three steps an install request goes through: the request, the check-in

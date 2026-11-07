@@ -472,6 +472,7 @@ impl Publisher {
     async fn screen_name(&self, device: &Device) -> String {
         match &device.showing {
             None => "Nothing yet".to_owned(),
+            Some(showing) if showing.asleep => "Asleep".to_owned(),
             Some(showing) => match showing.screen_id {
                 None => "Afterimage's own screen".to_owned(),
                 Some(id) => match self.screens.get(device.account_id, id).await {

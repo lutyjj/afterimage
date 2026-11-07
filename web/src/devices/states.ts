@@ -2,7 +2,7 @@ import type { Device } from "@afterimage/management-client";
 import { useEffect, useRef, useState } from "react";
 
 import { ago } from "../app/format";
-import { isCurrent, nowIn } from "./schedule";
+import { isAsleep, isCurrent, nowIn } from "./schedule";
 
 export interface DeviceState {
   key: "never-seen" | "not-seen" | "nothing-scheduled";
@@ -11,9 +11,12 @@ export interface DeviceState {
 }
 
 /** The states that need the person's attention. A device misses a check-in when it
- * stays quiet past twice its refresh interval and a few minutes more. */
+ * stays quiet past the time it was asked to wake, by its refresh interval and a few
+ * minutes more, so a sleeping device is not missed. A sleeping device has nothing
+ * scheduled by design. */
 export function deviceStates(device: Device, timeZone: string, now: Date = new Date()): DeviceState[] {
   const states: DeviceState[] = [];
+  const refresh = device.refreshMinutes * 60_000;
   if (!device.seenAt) {
     states.push({
       key: "never-seen",
@@ -21,8 +24,8 @@ export function deviceStates(device: Device, timeZone: string, now: Date = new D
       title: "Claimed, and waiting for the display's first check-in.",
     });
   } else {
-    const quietFor = now.getTime() - device.seenAt.getTime();
-    if (quietFor > (device.refreshMinutes * 2 + 10) * 60_000) {
+    const due = device.wakesAt?.getTime() ?? device.seenAt.getTime() + refresh;
+    if (now.getTime() > due + refresh + 10 * 60_000) {
       states.push({
         key: "not-seen",
         label: "Not seen lately",
@@ -31,7 +34,8 @@ export function deviceStates(device: Device, timeZone: string, now: Date = new D
     }
   }
   const { day, minute } = nowIn(timeZone, now);
-  if (!device.playlist.some((entry) => isCurrent(entry, day, minute))) {
+  const asleep = isAsleep(device.sleep.windows, day, minute);
+  if (!asleep && !device.playlist.some((entry) => isCurrent(entry, day, minute))) {
     states.push({
       key: "nothing-scheduled",
       label: "Nothing scheduled",

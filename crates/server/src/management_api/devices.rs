@@ -171,6 +171,28 @@ pub async fn set_playlist(
     })
 }
 
+pub async fn set_sleep(
+    input: input::SetSleepInput,
+    Extension(state): Shared,
+    caller: Caller,
+) -> Result<output::SetSleepOutput, error::SetSleepError> {
+    let sleep = wire::stored_sleep(&input.sleep);
+    let device = match state
+        .devices
+        .set_sleep(caller.account.id, *input.device_id.inner(), &sleep)
+        .await
+    {
+        Ok(device) => device.ok_or_else(not_found)?,
+        Err(error @ devices::Error::UnknownScreen(_)) => {
+            return Err(invalid(error.to_string()).into());
+        }
+        Err(error) => return Err(internal(&error).into()),
+    };
+    Ok(output::SetSleepOutput {
+        device: shown(&state, device)?,
+    })
+}
+
 pub async fn delete_device(
     input: input::DeleteDeviceInput,
     Extension(state): Shared,

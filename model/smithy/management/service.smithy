@@ -48,7 +48,8 @@ use smithy.framework#ValidationException
 /// `CreateScreen` or `UpdateScreen` saves it. A device shows the screens of its
 /// playlist (`SetPlaylist`) in turn, each on its days and between its times in the
 /// server's time zone (`GetServer`, which also names the secrets source requests
-/// may read).
+/// may read), and sleeps in its sleep windows (`SetSleep`), which take the same
+/// days and times.
 ///
 /// Every operation needs a credential except those that exist to start a
 /// session (`GetSignInOptions`, `CreateFirstAccount`, `SignIn`,
@@ -78,6 +79,7 @@ service Management {
         GetDevice
         UpdateDevice
         SetPlaylist
+        SetSleep
         DeleteDevice
         GetDeviceImage
         ListFirmwareBoards
