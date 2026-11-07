@@ -1,14 +1,53 @@
 # Afterimage
 
-A self-hosted server for TRMNL e-paper displays. An e-paper screen keeps its last image with the power off, an afterimage of what it last showed.
+A self-hosted server for TRMNL e-paper displays. An e-paper screen keeps its last image with the power off, an afterimage of what it last showed. [The design](docs/design.md) explains how it works.
 
-See [the design](docs/design.md).
+## Run it
 
-## Running
+`nix build` produces `result/bin/afterimage`. In a display's Wi-Fi setup portal, set the server URL to its address.
 
-`nix build` produces `result/bin/afterimage`, which serves TRMNL's device API under `/api/`, the management API under `/manage/`, its MCP endpoint at `/mcp` and the web UI everywhere else. It listens on `AFTERIMAGE_BIND` (default `0.0.0.0:8080`), keeps its database in `AFTERIMAGE_DATA_DIR` (default `./data`) and the firmware images it serves in `AFTERIMAGE_CACHE_DIR` (default `cache` in the data directory), and fetches firmware from `https://trmnl.com` and the images it lists; `afterimage --help` lists every setting, each a flag or an `AFTERIMAGE_*` environment variable. Data sources read secrets from `AFTERIMAGE_SECRET_<NAME>` variables. With `AFTERIMAGE_MQTT_URL` (and `AFTERIMAGE_MQTT_USERNAME` and `AFTERIMAGE_MQTT_PASSWORD` where the broker asks), it publishes every claimed device to Home Assistant through MQTT discovery; without it, the first account can set the broker in the web UI's settings instead. In a device's Wi-Fi setup portal, set the server URL to this server's address. Scripts and agents call the management API with a personal access token, created in the web UI's settings and sent as `Authorization: Bearer <token>`; `tools/generate` writes the API's OpenAPI document to `gen/management-api.openapi.json`. Agents can instead connect to the MCP endpoint at `/mcp` (streamable HTTP) with the same token.
+| Path | Serves |
+|---|---|
+| `/api/` | TRMNL's device API, for the displays |
+| `/manage/` | The management API, for the web UI, scripts and agents |
+| `/mcp` | The MCP endpoint, over streamable HTTP |
+| Everything else | The web UI |
 
-On NixOS, the flake's `nixosModules.default` runs it as `services.afterimage`: `settings` takes the `AFTERIMAGE_*` variables, `environmentFile` the secrets (`AFTERIMAGE_OIDC_CLIENT_ID`, `AFTERIMAGE_OIDC_CLIENT_SECRET`, `AFTERIMAGE_MQTT_PASSWORD` and the `AFTERIMAGE_SECRET_*` values), the database lives in the service's state directory and firmware images in its cache directory.
+Scripts and agents act with a personal access token, made in the web UI's settings and sent as `Authorization: Bearer <token>`. `tools/generate` writes the management API's OpenAPI document to `gen/management-api.openapi.json`.
+
+## Settings
+
+Each setting is an environment variable or the flag `afterimage --help` lists beside it.
+
+| Variable | Default | Sets |
+|---|---|---|
+| `AFTERIMAGE_BIND` | `0.0.0.0:8080` | The address to listen on; displays must reach it |
+| `AFTERIMAGE_DATA_DIR` | `data` | The database's directory |
+| `AFTERIMAGE_CACHE_DIR` | `cache` in the data directory | Files the server can fetch again, such as firmware images |
+| `AFTERIMAGE_URL` | | The address browsers use, such as `https://afterimage.example`. OIDC needs it; an `https` address makes cookies `Secure` |
+| `AFTERIMAGE_WEB_DIR` | | The built web UI |
+| `AFTERIMAGE_TIME_ZONE` | The host's | The time zone of playlists and of dates on screens, such as `Europe/Berlin` |
+| `AFTERIMAGE_TRMNL_URL` | `https://trmnl.com` | TRMNL's site, which publishes the firmware displays install |
+| `AFTERIMAGE_PASSWORD_SIGN_IN` | `true` | Whether people may sign in with a password; `false` needs OIDC |
+| `AFTERIMAGE_OIDC_ISSUER` | | The OIDC provider. Its client allows the redirect `<AFTERIMAGE_URL>/manage/auth/oidc/callback` |
+| `AFTERIMAGE_OIDC_CLIENT_ID`, `AFTERIMAGE_OIDC_CLIENT_SECRET` | | The OIDC client |
+| `AFTERIMAGE_OIDC_NAME` | `Single sign-on` | What the sign-in button calls the provider |
+| `AFTERIMAGE_MQTT_URL` | | The broker that carries every display to Home Assistant, `mqtt://` or `mqtts://`. Unset, the first account sets it in the web UI |
+| `AFTERIMAGE_MQTT_USERNAME`, `AFTERIMAGE_MQTT_PASSWORD` | | The broker's credentials |
+| `AFTERIMAGE_MQTT_TOPIC` | `afterimage` | The topic every display publishes under |
+| `AFTERIMAGE_MQTT_DISCOVERY_PREFIX` | `homeassistant` | Home Assistant's discovery prefix |
+| `AFTERIMAGE_SECRET_<NAME>` | | A secret data sources read as `secrets.<NAME>` |
+
+## NixOS
+
+The flake's `nixosModules.default` runs the server as `services.afterimage`, with the database in the service's state directory and firmware images in its cache directory.
+
+| Option | Default | Sets |
+|---|---|---|
+| `listenAddress`, `port` | `0.0.0.0`, `8080` | Where the server listens |
+| `openFirewall` | `false` | Opens `port` for clients that reach the server without a reverse proxy |
+| `settings` | `{ }` | The `AFTERIMAGE_*` variables. The module sets the bind address, data and cache directories, and the time zone from `time.timeZone` |
+| `environmentFile` | | A file of secrets: the OIDC client, the MQTT password and the `AFTERIMAGE_SECRET_*` values |
 
 ## Development
 
