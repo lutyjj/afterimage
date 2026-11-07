@@ -123,24 +123,28 @@ export function PlaylistEditor({
                 Nothing scheduled: the display shows “Nothing to show”. Add a screen to give it something.
               </p>
             )}
-            {draft.length > 0 && (
-              <div role="list" className="grid overflow-hidden rounded-button border border-border">
-                <SettlingRows scope={`playlist-${device.id}`} marksArrivals>
-                  {draft.map((entry, index) => (
-                    <EntryRow
-                      key={entry.key}
-                      entry={entry}
-                      index={index}
-                      count={draft.length}
-                      screens={screens ?? []}
-                      onChange={(change) => update(entry.key, change)}
-                      onMove={(by) => move(index, by)}
-                      onRemove={() => remove(entry.key)}
-                    />
-                  ))}
-                </SettlingRows>
-              </div>
-            )}
+            {/* The list stays on the page while it is empty, only hidden, so
+                the first screen added to it arrives into the same list. */}
+            <div
+              role="list"
+              hidden={draft.length === 0}
+              className="grid overflow-hidden rounded-button border border-border"
+            >
+              <SettlingRows scope={`playlist-${device.id}`} marksArrivals>
+                {draft.map((entry, index) => (
+                  <EntryRow
+                    key={entry.key}
+                    entry={entry}
+                    index={index}
+                    count={draft.length}
+                    screens={screens ?? []}
+                    onChange={(change) => update(entry.key, change)}
+                    onMove={(by) => move(index, by)}
+                    onRemove={() => remove(entry.key)}
+                  />
+                ))}
+              </SettlingRows>
+            </div>
             <Actions>
               <Button onClick={add} disabled={!screens?.length || draft.length >= 32}>
                 <Plus aria-hidden="true" className="size-4" /> Add a screen
