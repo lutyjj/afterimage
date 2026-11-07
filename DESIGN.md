@@ -125,7 +125,7 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 | Token | Marks |
 |---|---|
 | `ink` | What a hand can act on or has set: links, the current place, focus, the primary action, chosen days, the caret, layout guides, a finished firmware leg |
-| `warn` | A device state that wants the person: not checked in, not seen lately, nothing scheduled; unsaved changes in the editor |
+| `warn` | A device state that wants the person: not checked in, not seen lately, nothing scheduled |
 | `danger` | Removal and failure: destructive buttons, editor problems, a failed firmware leg |
 | `positive` | A broker that is connected |
 | `epaper` | The ground of every display's screen, in both themes |
@@ -144,6 +144,7 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 - linen's `Shell` holds every signed-in screen: the rail on a desk, and on a phone a bar along the top with the wordmark and the places, which scrolls away and leaves the whole screen to the content. The screen editor holds the rail folded so the YAML and a 1:1 preview share the width.
 - A display's card sets its screen beside its facts (at least 15rem) from 72rem, stacked below.
 - The editor is `wide`: its YAML (at least 24rem) beside a preview column as wide as the display, each scrolling on its own; below 64rem they stack.
+- A display and a screen name the list above them in their top bar's trail ("Devices / Living room"), so the bar stays one line on a phone.
 
 ## Components
 
@@ -155,7 +156,8 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 | Claim code | Six 5:6 cells over one real input that takes typing and paste; the active cell takes the ink border and a 3px halo, an invalid code turns every cell red. |
 | Firmware legs | Requested, sent, installed as columns under 3px rules: done in ink, current dashed, waiting in `border`, failed in `danger`. |
 | State badge | A row chip in `warn` with a dot. A state that ends while the page is open stays, struck through at 55% opacity. |
-| Wordmark | The lowercase name at 16px after the 16px mark; the mark alone heads the folded rail. |
+| Wordmark | The lowercase name at 16px after the 16px mark; the mark alone heads the folded rail. Either leads to the first screen. |
+| Save button | The editor's one primary act. While there is something to save it is in ink and reads "Save"; once saved it turns quiet and reads "Saved", keeping its width. Delete stands beside it as a trash icon. |
 
 ## Do's and Don'ts
 

@@ -9,11 +9,12 @@ import {
   Content,
   EmptyState,
   IconButton,
+  TitleField,
   TopBar,
   useToast,
   WIDE_COLUMN_CLASS,
 } from "linen";
-import { Grid3x3 } from "lucide-react";
+import { Grid3x3, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useBlocker, useLocation, useNavigate, useParams } from "react-router";
 
@@ -27,7 +28,23 @@ import { STARTERS } from "./starters";
 import { usePreview } from "./usePreview";
 import { openingText, parseYaml, rangeOf } from "./yamlDocument";
 
-const BACK = { to: "/screens", label: "Screens" };
+const TRAIL = [{ to: "/screens", label: "Screens" }];
+
+const SAVE_LABELS = { save: "Save", saving: "Saving", saved: "Saved" } as const;
+
+/** The save button's words, every one laid in the same cell so the button
+ * keeps the width of the longest and its neighbour never shifts. */
+function SaveLabel({ shown }: { shown: keyof typeof SAVE_LABELS }) {
+  return (
+    <span className="grid">
+      {Object.entries(SAVE_LABELS).map(([key, text]) => (
+        <span key={key} className={classes("col-start-1 row-start-1", key !== shown && "invisible")}>
+          {text}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 /** Writing a screen: its YAML beside a preview the server draws at the display's
  * own pixels, with what each source answered and every problem in place. */
@@ -36,11 +53,11 @@ export function ScreenEditor() {
   const id = screenId === undefined ? undefined : Number(screenId);
   const screen = useQuery({ ...screenQuery(id ?? 0), enabled: id !== undefined });
 
-  if (id !== undefined && screen.isPending) return <TopBar back={BACK} title="Screen" wide />;
+  if (id !== undefined && screen.isPending) return <TopBar trail={TRAIL} title="Screen" wide />;
   if (id !== undefined && screen.isError) {
     return (
       <>
-        <TopBar back={BACK} title="Screen" wide />
+        <TopBar trail={TRAIL} title="Screen" wide />
         <Content>
           <EmptyState title="This screen could not load" detail={messageOf(screen.error)}>
             <Link to="/screens" className={buttonClass()}>
@@ -172,6 +189,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
       : dirty
         ? "Unsaved changes"
         : "Saved";
+  const saved = status === "Saved";
 
   return (
     <div
@@ -179,13 +197,11 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
       style={model ? ({ "--display-width": `${model.width}px` } as CSSProperties) : undefined}
     >
       <TopBar
-        back={BACK}
+        trail={TRAIL}
         wide
         title={
-          <input
+          <TitleField
             aria-label="Screen name"
-            className="-mx-1.5 max-w-[min(32rem,60vw)] rounded-button border border-transparent px-1.5 hover:border-border focus-visible:border-accent focus-visible:bg-surface focus-visible:outline-none"
-            size={Math.max(name.length + 1, 8)}
             value={name}
             maxLength={64}
             required
@@ -194,25 +210,31 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
           />
         }
         meta={
-          <span
-            role="status"
-            className={classes(
-              "inline-flex items-center gap-1.5 text-sm",
-              dirty ? "text-text-secondary" : "text-text-muted",
-            )}
-          >
-            {dirty && <span aria-hidden="true" className="size-1.5 rounded-full bg-warn" />}
+          // The eye reads the state from the save button: quiet once saved,
+          // in ink while there is something to save.
+          <span role="status" className="sr-only">
             {status}
           </span>
         }
       >
         {screen && (
-          <Button variant="destructive" disabled={remove.isPending} onClick={() => setConfirmDelete(true)}>
-            {remove.isPending ? "Deleting" : "Delete"}
-          </Button>
+          <IconButton
+            variant="destructive"
+            aria-label="Delete screen"
+            title="Delete screen"
+            disabled={remove.isPending}
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 aria-hidden="true" className="size-4" />
+          </IconButton>
         )}
-        <Button variant="primary" disabled={!canSave} onClick={() => save.mutate()} title="Ctrl+S">
-          {save.isPending ? "Saving" : screen ? "Save" : "Save screen"}
+        <Button
+          variant={saved ? "default" : "primary"}
+          disabled={!canSave}
+          onClick={() => save.mutate()}
+          title="Ctrl+S"
+        >
+          <SaveLabel shown={save.isPending ? "saving" : saved ? "saved" : "save"} />
         </Button>
       </TopBar>
 

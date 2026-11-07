@@ -7,6 +7,8 @@ import { accountQuery } from "./client";
 import { THEME_OPTIONS, useTheme } from "./theme";
 import { Mark, Wordmark } from "./Wordmark";
 
+const HOME = { to: "/", label: "Afterimage" };
+
 const PLACES: readonly Place[] = [
   { to: "/devices", label: "Devices", icon: Tablet },
   { to: "/screens", label: "Screens", icon: PanelsTopLeft },
@@ -31,6 +33,7 @@ export function Shell() {
     <Frame
       label="Places"
       places={PLACES}
+      home={HOME}
       storageKey="afterimage.rail"
       wordmark={<Wordmark />}
       mark={<Mark />}

@@ -14,7 +14,7 @@ import { RemoveDevice } from "./RemoveDevice";
 import { deviceStates, useShownStates } from "./states";
 import { StateBadge } from "./StateBadge";
 
-const BACK = { to: "/devices", label: "Devices" };
+const TRAIL = [{ to: "/devices", label: "Devices" }];
 
 export function DeviceDetail() {
   const deviceId = Number(useParams().deviceId);
@@ -25,12 +25,12 @@ export function DeviceDetail() {
   const states = useShownStates(device.data && timeZone ? deviceStates(device.data, timeZone) : []);
 
   if (device.isPending) {
-    return <TopBar back={BACK} title="Display" />;
+    return <TopBar trail={TRAIL} title="Display" />;
   }
   if (device.isError) {
     return (
       <>
-        <TopBar back={BACK} title="Display" />
+        <TopBar trail={TRAIL} title="Display" />
         <Content>
           <EmptyState title="This display could not load" detail={messageOf(device.error)}>
             <Link to="/devices" className={buttonClass()}>
@@ -47,7 +47,7 @@ export function DeviceDetail() {
   return (
     <>
       <TopBar
-        back={BACK}
+        trail={TRAIL}
         title={data.name}
         meta={states.map((state) => (
           <StateBadge key={state.key} ended={state.ended} title={state.title}>
