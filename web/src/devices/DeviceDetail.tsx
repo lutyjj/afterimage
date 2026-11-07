@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { displayModelsQuery, messageOf, serverQuery } from "../app/client";
-import { Proof } from "../proof/Proof";
-import { Stamp } from "../proof/Stamp";
+import { Page } from "../app/Page";
+import { Panel } from "../panel/Panel";
 import { screensQuery } from "../screens/queries";
 import styles from "./DeviceDetail.module.css";
 import { Aside, DeviceFacts, Fact } from "./DeviceFacts";
@@ -14,7 +13,8 @@ import { DeviceSettings } from "./DeviceSettings";
 import { PlaylistEditor } from "./PlaylistEditor";
 import { deviceQuery, findDisplay, imageUrl } from "./queries";
 import { RemoveDevice } from "./RemoveDevice";
-import { deviceStates, useStamps } from "./states";
+import { deviceStates, useShownStates } from "./states";
+import { StateBadge } from "./StateBadge";
 
 export function DeviceDetail() {
   const deviceId = Number(useParams().deviceId);
@@ -30,38 +30,41 @@ export function DeviceDetail() {
   const models = useQuery(displayModelsQuery).data;
   const screens = useQuery(screensQuery).data;
   const timeZone = useQuery(serverQuery).data?.timeZone;
-  const stamps = useStamps(device.data && timeZone ? deviceStates(device.data, timeZone) : []);
+  const states = useShownStates(device.data && timeZone ? deviceStates(device.data, timeZone) : []);
+  const back = { to: "/", label: "Devices" };
 
   if (device.isPending) {
-    return <p className={`${styles.page} annotation`}>Loading</p>;
+    return (
+      <Page back={back} title="Loading">
+        <p className="muted">Loading the display</p>
+      </Page>
+    );
   }
   if (device.isError) {
     return (
-      <div className={styles.page}>
+      <Page back={back} title="This display could not load">
         <p className="error-text">{messageOf(device.error)}</p>
         <Link to="/">Back to devices</Link>
-      </div>
+      </Page>
     );
   }
   const data = device.data;
   const { model, palette } = findDisplay(models, data);
 
   return (
-    <div className={styles.page}>
-      <nav className={styles.trail} aria-label="Breadcrumb">
-        <Link to="/">
-            <ArrowLeft size={14} aria-hidden="true" />
-            Devices
-          </Link>
-      </nav>
-      <header className={styles.head}>
-        <h1 className={styles.name}>{data.name}</h1>
-        {stamps.map((stamp) => (
-          <Stamp key={stamp.key} cancelled={stamp.cancelled} title={stamp.title}>
-            {stamp.label}
-          </Stamp>
-        ))}
-      </header>
+    <Page
+      back={back}
+      title={
+        <span className={styles.title}>
+          {data.name}
+          {states.map((state) => (
+            <StateBadge key={state.key} ended={state.ended} title={state.title}>
+              {state.label}
+            </StateBadge>
+          ))}
+        </span>
+      }
+    >
       {claimed?.claimed && (
         <p className={styles.notice} role="status">
           {claimed.replaced
@@ -71,7 +74,7 @@ export function DeviceDetail() {
       )}
 
       <div className={styles.top}>
-        <Proof
+        <Panel
           src={imageUrl(data)}
           alt={`What ${data.name} shows`}
           width={model?.width}
@@ -79,7 +82,7 @@ export function DeviceDetail() {
           colors={palette?.colors}
           paletteName={palette?.name}
         />
-        <DeviceFacts device={data} screens={screens} timeZone={timeZone} className={styles.facts}>
+        <DeviceFacts device={data} screens={screens} timeZone={timeZone}>
           <Fact label="Hardware">
             {data.firmwareModel}
             <Aside> {data.mac}</Aside>
@@ -91,6 +94,6 @@ export function DeviceDetail() {
       <DeviceSettings device={data} models={models} />
       <DeviceFirmware device={data} timeZone={timeZone} />
       <RemoveDevice device={data} />
-    </div>
+    </Page>
   );
 }

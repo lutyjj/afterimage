@@ -2,34 +2,30 @@
   display: grid;
   place-items: center;
   min-height: 100dvh;
-  padding: var(--space-6) var(--gutter);
+  padding: var(--space-6) var(--space-4);
 }
 
 .sheet {
-  position: relative;
   display: grid;
   gap: var(--space-6);
-  width: min(100%, 24rem);
+  width: min(100%, 23rem);
   padding: var(--space-6);
-  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-dialog);
+  background: var(--surface);
 }
 
 .header {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 
 .wordmark {
-  color: var(--blue-text);
-  font-size: var(--text-2xl);
-  font-stretch: 118%;
-  font-weight: 640;
-  letter-spacing: -0.02em;
+  font-size: var(--text-lg);
 }
 
 .tagline {
-  color: var(--ink-soft);
-  font-size: var(--text-sm);
+  color: var(--text-secondary);
 }
 
 .forms {
@@ -47,11 +43,31 @@
 }
 
 .form :global(.button) {
-  justify-self: start;
+  width: 100%;
 }
 
 .oidc {
   display: grid;
-  justify-items: start;
   gap: var(--space-3);
+}
+
+.oidc :global(.button) {
+  width: 100%;
+}
+
+/* A rule either side of "or", between the two ways in. */
+.or {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.or::before,
+.or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
 }

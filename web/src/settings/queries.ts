@@ -2,6 +2,12 @@ import { queryOptions } from "@tanstack/react-query";
 
 import { client } from "../app/client";
 
+/** The account's personal API tokens, newest first; never their secrets. */
+export const tokensQuery = queryOptions({
+  queryKey: ["account", "tokens"],
+  queryFn: async () => (await client.listAccessTokens({})).tokens,
+});
+
 /** The MQTT broker's settings, which only the administrator reads; asked again
  * every two seconds while the server connects or the broker refuses, so the
  * page shows when it gets there. */

@@ -26,7 +26,7 @@ export function ScreenList() {
         </Link>
       }
     >
-      {screens.isPending && <p className="annotation">Loading screens</p>}
+      {screens.isPending && <p className="muted">Loading screens</p>}
       {screens.isError && <p className="error-text">{messageOf(screens.error)}</p>}
       {screens.data?.length === 0 && (
         <div className={styles.empty}>
@@ -34,7 +34,7 @@ export function ScreenList() {
           <p>
             A screen is a document: the data it reads, such as a Home Assistant sensor or any JSON
             over HTTP, and the components that show it in TRMNL's design. Start from an example
-            and watch the proof update as you write.
+            and watch the preview update as you write.
           </p>
           <Link to="/screens/new" className="button" data-variant="primary">
             Write the first screen

@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { accountQuery, client, messageOf, queryClient, signInOptionsQuery } from "../app/client";
-import { CropMarks } from "../proof/CropMarks";
+import { Wordmark } from "../app/Wordmark";
 import styles from "./SignIn.module.css";
 
 const providerErrors: Record<string, string> = {
@@ -21,12 +21,13 @@ export function SignIn() {
   return (
     <main className={styles.page}>
       <div className={styles.sheet}>
-        <CropMarks />
         <header className={styles.header}>
-          <h1 className={styles.wordmark}>Afterimage</h1>
+          <h1 className={styles.wordmark}>
+            <Wordmark />
+          </h1>
           <p className={styles.tagline}>A server for TRMNL e-paper displays.</p>
         </header>
-        {options.isPending && <p className="annotation">Loading</p>}
+        {options.isPending && <p className="muted">Loading</p>}
         {options.isError && <p className="error-text">{messageOf(options.error)}</p>}
         {options.data && (
           <div className={styles.forms}>
@@ -39,7 +40,7 @@ export function SignIn() {
               (options.data.firstAccount ? <FirstAccountForm /> : <PasswordForm />)}
             {options.data.oidc && (
               <div className={styles.oidc}>
-                {options.data.password && <span className="annotation">or</span>}
+                {options.data.password && <span className={styles.or}>or</span>}
                 <a className="button" data-variant={options.data.password ? undefined : "primary"} href="/manage/auth/oidc">
                   Sign in with {options.data.oidc.name}
                 </a>

@@ -61,36 +61,44 @@ const yamlLinter = linter((view) =>
   ),
 );
 
-/** Ink for what the document says, blue for its structure: the proofroom's two
- * voices, in the editor too. */
+/** Keys in weight, so a document's structure reads at a glance; what it says in
+ * the secondary text; numbers, literals and punctuation quieter. The ink stays
+ * for what a hand acts on. */
 const highlight = HighlightStyle.define([
-  { tag: [tags.propertyName, tags.definition(tags.propertyName)], color: "var(--blue-text)", fontWeight: "560" },
-  { tag: [tags.string, tags.content], color: "var(--ink)" },
-  { tag: [tags.number, tags.bool, tags.null, tags.atom], color: "var(--ink-soft)" },
-  { tag: [tags.comment, tags.meta], color: "var(--blue-gray)", fontStyle: "italic" },
-  { tag: [tags.punctuation, tags.separator, tags.squareBracket, tags.brace], color: "var(--blue-gray)" },
+  { tag: [tags.propertyName, tags.definition(tags.propertyName)], color: "var(--text)", fontWeight: "600" },
+  { tag: [tags.string, tags.content], color: "var(--text-secondary)" },
+  { tag: [tags.number, tags.bool, tags.null, tags.atom], color: "var(--text-secondary)" },
+  { tag: [tags.comment, tags.meta], color: "var(--text-muted)", fontStyle: "italic" },
+  { tag: [tags.punctuation, tags.separator, tags.squareBracket, tags.brace], color: "var(--text-muted)" },
 ]);
 
 const theme = EditorView.theme({
-  "&": { height: "100%", backgroundColor: "var(--white)", color: "var(--ink)", fontSize: "13.5px" },
-  ".cm-scroller": { fontFamily: "var(--mono)", lineHeight: "1.6" },
-  ".cm-content": { caretColor: "var(--blue)", padding: "12px 0" },
-  ".cm-cursor": { borderLeftColor: "var(--blue)", borderLeftWidth: "2px" },
-  ".cm-gutters": { backgroundColor: "var(--paper)", color: "var(--blue-gray)", borderRight: "1px solid var(--blue-rule)" },
-  ".cm-activeLineGutter": { backgroundColor: "var(--blue-wash)", color: "var(--blue-text)" },
-  ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--blue-wash) 45%, transparent)" },
-  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": { backgroundColor: "var(--blue-rule)" },
-  ".cm-tooltip": { border: "1px solid var(--blue-rule)", backgroundColor: "var(--white)", borderRadius: "2px" },
-  ".cm-tooltip-autocomplete > ul > li[aria-selected]": { backgroundColor: "var(--blue-text)", color: "var(--white)" },
+  "&": { height: "100%", backgroundColor: "var(--surface)", color: "var(--text)", fontSize: "13px" },
+  ".cm-scroller": { fontFamily: "var(--mono)", lineHeight: "1.65" },
+  ".cm-content": { caretColor: "var(--ink)", padding: "12px 0" },
+  ".cm-cursor": { borderLeftColor: "var(--ink)", borderLeftWidth: "2px" },
+  ".cm-gutters": { backgroundColor: "var(--surface)", color: "var(--text-muted)", borderRight: "1px solid var(--border)" },
+  ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--text)" },
+  ".cm-activeLine": { backgroundColor: "color-mix(in oklch, var(--ink-weak) 55%, transparent)" },
+  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
+    backgroundColor: "color-mix(in oklch, var(--ink) 22%, transparent)",
+  },
+  ".cm-tooltip": {
+    border: "1px solid var(--border)",
+    backgroundColor: "var(--surface)",
+    borderRadius: "var(--radius-control)",
+    boxShadow: "var(--shadow-overlay)",
+  },
+  ".cm-tooltip-autocomplete > ul > li[aria-selected]": { backgroundColor: "var(--ink)", color: "var(--on-ink)" },
   ".cm-tooltip.cm-tooltip-hover": { maxWidth: "28rem", padding: "6px 10px", fontFamily: "var(--font)" },
-  ".cm-diagnostic-error": { borderLeftColor: "var(--red)" },
+  ".cm-diagnostic-error": { borderLeftColor: "var(--danger)" },
   ".cm-lintRange-error": {
     backgroundImage: "none",
-    textDecoration: "underline wavy var(--red)",
+    textDecoration: "underline wavy var(--danger)",
     textUnderlineOffset: "3px",
   },
-  ".cm-panels": { backgroundColor: "var(--paper)", color: "var(--ink)" },
-  ".cm-foldPlaceholder": { backgroundColor: "var(--blue-wash)", border: "none", color: "var(--blue-text)" },
+  ".cm-panels": { backgroundColor: "var(--sunken)", color: "var(--text)" },
+  ".cm-foldPlaceholder": { backgroundColor: "var(--ink-weak)", border: "none", color: "var(--ink)" },
 });
 
 export interface EditorHandle {
@@ -124,7 +132,7 @@ export function Editor({ initial, onChange, problems, label, ref }: EditorProps)
         basicSetup,
         indentUnit.of("  "),
         // Long templates wrap under their own indentation, so the pane beside the
-        // proof never hides the end of a line.
+        // preview never hides the end of a line.
         EditorView.lineWrapping,
         wrappedLineIndent,
         yamlSchema(documentSchema as Parameters<typeof yamlSchema>[0]),

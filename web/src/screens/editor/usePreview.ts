@@ -1,10 +1,12 @@
 import { ValidationException, type Display, type Problem, type ScreenDocument, type SourceResult } from "@afterimage/management-client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { client, messageOf } from "../../app/client";
 
 export interface Preview {
-  /** An object URL of the last image drawn; kept while the next one draws. */
+  /** A data URL of the last image drawn; kept while the next one draws. It is
+   * a value rather than a handle to release, so a panel may keep showing it as
+   * the image fades out. */
   image?: string;
   sources?: Record<string, SourceResult>;
   /** What kept the screen from being drawn as written, with document paths. */
@@ -18,11 +20,19 @@ export interface Preview {
 
 const WAIT = 600;
 
+function dataUrl(png: Uint8Array): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error("the image could not be read"));
+    reader.readAsDataURL(new Blob([png as BlobPart], { type: "image/png" }));
+  });
+}
+
 /** Draws `document` on the server a moment after it stops changing. A newer
  * document cancels the drawing of an older one. */
 export function usePreview(document: unknown, display: Display | undefined, deviceId: number | undefined): Preview {
   const [preview, setPreview] = useState<Preview>({ problems: [], drawing: false, stale: false });
-  const image = useRef<string | undefined>(undefined);
   const key = JSON.stringify([document, display, deviceId]);
 
   useEffect(() => {
@@ -35,18 +45,15 @@ export function usePreview(document: unknown, display: Display | undefined, devi
           { document: document as ScreenDocument, display, deviceId },
           { abortSignal: abort.signal },
         );
-        const url = output.image ? URL.createObjectURL(new Blob([output.image as BlobPart], { type: "image/png" })) : undefined;
-        if (url) {
-          if (image.current) URL.revokeObjectURL(image.current);
-          image.current = url;
-        }
-        setPreview({
-          image: image.current,
+        const url = output.image ? await dataUrl(output.image) : undefined;
+        if (abort.signal.aborted) return;
+        setPreview((current) => ({
+          image: url ?? current.image,
           sources: output.sources,
           problems: output.problems,
           drawing: false,
           stale: !url,
-        });
+        }));
       } catch (error) {
         if (abort.signal.aborted) return;
         // The server checks the document against the model before drawing; its
@@ -75,13 +82,6 @@ export function usePreview(document: unknown, display: Display | undefined, devi
     };
     // `key` carries every input; the objects themselves are new on every render.
   }, [key]);
-
-  useEffect(
-    () => () => {
-      if (image.current) URL.revokeObjectURL(image.current);
-    },
-    [],
-  );
 
   return preview;
 }

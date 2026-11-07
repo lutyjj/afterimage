@@ -1,22 +1,27 @@
 .facts {
   display: grid;
-  gap: var(--space-3) var(--space-4);
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-5);
+  font-size: var(--text-base);
+}
+
+.facts > div {
+  display: contents;
 }
 
 .facts dt {
-  color: var(--blue-text);
-  font-size: var(--text-xs);
-  font-stretch: var(--narrow);
-  font-weight: 560;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .facts dd {
-  font-size: var(--text-sm);
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .aside {
-  color: var(--ink-soft);
+  color: var(--text-muted);
+}
+
+.moment {
+  white-space: nowrap;
 }

@@ -21,6 +21,11 @@ function browserRuntimeConfig(): Plugin {
   };
 }
 
+/** The server the development UI talks to: a local one by default, or any other,
+ * such as a deployment, named by AFTERIMAGE_SERVER. */
+const server = process.env.AFTERIMAGE_SERVER ?? "http://127.0.0.1:8080";
+const proxy = { target: server, changeOrigin: true };
+
 // The generated client is compiled from its TypeScript source, so it needs no
 // build of its own. In development the server answers /api and /manage.
 export default defineConfig({
@@ -38,8 +43,9 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://127.0.0.1:8080",
-      "/manage": "http://127.0.0.1:8080",
+      "/api": proxy,
+      "/manage": proxy,
+      "/mcp": proxy,
     },
   },
 });

@@ -1,11 +1,14 @@
 import { Unauthenticated } from "@afterimage/management-client";
-import { createBrowserRouter, redirect } from "react-router";
+import { createBrowserRouter, Navigate, redirect } from "react-router";
 
-import { AccountPage } from "../account/AccountPage";
 import { DeviceDetail } from "../devices/DeviceDetail";
 import { DeviceList } from "../devices/DeviceList";
 import { ScreenList } from "../screens/ScreenList";
-import { ServerPage } from "../server/ServerPage";
+import { AccessTokens } from "../settings/AccessTokens";
+import { HomeAssistant } from "../settings/HomeAssistant";
+import { Preferences } from "../settings/Preferences";
+import { ServerInfo } from "../settings/ServerInfo";
+import { SettingsPage } from "../settings/SettingsPage";
 import { SignIn } from "../sign-in/SignIn";
 import { accountQuery, client, queryClient, whenSignedOut } from "./client";
 import { NotFoundPage, RouteError } from "./RouteError";
@@ -68,8 +71,17 @@ export const router = createBrowserRouter([
       { path: "screens", Component: ScreenList },
       { path: "screens/new", lazy: screenEditor },
       { path: "screens/:screenId", lazy: screenEditor },
-      { path: "account", Component: AccountPage },
-      { path: "server", Component: ServerPage },
+      {
+        path: "settings",
+        Component: SettingsPage,
+        children: [
+          { index: true, element: <Navigate to="preferences" replace /> },
+          { path: "preferences", Component: Preferences },
+          { path: "tokens", Component: AccessTokens },
+          { path: "home-assistant", Component: HomeAssistant },
+          { path: "server", Component: ServerInfo },
+        ],
+      },
       { path: "*", Component: NotFoundPage },
     ],
   },

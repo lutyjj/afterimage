@@ -1,0 +1,108 @@
+.panel {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  min-width: 0;
+}
+
+/* The screen: white as e-paper is, edged by a hairline so a blank one still
+   reads as an object, with the corners of a panel in its bezel. */
+.screen {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-inner);
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--border-strong);
+  transition: opacity 240ms var(--ease-out);
+}
+
+.screen[data-unsized] {
+  min-height: 8rem;
+}
+
+.screen[data-busy] {
+  opacity: 0.6;
+}
+
+.image,
+.ghost {
+  width: 100%;
+  height: auto;
+  user-select: none;
+}
+
+.image[data-upscaled],
+.ghost[data-upscaled] {
+  image-rendering: pixelated;
+}
+
+/* What the screen showed before, darkening the new image where it was dark and
+   fading out over a long breath, as e-paper ghosts after a refresh. */
+.ghost {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  animation: afterimage 2000ms cubic-bezier(0.45, 0, 0.55, 1) forwards;
+}
+
+@keyframes afterimage {
+  from {
+    opacity: 0.4;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(1.5px);
+  }
+}
+
+.empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-3);
+  background: var(--sunken);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.emptyMark {
+  width: 2.5rem;
+  height: 2.5rem;
+  opacity: 0.55;
+}
+
+.caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.625rem;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.swatches {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.swatches span,
+.band {
+  height: 0.625rem;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--text) 18%, transparent);
+}
+
+.swatches span {
+  width: 0.625rem;
+}
+
+.band {
+  display: inline-block;
+  width: 3rem;
+  background: linear-gradient(90deg, #000, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #fff);
+}

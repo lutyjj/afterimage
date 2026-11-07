@@ -1,21 +1,20 @@
 .closed {
-  display: grid;
-  justify-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
 }
 
 .open {
   display: grid;
   gap: var(--space-4);
-  max-width: 40rem;
-  padding: var(--space-4);
-  border: 1px solid var(--red);
-  background: var(--white);
+  max-width: var(--measure);
 }
 
 .choices {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   border: 0;
@@ -23,15 +22,23 @@
 
 .choice {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-3);
-  align-items: start;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
   cursor: pointer;
+  transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out);
+}
+
+.choice:has(input:checked) {
+  border-color: color-mix(in oklab, var(--danger) 50%, var(--border));
+  background: var(--danger-weak);
 }
 
 .choice input {
-  margin-top: 0.25rem;
-  accent-color: var(--red-text);
+  margin: 0.2rem 0 0;
+  accent-color: var(--danger);
 }
 
 .choice > span {
@@ -40,10 +47,11 @@
 }
 
 .choice strong {
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }

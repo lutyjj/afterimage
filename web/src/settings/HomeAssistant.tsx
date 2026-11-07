@@ -8,15 +8,13 @@ import { useMutation, useQuery, type UseMutationResult } from "@tanstack/react-q
 import { useState, type FormEvent } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
-import { Page } from "../app/Page";
 import { Section } from "../app/Section";
 import { mqttQuery } from "./queries";
-import styles from "./ServerPage.module.css";
+import styles from "./Settings.module.css";
 
-/** The server's own settings, which only its administrator, the first account,
- * reads and changes: the MQTT broker that carries every display to Home
- * Assistant. */
-export function ServerPage() {
+/** The MQTT broker that carries every display to Home Assistant, which only the
+ * server's administrator, its first account, reads and changes. */
+export function HomeAssistant() {
   const mqtt = useQuery(mqttQuery);
   // Kept here, since the form starts afresh from what the server saved.
   const save = useMutation({
@@ -25,27 +23,24 @@ export function ServerPage() {
   });
 
   return (
-    <Page title="Server" note="Settings for everyone on this server" narrow>
-      <Section
-        title="MQTT broker"
-        intro="Afterimage publishes every claimed display to Home Assistant through its MQTT discovery: battery, signal, last check-in, the screen it shows, and a firmware update Home Assistant can install."
-      >
-
-        {mqtt.isPending && <p className="annotation">Loading the broker</p>}
-        {mqtt.isError && (
-          <p className="error-text" role="alert">
-            {mqtt.error instanceof Forbidden
-              ? "Only the server's administrator, its first account, sees these settings."
-              : messageOf(mqtt.error)}
-          </p>
-        )}
-        {mqtt.data && <Connection settings={mqtt.data} />}
-        {mqtt.data?.setByDeployment && <SetByDeployment settings={mqtt.data} />}
-        {mqtt.data && !mqtt.data.setByDeployment && (
-          <BrokerForm key={JSON.stringify({ ...mqtt.data, connection: undefined })} settings={mqtt.data} save={save} />
-        )}
-      </Section>
-    </Page>
+    <Section
+      title="MQTT broker"
+      intro="Afterimage publishes every claimed display to Home Assistant through its MQTT discovery: battery, signal, last check-in, the screen it shows, and a firmware update Home Assistant can install."
+    >
+      {mqtt.isPending && <p className="muted">Loading the broker</p>}
+      {mqtt.isError && (
+        <p className="error-text" role="alert">
+          {mqtt.error instanceof Forbidden
+            ? "Only the server's administrator, its first account, sees these settings."
+            : messageOf(mqtt.error)}
+        </p>
+      )}
+      {mqtt.data && <Connection settings={mqtt.data} />}
+      {mqtt.data?.setByDeployment && <SetByDeployment settings={mqtt.data} />}
+      {mqtt.data && !mqtt.data.setByDeployment && (
+        <BrokerForm key={JSON.stringify({ ...mqtt.data, connection: undefined })} settings={mqtt.data} save={save} />
+      )}
+    </Section>
   );
 }
 
@@ -59,16 +54,16 @@ function Connection({ settings }: { settings: MqttSettings }) {
           ? `Refused by ${settings.url}`
           : "Not publishing";
   return (
-    <dl className={`${styles.facts} ${styles.whole}`} aria-live="polite">
+    <dl className={styles.facts} aria-live="polite">
       <div>
         <dt>Connection</dt>
         <dd>
           {state}
           {settings.connection === "connecting" && (
-            <span className={styles.aside}> · trying again every few seconds until the broker answers</span>
+            <span className="muted"> · trying again every few seconds until the broker answers</span>
           )}
           {settings.connection === "refused" && (
-            <span className={styles.aside}> · the broker answered and refused; check the username and password</span>
+            <span className="muted"> · the broker answered and refused; check the username and password</span>
           )}
         </dd>
       </div>
@@ -83,11 +78,11 @@ function SetByDeployment({ settings }: { settings: MqttSettings }) {
       <dl className={styles.facts}>
         <div>
           <dt>Username</dt>
-          <dd>{settings.username ?? <span className={styles.aside}>None</span>}</dd>
+          <dd>{settings.username ?? <span className="muted">None</span>}</dd>
         </div>
         <div>
           <dt>Password</dt>
-          <dd>{settings.passwordSet ? "Set" : <span className={styles.aside}>None</span>}</dd>
+          <dd>{settings.passwordSet ? "Set" : <span className="muted">None</span>}</dd>
         </div>
         <div>
           <dt>Topic</dt>
@@ -223,7 +218,7 @@ function BrokerForm({
         <button className="button" data-variant="primary" type="submit" disabled={save.isPending}>
           {save.isPending && !confirmingStop ? "Saving" : publishing ? "Save" : "Save and connect"}
         </button>
-        {save.isSuccess && <span className="annotation">{save.data.settings.url ? "Saved" : "Stopped"}</span>}
+        {save.isSuccess && <span className="hint">{save.data.settings.url ? "Saved" : "Stopped"}</span>}
         {save.isError && (
           <span className="error-text" role="alert">
             {messageOf(save.error)}

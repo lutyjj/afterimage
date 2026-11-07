@@ -6,7 +6,7 @@ import { Link, useBlocker, useLocation, useNavigate, useParams } from "react-rou
 
 import { client, displayModelsQuery, messageOf, queryClient, serverQuery } from "../../app/client";
 import { devicesQuery } from "../../devices/queries";
-import { Proof } from "../../proof/Proof";
+import { Panel } from "../../panel/Panel";
 import { screenQuery, screensQuery } from "../queries";
 import { Editor, type EditorHandle, type Located } from "./Editor";
 import styles from "./ScreenEditor.module.css";
@@ -15,14 +15,14 @@ import { STARTERS } from "./starters";
 import { usePreview } from "./usePreview";
 import { openingText, parseYaml, rangeOf } from "./yamlDocument";
 
-/** Writing a screen: its YAML beside a proof the server draws at the display's
+/** Writing a screen: its YAML beside a preview the server draws at the display's
  * own pixels, with what each source answered and every problem in place. */
 export function ScreenEditor() {
   const { screenId } = useParams();
   const id = screenId === undefined ? undefined : Number(screenId);
   const screen = useQuery({ ...screenQuery(id ?? 0), enabled: id !== undefined });
 
-  if (id !== undefined && screen.isPending) return <p className={`${styles.loading} annotation`}>Loading screen</p>;
+  if (id !== undefined && screen.isPending) return <p className={`${styles.loading} muted`}>Loading screen</p>;
   if (id !== undefined && screen.isError) {
     return (
       <div className={styles.loading}>
@@ -220,8 +220,8 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
 
       {!screen && !touched && (
         <section className={styles.starters} aria-labelledby="starters-title">
-          <h2 id="starters-title" className="annotation">
-            Start from
+          <h2 id="starters-title" className={styles.startersTitle}>
+            Start from an example
           </h2>
           <ul>
             {STARTERS.map((candidate) => (
@@ -244,7 +244,10 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
         </section>
       )}
 
-      <div className={styles.bench}>
+      <div
+        className={styles.bench}
+        style={model ? ({ "--display-width": `${model.width}px` } as CSSProperties) : undefined}
+      >
         <div className={styles.source}>
           <Editor
             ref={editor}
@@ -259,13 +262,12 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
         </div>
 
         <aside
-          className={styles.proofColumn}
-          aria-label="Proof"
-          style={model ? ({ "--display-width": `${model.width}px` } as CSSProperties) : undefined}
+          className={styles.previewColumn}
+          aria-label="Preview"
         >
           <div className={styles.toolbar}>
             <label className={styles.target}>
-              <span className="annotation">Proof on</span>
+              <span className={styles.targetLabel}>Preview on</span>
               <select className="select" value={chosenTarget} onChange={(event) => setTarget(event.target.value)}>
                 {devices?.map((device) => (
                   <option key={device.id} value={`device:${device.id}`}>
@@ -328,12 +330,12 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
               {preview.drawing
                 ? "Drawing"
                 : preview.stale && preview.image
-                  ? "The last proof that drew; see the problems below"
+                  ? "The last preview that drew; see the problems below"
                   : ""}
             </span>
           </div>
 
-          <Proof
+          <Panel
             src={preview.image}
             alt="The screen as the display will show it"
             width={model?.width}
@@ -347,7 +349,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
 
           {(preview.failure || parsed.errors.length > 0 || located.length > 0) && (
             <section className={styles.problems} aria-labelledby="problems-title">
-              <h3 id="problems-title" className="annotation">
+              <h3 id="problems-title" className={styles.problemsTitle}>
                 Problems
               </h3>
               <ul>
@@ -381,7 +383,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
   );
 }
 
-/** Guides over the proof: every 40 device pixels, stronger every 200, and the
+/** Guides over the preview: every 40 device pixels, stronger every 200, and the
  * centre lines. */
 function LayoutGrid({ width, height }: { width: number; height: number }) {
   const cell = (step: number, size: number) => `${(step / size) * 100}%`;

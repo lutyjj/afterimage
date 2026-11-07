@@ -44,8 +44,8 @@ export function deviceStates(device: Device, timeZone: string, now: Date = new D
   return states;
 }
 
-export interface StampedState extends DeviceState {
-  cancelled: boolean;
+export interface ShownState extends DeviceState {
+  ended: boolean;
 }
 
 const ORDER: Array<DeviceState["key"]> = ["never-seen", "not-seen", "nothing-scheduled"];
@@ -59,9 +59,9 @@ export function endedStates(ended: DeviceState[], before: DeviceState[], now: De
   return [...new Map(over.map((state) => [state.key, state])).values()];
 }
 
-/** The device's states as stamps that cancel rather than vanish: a state that ends
- * while the page is open stays, struck through. */
-export function useStamps(states: DeviceState[]): StampedState[] {
+/** The device's states as the page shows them: a state that ends while the page
+ * is open stays, struck through, rather than vanishing. */
+export function useShownStates(states: DeviceState[]): ShownState[] {
   const [ended, setEnded] = useState<DeviceState[]>([]);
   const before = useRef(states);
   const key = states.map((state) => state.key).join();
@@ -72,7 +72,7 @@ export function useStamps(states: DeviceState[]): StampedState[] {
   }, [key]);
   const live = new Set(states.map((state) => state.key));
   return [
-    ...states.map((state) => ({ ...state, cancelled: false })),
-    ...ended.filter((state) => !live.has(state.key)).map((state) => ({ ...state, cancelled: true })),
+    ...states.map((state) => ({ ...state, ended: false })),
+    ...ended.filter((state) => !live.has(state.key)).map((state) => ({ ...state, ended: true })),
   ].sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key));
 }

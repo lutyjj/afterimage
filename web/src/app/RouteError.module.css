@@ -2,7 +2,7 @@
   display: grid;
   gap: var(--space-3);
   max-width: 40rem;
-  padding: var(--space-7) var(--gutter);
+  padding: var(--space-7) var(--space-6);
 }
 
 .page h1 {
@@ -10,5 +10,5 @@
 }
 
 .reason {
-  color: var(--red-text);
+  color: var(--danger);
 }

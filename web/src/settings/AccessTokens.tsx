@@ -3,49 +3,44 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Check, Copy } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
-import { accountQuery, client, messageOf, queryClient, serverQuery } from "../app/client";
-import { Page } from "../app/Page";
-import { Section } from "../app/Section";
+import { client, messageOf, queryClient, serverQuery } from "../app/client";
 import { ago, moment } from "../app/format";
-import styles from "./AccountPage.module.css";
+import { Section } from "../app/Section";
 import { tokensQuery } from "./queries";
+import styles from "./Settings.module.css";
 
-/** Who is signed in, and the personal API tokens scripts and agents act with. */
-export function AccountPage() {
-  const account = useQuery(accountQuery).data;
+type Created = { token: AccessToken; secret: string };
+
+/** The personal API tokens scripts and agents act with, and how an agent
+ * connects over MCP with one. */
+export function AccessTokens() {
   const timeZone = useQuery(serverQuery).data?.timeZone;
   const tokens = useQuery(tokensQuery);
-  const [created, setCreated] = useState<{ token: AccessToken; secret: string } | undefined>();
+  const [created, setCreated] = useState<Created | undefined>();
 
   return (
-    <Page
-      title={account?.name ?? "Account"}
-      note={account?.username ? `Signs in as ${account.username}` : "Signs in through single sign-on"}
-      narrow
-    >
+    <>
       <Section
-        title="API tokens"
+        title="Access tokens"
         intro={
           <>
             Scripts and agents send a token instead of signing in, as <code>Authorization: Bearer</code> and the
-            token. It acts as you until you revoke it. Give each script its own, so that you can revoke one alone.
+            token. It acts as you until you revoke it; give each its own, so you can revoke one alone.
           </>
         }
       >
-
         {created ? (
           <ShownOnce created={created} onDone={() => setCreated(undefined)} />
         ) : (
           <CreateToken onCreated={setCreated} />
         )}
-
-        {tokens.isPending && <p className="annotation">Loading tokens</p>}
+        {tokens.isPending && <p className="muted">Loading tokens</p>}
         {tokens.isError && (
           <p className="error-text" role="alert">
             {messageOf(tokens.error)}
           </p>
         )}
-        {tokens.data?.length === 0 && <p className="hint">No tokens yet.</p>}
+        {tokens.data?.length === 0 && <p className="muted">No tokens yet.</p>}
         {tokens.data && tokens.data.length > 0 && (
           <ul className={styles.tokens}>
             {tokens.data.map((token) => (
@@ -54,16 +49,71 @@ export function AccountPage() {
           </ul>
         )}
       </Section>
-    </Page>
+      <Agents secret={created?.secret} />
+    </>
   );
 }
 
-function CreateToken({ onCreated }: { onCreated: (created: { token: AccessToken; secret: string }) => void }) {
+/** How an agent reaches the MCP endpoint: its address, and the token in its
+ * `Authorization` header. */
+function Agents({ secret }: { secret: string | undefined }) {
+  const endpoint = `${window.location.origin}/mcp`;
+  const command = `claude mcp add --transport http afterimage ${endpoint} --header "Authorization: Bearer ${secret ?? "<token>"}"`;
+  return (
+    <Section
+      title="Agents"
+      intro="An agent that speaks MCP writes screens, previews them and arranges playlists with a token, through the same API as this page."
+    >
+      <dl className={styles.facts}>
+        <div>
+          <dt>Address</dt>
+          <dd>
+            <CopyText text={endpoint} />
+          </dd>
+        </div>
+        <div>
+          <dt>Transport</dt>
+          <dd>Streamable HTTP, with the token as a bearer token</dd>
+        </div>
+        <div>
+          <dt>Claude Code</dt>
+          <dd>
+            <CopyText text={command} />
+          </dd>
+        </div>
+      </dl>
+      <p className="hint">A read-only token gives an agent everything to read and nothing to change.</p>
+    </Section>
+  );
+}
+
+function CopyText({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return (
+    <span className={styles.copyText}>
+      <code tabIndex={0} onFocus={(event) => window.getSelection()?.selectAllChildren(event.currentTarget)}>
+        {text}
+      </code>
+      <button type="button" className="icon-button" onClick={() => void copy()} aria-label="Copy" title="Copy">
+        {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+      </button>
+    </span>
+  );
+}
+
+function CreateToken({ onCreated }: { onCreated: (created: Created) => void }) {
   const [name, setName] = useState("");
   const [readOnly, setReadOnly] = useState(false);
   const create = useMutation({
-    mutationFn: () =>
-      client.createAccessToken({ name: name.trim(), scope: readOnly ? "read_only" : undefined }),
+    mutationFn: () => client.createAccessToken({ name: name.trim(), scope: readOnly ? "read_only" : undefined }),
     onSuccess: (created) => {
       void queryClient.invalidateQueries({ queryKey: tokensQuery.queryKey });
       setName("");
@@ -89,7 +139,7 @@ function CreateToken({ onCreated }: { onCreated: (created: { token: AccessToken;
           onChange={(event) => setName(event.target.value)}
         />
       </label>
-      <label className={styles.readOnly}>
+      <label className={styles.check}>
         <input type="checkbox" checked={readOnly} onChange={(event) => setReadOnly(event.target.checked)} />
         <span>
           Read only
@@ -111,39 +161,14 @@ function CreateToken({ onCreated }: { onCreated: (created: { token: AccessToken;
 }
 
 /** The new token's secret, which the server never shows again. */
-function ShownOnce({ created, onDone }: { created: { token: AccessToken; secret: string }; onDone: () => void }) {
-  const [copied, setCopied] = useState(false);
-  const [copyFailed, setCopyFailed] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(created.secret);
-      setCopied(true);
-      setCopyFailed(false);
-    } catch {
-      setCopyFailed(true);
-    }
-  };
-
+function ShownOnce({ created, onDone }: { created: Created; onDone: () => void }) {
   return (
     <div className={styles.shownOnce} role="status">
       <p>
         <strong>{created.token.name}</strong> is ready. Copy its token now: Afterimage keeps only a fingerprint of it
         and cannot show it again.
       </p>
-      <div className={styles.secretRow}>
-        <code className={styles.secret} onFocus={(event) => window.getSelection()?.selectAllChildren(event.currentTarget)} tabIndex={0}>
-          {created.secret}
-        </code>
-        <button className="button" type="button" onClick={() => void copy()}>
-          {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
-      {copyFailed && (
-        <p className="error-text" role="alert">
-          The browser did not allow copying. Select the token and copy it yourself.
-        </p>
-      )}
+      <CopyText text={created.secret} />
       <div className={styles.actions}>
         <button className="button" data-variant="primary" type="button" onClick={onDone}>
           Done
@@ -163,11 +188,12 @@ function TokenRow({ token, timeZone }: { token: AccessToken; timeZone: string | 
   return (
     <li className={styles.token}>
       <div className={styles.tokenFacts}>
-        <span className={styles.tokenName}>{token.name}</span>
-        <span className={styles.scope}>{token.scope === "read_only" ? "Read only" : "Full access"}</span>
-        <span className={styles.when}>
-          Created {timeZone ? moment(token.createdAt, timeZone) : ago(token.createdAt)}
-          {" · "}
+        <span className={styles.tokenName}>
+          {token.name}
+          <span className={styles.tag}>{token.scope === "read_only" ? "Read only" : "Full access"}</span>
+        </span>
+        <span className="muted">
+          Created {timeZone ? moment(token.createdAt, timeZone) : ago(token.createdAt)},{" "}
           {token.lastUsedAt ? `last used ${ago(token.lastUsedAt)}` : "never used"}
         </span>
       </div>
@@ -176,7 +202,7 @@ function TokenRow({ token, timeZone }: { token: AccessToken; timeZone: string | 
           Revoke…
         </button>
       ) : (
-        <div className={styles.confirm}>
+        <div className={styles.actions}>
           <span className="hint">Whatever uses it stops working at once.</span>
           <button
             className="button"

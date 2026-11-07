@@ -1,113 +1,85 @@
-.layout {
+.devices {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 17.5rem;
-  grid-template-areas: "list claim";
+  gap: var(--space-4);
+}
+
+/* A display's card: its screen at the scale the column allows (800 pixels at
+   1:1 on a wide window), and beside it what it reports and its day. */
+.device {
+  display: grid;
+  grid-template-columns: minmax(0, 800px) minmax(15rem, 1fr);
   gap: var(--space-5);
   align-items: start;
+  padding: var(--gutter);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
 }
 
-/* Level with the first plate (the row's padding, less the proof's offset, plus
-   its room for crop marks), so the panel's crop mark never lies on the list's
-   top rule. */
-.claim {
-  grid-area: claim;
-  position: sticky;
-  /* Stuck under the top bar with room for its crop mark above it. */
-  top: calc(var(--bar-height) + 2rem);
-  margin-top: calc(var(--space-4) - 0.25rem + var(--crop-room));
-}
-
-.list {
-  grid-area: list;
-  min-width: 0;
-}
-
-.rows {
-  display: grid;
-}
-
-/* Every row shares one proof track, wide enough for an 800-pixel plate at its
-   true pixels, so every row's facts start at one edge whatever its plate holds;
-   the crop marks stand in the gap. */
-.row {
-  display: grid;
-  grid-template-columns: minmax(0, 800px) minmax(13rem, 1fr);
-  grid-template-areas:
-    "proof meta"
-    "today meta";
-  gap: var(--space-2) calc(var(--crop-room) + var(--space-5));
-  align-items: start;
-  padding: var(--space-4) 0 var(--space-5);
-  border-top: var(--rule);
-}
-
-.row:last-child {
-  border-bottom: var(--rule);
-}
-
-.proofLink {
-  grid-area: proof;
+.panel {
   display: block;
   min-width: 0;
-  margin-top: -0.25rem;
   color: inherit;
   text-decoration: none;
 }
 
-.proofLink:hover {
-  text-decoration: none;
-}
-
-.meta {
-  grid-area: meta;
+.details {
   display: grid;
-  align-content: start;
   gap: var(--space-4);
+  align-content: start;
   min-width: 0;
-  padding-top: var(--space-4);
 }
 
 .titleLine {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2) var(--space-3);
+  gap: var(--space-2);
 }
 
 .name {
+  margin-right: var(--space-1);
   font-size: var(--text-lg);
+  letter-spacing: -0.018em;
 }
 
 .name a {
-  color: var(--ink);
+  color: var(--text);
   text-decoration: none;
 }
 
 .name a:hover {
-  text-decoration: underline;
-  text-decoration-color: var(--blue);
-}
-
-.stamps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  color: var(--ink-strong);
 }
 
 .today {
-  grid-area: today;
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.todayTitle {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 560;
 }
 
 .first {
-  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+  gap: var(--space-6);
+  align-items: start;
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.firstText {
   display: grid;
   gap: var(--space-4);
-  max-width: 34rem;
-  margin: var(--space-5) 0 0 var(--space-5);
-  padding: var(--space-6);
-  background: var(--white);
+  align-content: start;
 }
 
 .firstTitle {
@@ -117,57 +89,49 @@
 .steps {
   display: grid;
   gap: var(--space-3);
+  max-width: 34rem;
   counter-reset: step;
+  color: var(--text-secondary);
 }
 
 .steps li {
-  counter-increment: step;
   display: grid;
-  grid-template-columns: 1.5rem 1fr;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  counter-increment: step;
 }
 
 .steps li::before {
   content: counter(step);
-  color: var(--blue-text);
-  font-stretch: var(--narrow);
-  font-weight: 640;
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 50%;
+  background: var(--ink-weak);
+  color: var(--ink-strong);
+  font-size: var(--text-xs);
+  font-weight: 650;
 }
 
 .origin {
-  padding: 0 0.25em;
-  background: var(--blue-wash);
+  padding: 0.0625rem 0.375rem;
+  border-radius: var(--radius-inner);
+  background: var(--sunken);
+  color: var(--text);
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 72rem) {
-  .row {
+/* A display that is not as wide as the card's columns would make it stacks:
+   screen, then what it reports. */
+@media (width < 72rem) {
+  .device {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "proof"
-      "meta"
-      "today";
-    gap: var(--space-4);
-  }
-
-  .meta {
-    padding-top: 0;
-  }
-
-  .facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 52rem) {
-  .layout {
+@media (width < 52rem) {
+  .first {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "claim"
-      "list";
-  }
-
-  .claim {
-    position: static;
-    margin-top: 0;
+    padding: var(--space-5) var(--gutter);
   }
 }

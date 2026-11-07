@@ -1,20 +1,19 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { CropMarks } from "./CropMarks";
-import styles from "./Proof.module.css";
+import { Mark } from "../app/Wordmark";
+import styles from "./Panel.module.css";
 
-export interface ProofProps {
+export interface PanelProps {
   /** The image a display shows, or absent before it has one. */
   src?: string | undefined;
   alt: string;
-  /** The display's size in pixels, for the frame before the image loads; absent
-   * until its model is known, when the frame keeps no size of its own. */
+  /** The display's size in pixels, for the frame before the image loads. */
   width?: number | undefined;
   height?: number | undefined;
-  /** The palette's colors, darkest gray first; absent for full color. */
+  /** The palette's colours, darkest first; absent for full colour. */
   colors?: string[] | undefined;
   paletteName?: string | undefined;
-  /** What the frame says when there is no image. */
+  /** What the panel says when there is no image. */
   empty?: string;
   /** Drawn over the image, such as a layout grid. */
   overlay?: ReactNode;
@@ -22,10 +21,10 @@ export interface ProofProps {
   busy?: boolean;
 }
 
-/** A display's image framed as a proof: crop marks at two corners, the image at
- * its true pixels when there is room, and beneath it the palette's step wedge
- * with the size and scale noted in blue. */
-export function Proof({
+/** A display's image at its true pixels where there is room, with the palette,
+ * size and scale beneath it. When the image changes, the one before lingers and
+ * fades, as an e-paper screen keeps a trace of what it showed. */
+export function Panel({
   src,
   alt,
   width,
@@ -35,10 +34,16 @@ export function Proof({
   empty = "No image yet",
   overlay,
   busy = false,
-}: ProofProps) {
+}: PanelProps) {
   const image = useRef<HTMLImageElement>(null);
   const [natural, setNatural] = useState({ width: width ?? 0, height: height ?? 0 });
   const [scale, setScale] = useState(1);
+  const [shown, setShown] = useState(src);
+  const [ghost, setGhost] = useState<string>();
+  if (src !== shown) {
+    setGhost(shown);
+    setShown(src);
+  }
 
   useEffect(() => {
     const element = image.current;
@@ -64,14 +69,13 @@ export function Proof({
   const sized = shownWidth !== undefined && shownHeight !== undefined && shownWidth > 0 && shownHeight > 0;
 
   return (
-    <figure className={styles.proof}>
+    <figure className={styles.panel}>
       <div
-        className={styles.plate}
+        className={styles.screen}
         style={sized ? { maxWidth: `${shownWidth}px`, aspectRatio: `${shownWidth} / ${shownHeight}` } : undefined}
         data-unsized={!sized || undefined}
         data-busy={busy || undefined}
       >
-        <CropMarks />
         {src ? (
           <img
             ref={image}
@@ -85,18 +89,28 @@ export function Proof({
           />
         ) : (
           <div className={styles.empty}>
-            <span className="annotation">{empty}</span>
+            <Mark className={styles.emptyMark} />
+            {empty}
           </div>
+        )}
+        {src && ghost && (
+          <img
+            key={ghost}
+            className={styles.ghost}
+            src={ghost}
+            alt=""
+            aria-hidden="true"
+            data-upscaled={scale >= 1 || undefined}
+            onAnimationEnd={() => setGhost(undefined)}
+          />
         )}
         {overlay}
       </div>
       <figcaption className={styles.caption}>
-        <Wedge colors={colors} />
-        <span className="annotation">
-          {paletteName && <span className={styles.palette}>{paletteName}</span>}
-          {sized && `${shownWidth} × ${shownHeight}`}
-          {src && <span className={styles.scale}>{scaleLabel(scale)}</span>}
-        </span>
+        <Swatches colors={colors} />
+        {paletteName && <span>{paletteName}</span>}
+        {sized && <span>{`${shownWidth} × ${shownHeight}`}</span>}
+        {src && <span>{scaleLabel(scale)}</span>}
       </figcaption>
     </figure>
   );
@@ -109,18 +123,17 @@ function scaleLabel(scale: number) {
 
 const MAX_STEPS = 16;
 
-/** The palette's levels as a row of patches; a palette of thousands of colors is
- * a continuous band. */
-function Wedge({ colors }: { colors?: string[] | undefined }) {
+/** The palette's levels as a row of chips; thousands of colours are a band. */
+function Swatches({ colors }: { colors?: string[] | undefined }) {
   if (!colors || colors.length === 0) {
     return <span className={styles.band} aria-hidden="true" />;
   }
   const stride = Math.max(1, Math.ceil(colors.length / MAX_STEPS));
   const steps = colors.filter((_, index) => index % stride === 0 || index === colors.length - 1);
   return (
-    <span className={styles.wedge} aria-hidden="true">
+    <span className={styles.swatches} aria-hidden="true">
       {steps.map((color, index) => (
-        <span key={`${color}-${index}`} className={styles.step} style={{ background: color }} />
+        <span key={`${color}-${index}`} style={{ background: color }} />
       ))}
     </span>
   );

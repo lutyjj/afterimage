@@ -1,63 +1,32 @@
-.page {
-  display: grid;
-  gap: var(--space-6);
-  padding: var(--space-5) var(--gutter) var(--space-8);
-}
-
-.trail {
-  font-size: var(--text-sm);
-  margin-bottom: calc(-1 * var(--space-5));
-}
-
-.trail a {
+.title {
   display: inline-flex;
-  align-items: center;
-  gap: 0.3em;
-}
-
-.head {
-  display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-3);
 }
 
-.name {
-  font-size: var(--text-2xl);
-  margin-right: var(--space-2);
-}
-
 .notice {
-  max-width: 44rem;
+  max-width: var(--measure);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--blue-rule);
-  background: var(--blue-wash);
-  color: var(--ink);
-  font-size: var(--text-sm);
+  border-radius: var(--radius-control);
+  background: var(--ink-weak);
+  color: var(--text);
 }
 
-/* The plate, and its facts level with its top edge; the crop marks stand in
-   the gap between them. */
+/* The screen at its true pixels where the window allows, its facts beside it. */
 .top {
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(14rem, 22rem);
-  justify-content: start;
-  gap: var(--space-5) calc(var(--crop-room) + var(--space-5));
+  grid-template-columns: minmax(0, 800px) minmax(15rem, 1fr);
+  gap: var(--space-5);
   align-items: start;
+  padding: var(--gutter);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
 }
 
-.facts {
-  padding-top: var(--crop-room);
-}
-
-@media (max-width: 64rem) {
+@media (width < 72rem) {
   .top {
     grid-template-columns: minmax(0, 1fr);
-    gap: 0;
-  }
-
-  .facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding-top: 0;
   }
 }

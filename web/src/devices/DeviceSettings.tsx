@@ -61,7 +61,7 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
   };
 
   return (
-    <Section title="Settings">
+    <Section title="Name and display">
       <form className={styles.form} onSubmit={submit} onChange={() => setSaved(false)}>
         <label className="field">
           <span>Name</span>
@@ -123,7 +123,7 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
             {save.isPending ? "Saving" : "Save settings"}
           </button>
           {saved && !changed && (
-            <span className="annotation" role="status">
+            <span className="hint" role="status">
               Saved. The display takes them at its next check-in.
             </span>
           )}

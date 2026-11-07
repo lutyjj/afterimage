@@ -1,10 +1,13 @@
 .editor {
   height: 100%;
   min-height: 0;
-  border: 1px solid var(--blue-rule);
-  background: var(--white);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  transition: border-color 150ms var(--ease-out);
 }
 
 .editor:focus-within {
-  border-color: var(--blue);
+  border-color: color-mix(in oklch, var(--ink) 55%, var(--border));
 }

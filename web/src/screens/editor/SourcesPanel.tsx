@@ -25,7 +25,7 @@ export function SourcesPanel({
 
   return (
     <section className={styles.panel} aria-labelledby="sources-title">
-      <h3 id="sources-title" className="annotation">
+      <h3 id="sources-title" className={styles.title}>
         Data sources
       </h3>
       {entries.length === 0 && (
@@ -57,7 +57,7 @@ export function SourcesPanel({
       )}
       {secretNames.length > 0 && (
         <div className={styles.secrets}>
-          <span className="annotation">Secrets</span>
+          <span className={styles.title}>Secrets</span>
           <p className="hint">
             Data source requests read them; screens never show them.{" "}
             {secretNames.map((name) => (

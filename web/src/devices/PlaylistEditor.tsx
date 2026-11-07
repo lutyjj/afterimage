@@ -82,7 +82,7 @@ export function PlaylistEditor({
 
       {now && (
         <div className={styles.today}>
-          <span className="annotation">Today · {now.day}</span>
+          <span className={styles.todayTitle}>Today</span>
           <DayStrip
             day={now.day}
             now={now.minute}
@@ -247,10 +247,10 @@ function EntryRow({
                   onChange={(event) => onChange({ from: event.target.value || undefined })}
                 />
               </label>
-              <span className="annotation" aria-hidden="true">
-                to
-              </span>
-              <label>
+              <label className={styles.until}>
+                <span className="muted" aria-hidden="true">
+                  to
+                </span>
                 <span className="visually-hidden">Until</span>
                 <input
                   className="input"
@@ -289,8 +289,8 @@ function EntryRow({
           names={false}
           label={`${daysLabel(entry.days)}, ${windowLabel(entryOf(entry))}`}
         />
-        <span className="annotation">
-          {daysLabel(entry.days)} · {windowLabel(entryOf(entry))}
+        <span className="muted">
+          {daysLabel(entry.days)}, {windowLabel(entryOf(entry))}
         </span>
       </div>
     </li>

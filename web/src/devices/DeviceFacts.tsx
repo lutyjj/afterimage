@@ -31,11 +31,21 @@ export function DeviceFacts({
     <dl className={`${styles.facts} ${className ?? ""}`}>
       <Fact label="Showing">
         {showingName}
-        {showing && timeZone && <Aside> since {moment(showing.renderedAt, timeZone)}</Aside>}
+        {showing && timeZone && (
+          <Aside>
+            {" "}
+            since <Moment at={showing.renderedAt} timeZone={timeZone} />
+          </Aside>
+        )}
       </Fact>
       <Fact label="Last seen">
         {seenAt ? ago(seenAt) : "Never"}
-        {seenAt && timeZone && <Aside> {moment(seenAt, timeZone)}</Aside>}
+        {seenAt && timeZone && (
+          <Aside>
+            {" "}
+            <Moment at={seenAt} timeZone={timeZone} />
+          </Aside>
+        )}
       </Fact>
       <Fact label="Battery">
         {batteryPercent !== undefined ? `${Math.round(batteryPercent)}%` : "Not reported"}
@@ -63,7 +73,16 @@ export function Fact({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-/** A fact's detail in soft ink, such as the voltage beside the battery's percent. */
+/** A day and time that stays on one line. */
+function Moment({ at, timeZone }: { at: Date; timeZone: string }) {
+  return (
+    <time className={styles.moment} dateTime={at.toISOString()}>
+      {moment(at, timeZone)}
+    </time>
+  );
+}
+
+/** A fact's detail, quieter, such as the voltage beside the battery's percent. */
 export function Aside({ children }: { children: ReactNode }) {
   return <span className={styles.aside}>{children}</span>;
 }
