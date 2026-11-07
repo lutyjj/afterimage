@@ -48,6 +48,15 @@ pub struct Entry {
     pub hours: Hours,
 }
 
+/// What an awake device shows: its playlist, or one screen pinned until set
+/// back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Shows {
+    #[default]
+    Playlist,
+    Screen(i64),
+}
+
 /// When a device sleeps, and the screen it shows meanwhile; `None` for the
 /// server's own.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -80,7 +89,10 @@ pub struct Device {
     pub display: Display,
     pub refresh_minutes: i64,
     pub playlist: Vec<Entry>,
+    pub shows: Shows,
     pub sleep: Sleep,
+    /// Held asleep outside its sleep windows until let go.
+    pub sleep_held: bool,
     pub readings: Readings,
     pub seen_at: Option<i64>,
     /// When the server asked the device to check in next.
@@ -92,6 +104,25 @@ pub struct Device {
     pub firmware_board: Option<String>,
     /// The latest firmware install request.
     pub firmware_update: Option<firmware::Update>,
+}
+
+/// Minutes past its wake and one more interval that a device may stay quiet
+/// before it counts as not seen lately.
+const GRACE_MINUTES: i64 = 10;
+
+impl Device {
+    /// When the device counts as not seen lately should it not check in before:
+    /// its refresh interval and [`GRACE_MINUTES`] past the wake it was asked
+    /// for, or past its last check-in and one interval where it has not been
+    /// asked yet. `None` before it checks in.
+    #[must_use]
+    pub fn overdue_at(&self) -> Option<i64> {
+        let refresh = self.refresh_minutes * 60;
+        let due = self
+            .wakes_at
+            .or_else(|| self.seen_at.map(|seen| seen + refresh))?;
+        Some(due + refresh + GRACE_MINUTES * 60)
+    }
 }
 
 /// What a claim did.
@@ -113,6 +144,8 @@ pub struct Changes {
     /// Choosing another board withdraws an install request the device has not
     /// received, since it names the old board's image.
     pub firmware_board: Option<String>,
+    pub shows: Option<Shows>,
+    pub sleep_held: Option<bool>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -427,19 +460,46 @@ impl Devices {
         if changes.firmware_board.is_some() && changes.firmware_board != board {
             firmware::updates::withdraw_unsent(&mut tx, id).await?;
         }
+        if let Some(shows) = changes.shows {
+            let pinned = match shows {
+                Shows::Playlist => None,
+                Shows::Screen(screen_id) => {
+                    let screen = sqlx::query_scalar!(
+                        "SELECT id FROM screens WHERE id = ? AND account_id = ?",
+                        screen_id,
+                        account_id
+                    )
+                    .fetch_optional(&mut *tx)
+                    .await?;
+                    if screen.is_none() {
+                        return Err(Error::UnknownScreen(screen_id));
+                    }
+                    Some(screen_id)
+                }
+            };
+            sqlx::query!(
+                "UPDATE devices SET pinned_screen_id = ? WHERE id = ?",
+                pinned,
+                id
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
         sqlx::query!(
             "UPDATE devices SET
                  name = COALESCE(?, name),
                  display_model = COALESCE(?, display_model),
                  palette = COALESCE(?, palette),
                  refresh_minutes = COALESCE(?, refresh_minutes),
-                 firmware_board = COALESCE(?, firmware_board)
+                 firmware_board = COALESCE(?, firmware_board),
+                 sleep_held = COALESCE(?, sleep_held)
              WHERE id = ?",
             changes.name,
             model,
             palette,
             changes.refresh_minutes,
             changes.firmware_board,
+            changes.sleep_held,
             id
         )
         .execute(&mut *tx)
@@ -637,6 +697,7 @@ async fn load(
                 devices.refresh_minutes, devices.playlist_position, devices.image_name,
                 devices.image_screen_id, devices.rendered_at, devices.image_asleep,
                 devices.firmware_board, devices.sleep_screen_id, devices.wakes_at,
+                devices.pinned_screen_id, devices.sleep_held,
                 registrations.mac, registrations.model, registrations.width, registrations.height,
                 registrations.seen_at, registrations.battery_voltage,
                 registrations.battery_percent, registrations.signal_dbm,
@@ -697,10 +758,12 @@ async fn load(
         },
         refresh_minutes: row.refresh_minutes,
         playlist,
+        shows: row.pinned_screen_id.map_or(Shows::Playlist, Shows::Screen),
         sleep: Sleep {
             windows,
             screen_id: row.sleep_screen_id,
         },
+        sleep_held: row.sleep_held != 0,
         readings: Readings {
             battery_voltage: row.battery_voltage,
             battery_percent: row.battery_percent,

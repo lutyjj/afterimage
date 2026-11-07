@@ -30,7 +30,7 @@ export function DeviceFacts({
         ? `Asleep, showing ${screenName(showing.screenId)}`
         : "Asleep"
       : showing.screenId !== undefined
-        ? screenName(showing.screenId)
+        ? `${screenName(showing.screenId)}${showing.screenId === device.shows.screenId ? ", pinned" : ""}`
         : "Afterimage's own screen";
 
   return (

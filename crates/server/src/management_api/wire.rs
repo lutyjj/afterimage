@@ -10,7 +10,7 @@ use afterimage_trmnl::catalog::Catalog;
 use aws_smithy_types::DateTime;
 
 use crate::accounts::Account;
-use crate::devices::{self, Device, Entry, Hours, Sleep};
+use crate::devices::{self, Device, Entry, Hours, Shows, Sleep};
 use crate::drawing;
 use crate::firmware::{self, Board, Firmware};
 use crate::screens::{Screen, Summary};
@@ -40,6 +40,7 @@ pub fn account(account: Account) -> Result<model::Account, InternalFailure> {
 /// A device, with its board and that board's newest release from TRMNL's
 /// `boards` when they could be read.
 pub fn device(device: Device, boards: Option<&[Board]>) -> Result<model::Device, InternalFailure> {
+    let overdue_at = device.overdue_at();
     let board = boards.and_then(|boards| Firmware::board(boards, &device));
     let firmware = model::DeviceFirmware {
         board: device
@@ -72,7 +73,9 @@ pub fn device(device: Device, boards: Option<&[Board]>) -> Result<model::Device,
             .into_iter()
             .map(entry)
             .collect::<Result<Vec<_>, _>>()?)?,
+        shows: shows(device.shows)?,
         sleep: sleep(device.sleep)?,
+        sleep_held: device.sleep_held,
         readings: model::Readings {
             battery_voltage: device.readings.battery_voltage,
             battery_percent: device.readings.battery_percent,
@@ -81,6 +84,7 @@ pub fn device(device: Device, boards: Option<&[Board]>) -> Result<model::Device,
         },
         seen_at: device.seen_at.map(DateTime::from_secs),
         wakes_at: device.wakes_at.map(DateTime::from_secs),
+        overdue_at: overdue_at.map(DateTime::from_secs),
         showing: device
             .showing
             .map(|showing| -> Result<_, InternalFailure> {
@@ -202,6 +206,21 @@ pub fn stored_entry(entry: &model::PlaylistEntry) -> Entry {
             entry.from.as_ref(),
             entry.until.as_ref(),
         ),
+    }
+}
+
+fn shows(shows: Shows) -> Result<model::Shows, InternalFailure> {
+    Ok(match shows {
+        Shows::Playlist => model::Shows::Playlist,
+        Shows::Screen(id) => model::Shows::ScreenId(fit(id)?),
+    })
+}
+
+/// What an awake device shows, as the store keeps it.
+pub fn stored_shows(shows: &model::Shows) -> Shows {
+    match shows {
+        model::Shows::Playlist => Shows::Playlist,
+        model::Shows::ScreenId(id) => Shows::Screen(*id.inner()),
     }
 }
 

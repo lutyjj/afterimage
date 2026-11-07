@@ -221,6 +221,9 @@ async fn get_display(
                 .await
                 .map_err(|error| internal_failure(&error))?;
             state.telemetry.device(device.id);
+            if woken_by_button(input.update_source.as_deref()) {
+                state.telemetry.pressed(device.id);
+            }
             output::GetDisplayOutput {
                 status: DisplayStatus::Show.code(),
                 image_url: Some(format!("{origin}/api/images/{}", shown.image)),
@@ -273,6 +276,12 @@ async fn get_current_screen(
             rendered_at: None,
         },
     })
+}
+
+/// Whether a press on its button woke the device: firmware 1.8.18 names a
+/// GPIO wake `button`, and an external pin's `EXT0` or `EXT1`.
+fn woken_by_button(update_source: Option<&str>) -> bool {
+    matches!(update_source, Some("button" | "EXT0" | "EXT1"))
 }
 
 /// Seconds until the wake the last check-in asked for, which counts the playlist

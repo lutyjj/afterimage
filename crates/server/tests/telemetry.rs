@@ -16,6 +16,9 @@ use serde_json::{Value, json};
 const CONFIG: &str = "homeassistant/device/afterimage_41b41039a101/config";
 const STATE: &str = "afterimage/41b41039a101/state";
 const FIRMWARE: &str = "afterimage/41b41039a101/firmware";
+const IMAGE: &str = "afterimage/41b41039a101/image";
+const BUTTON: &str = "afterimage/41b41039a101/button";
+const DEVICE: &str = "afterimage/41b41039a101";
 
 async fn start(broker: &Broker) -> Server {
     let url = broker.url();
@@ -58,7 +61,8 @@ async fn a_claimed_device_is_a_home_assistant_device() {
     assert_eq!(
         components.keys().map(String::as_str).collect::<Vec<_>>(),
         [
-            "battery", "firmware", "screen", "seen_at", "signal", "voltage"
+            "asleep", "battery", "button", "firmware", "held", "image", "overdue", "refresh",
+            "screen", "seen_at", "showing", "signal", "voltage", "wakes_at"
         ]
     );
     assert_eq!(components["battery"]["state_topic"], STATE);
@@ -444,4 +448,123 @@ async fn a_tls_broker_url_starts_the_server() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn home_assistant_holds_sleep_pins_a_screen_and_sets_the_wake() {
+    let broker = Broker::start().await;
+    let observer = Observer::start(&broker);
+    let server = start(&broker).await;
+    server.sign_up().await;
+    let (claimed, _) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    let (status, body) = server
+        .call(
+            "POST",
+            "/manage/screens",
+            Some(json!({ "name": "Night", "document": { "content": { "title": { "text": "Night" } } } })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    let night = body["screen"]["id"].clone();
+    let config = observer
+        .wait(CONFIG, |config| {
+            config["components"]["showing"]["options"] == json!(["Playlist", "Night"])
+        })
+        .await;
+    assert_eq!(
+        config["components"]["showing"]["command_topic"],
+        format!("{DEVICE}/showing/set")
+    );
+
+    observer
+        .publish(&format!("{DEVICE}/held/set"), "ON", false)
+        .await;
+    observer.wait(STATE, |state| state["held"] == true).await;
+    assert_eq!(device(&server, id).await["sleepHeld"], true);
+
+    observer
+        .publish(&format!("{DEVICE}/showing/set"), "Night", false)
+        .await;
+    observer
+        .wait(STATE, |state| state["showing"] == "Night")
+        .await;
+    assert_eq!(
+        device(&server, id).await["shows"],
+        json!({ "screenId": night })
+    );
+    observer
+        .publish(&format!("{DEVICE}/showing/set"), "Playlist", false)
+        .await;
+    observer
+        .wait(STATE, |state| state["showing"] == "Playlist")
+        .await;
+    assert_eq!(
+        device(&server, id).await["shows"],
+        json!({ "playlist": {} })
+    );
+
+    observer
+        .publish(&format!("{DEVICE}/refresh/set"), "30.0", false)
+        .await;
+    observer.wait(STATE, |state| state["refresh"] == 30).await;
+    assert_eq!(device(&server, id).await["refreshMinutes"], 30);
+}
+
+#[tokio::test]
+async fn a_press_on_the_button_is_an_event_and_the_image_is_published() {
+    let broker = Broker::start().await;
+    let observer = Observer::start(&broker);
+    let server = start(&broker).await;
+    server.sign_up().await;
+    let (_, key) = server.claim(&mac(1)).await;
+    server.display(&key, &READINGS).await;
+    let image = observer
+        .wait(IMAGE, |image| {
+            image.as_str().is_some_and(|png| png.contains("PNG"))
+        })
+        .await;
+    assert!(
+        image
+            .as_str()
+            .is_some_and(|png| png.starts_with('\u{fffd}'))
+    );
+    assert!(
+        observer.payloads(BUTTON).is_empty(),
+        "a wake by the timer is not a press"
+    );
+
+    server.press(&key).await;
+    let event = observer.wait(BUTTON, |_| true).await;
+    assert_eq!(event, json!({ "event_type": "press" }));
+}
+
+#[tokio::test]
+async fn a_device_quiet_past_its_wake_is_not_seen_lately() {
+    let broker = Broker::start().await;
+    let observer = Observer::start(&broker);
+    let server = start(&broker).await;
+    server.sign_up().await;
+    let (_, key) = server.claim(&mac(1)).await;
+    server.display(&key, &READINGS).await;
+    let state = observer
+        .wait(STATE, |state| state["wakes_at"] == "2027-01-15T08:15:00Z")
+        .await;
+    assert_eq!(state["overdue"], false);
+
+    // Its wake at 08:15, one fifteen-minute interval and ten minutes more.
+    server.clock.advance((15 + 15 + 10) * 60 + 1);
+    // Home Assistant announcing itself has every device published again now.
+    observer
+        .publish("homeassistant/status", "online", false)
+        .await;
+    observer.wait(STATE, |state| state["overdue"] == true).await;
+}
+
+async fn device(server: &Server, id: i64) -> Value {
+    server
+        .call("GET", &format!("/manage/devices/{id}"), None)
+        .await
+        .1["device"]
+        .clone()
 }

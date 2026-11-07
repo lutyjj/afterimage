@@ -21,6 +21,10 @@ const DAY_MINUTES: u16 = 24 * 60;
 /// checks in, and takes a change, once a day.
 pub const LONGEST_SLEEP_MINUTES: i64 = 24 * 60;
 
+/// How often a device held asleep outside its windows checks in, to learn of
+/// its release: it cannot be woken from the server.
+pub const HELD_SLEEP_MINUTES: i64 = 60;
+
 fn day_bit(weekday: Weekday) -> u8 {
     1 << weekday.to_monday_zero_offset()
 }
@@ -69,13 +73,23 @@ pub fn next(playlist: &[Entry], last: Option<usize>, at: &Zoned) -> Option<usize
         .or_else(|| current.first().copied())
 }
 
-/// Seconds until the device should check in again. Awake, its refresh interval,
-/// or less when the set of current entries changes or it falls asleep sooner.
-/// Asleep, until no sleep window is current, a day at most.
+/// Seconds until the device should check in again. In a sleep window, until no
+/// window is current, a day at most. Held asleep outside them, an hour. Awake,
+/// its refresh interval, or less when the set of current entries of `playlist`
+/// changes or it falls asleep sooner; a device pinned to one screen passes no
+/// playlist.
 #[must_use]
-pub fn wait(playlist: &[Entry], sleep: &[Hours], refresh_minutes: i64, at: &Zoned) -> i64 {
+pub fn wait(
+    playlist: &[Entry],
+    sleep: &[Hours],
+    held: bool,
+    refresh_minutes: i64,
+    at: &Zoned,
+) -> i64 {
     if asleep(sleep, at) {
         until_change(at, LONGEST_SLEEP_MINUTES, |later| asleep(sleep, later))
+    } else if held {
+        HELD_SLEEP_MINUTES * 60
     } else {
         until_change(at, refresh_minutes.max(1), |later| {
             (current(playlist, later), asleep(sleep, later))
@@ -197,13 +211,13 @@ mod tests {
     fn wakes_at_the_next_change_when_it_comes_before_the_refresh() {
         let playlist = [entry(None, Some(12 * 60 + 10), Some(13 * 60))];
         let at: Zoned = "2026-11-04T12:00:30[Europe/Berlin]".parse().unwrap();
-        assert_eq!(wait(&playlist, &[], 15, &at), 9 * 60 + 30);
+        assert_eq!(wait(&playlist, &[], false, 15, &at), 9 * 60 + 30);
         assert_eq!(
-            wait(&playlist, &[], 5, &at),
+            wait(&playlist, &[], false, 5, &at),
             5 * 60,
             "the refresh comes first"
         );
-        assert_eq!(wait(&[], &[], 15, &at), 15 * 60);
+        assert_eq!(wait(&[], &[], false, 15, &at), 15 * 60);
     }
 
     #[test]
@@ -216,7 +230,7 @@ mod tests {
             .to_zoned(TimeZone::get("Europe/Berlin").unwrap());
         assert_eq!(at.hour(), 2);
         assert_eq!(
-            wait(&playlist, &[], 24 * 60, &at),
+            wait(&playlist, &[], false, 24 * 60, &at),
             2 * 60 * 60,
             "two real hours to 03:00 winter time"
         );
@@ -240,7 +254,7 @@ mod tests {
         ];
         let at: Zoned = "2026-11-04T23:00:00[Europe/Berlin]".parse().unwrap();
         assert_eq!(
-            wait(&[entry(None, None, None)], &nights, 15, &at),
+            wait(&[entry(None, None, None)], &nights, false, 15, &at),
             8 * 60 * 60,
             "through both windows, past the refresh"
         );
@@ -250,7 +264,10 @@ mod tests {
     fn sleeps_a_day_at_most() {
         let always = [hours(None, None, None)];
         let at = wednesday("12:00");
-        assert_eq!(wait(&[], &always, 15, &at), LONGEST_SLEEP_MINUTES * 60);
+        assert_eq!(
+            wait(&[], &always, false, 15, &at),
+            LONGEST_SLEEP_MINUTES * 60
+        );
     }
 
     #[test]
@@ -258,9 +275,25 @@ mod tests {
         let nights = [hours(None, Some(23 * 60), Some(7 * 60))];
         let at: Zoned = "2026-11-04T22:50:00[Europe/Berlin]".parse().unwrap();
         assert_eq!(
-            wait(&[entry(None, None, None)], &nights, 60, &at),
+            wait(&[entry(None, None, None)], &nights, false, 60, &at),
             10 * 60,
             "at 23:00, before its hour is up"
+        );
+    }
+
+    #[test]
+    fn a_device_held_asleep_checks_in_hourly_outside_its_windows() {
+        let nights = [hours(None, Some(23 * 60), Some(7 * 60))];
+        let playlist = [entry(None, None, None)];
+        assert_eq!(
+            wait(&playlist, &nights, true, 15, &wednesday("12:00")),
+            HELD_SLEEP_MINUTES * 60
+        );
+        let night: Zoned = "2026-11-04T23:00:00[Europe/Berlin]".parse().unwrap();
+        assert_eq!(
+            wait(&playlist, &nights, true, 15, &night),
+            8 * 60 * 60,
+            "in a window it sleeps the window through, held or not"
         );
     }
 }

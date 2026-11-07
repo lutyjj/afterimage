@@ -10,13 +10,12 @@ export interface DeviceState {
   title: string;
 }
 
-/** The states that need the person's attention. A device misses a check-in when it
- * stays quiet past the time it was asked to wake, by its refresh interval and a few
- * minutes more, so a sleeping device is not missed. A sleeping device has nothing
- * scheduled by design. */
+/** The states that need the person's attention. A device is not seen lately once it
+ * stays quiet past the moment the server names (`overdueAt`, its wake and a little
+ * more), so a sleeping device is not missed; Home Assistant reads the same moment.
+ * A sleeping device, or one pinned to a screen, misses nothing in its playlist. */
 export function deviceStates(device: Device, timeZone: string, now: Date = new Date()): DeviceState[] {
   const states: DeviceState[] = [];
-  const refresh = device.refreshMinutes * 60_000;
   if (!device.seenAt) {
     states.push({
       key: "never-seen",
@@ -24,8 +23,7 @@ export function deviceStates(device: Device, timeZone: string, now: Date = new D
       title: "Claimed, and waiting for the display's first check-in.",
     });
   } else {
-    const due = device.wakesAt?.getTime() ?? device.seenAt.getTime() + refresh;
-    if (now.getTime() > due + refresh + 10 * 60_000) {
+    if (device.overdueAt && now > device.overdueAt) {
       states.push({
         key: "not-seen",
         label: "Not seen lately",
@@ -34,8 +32,9 @@ export function deviceStates(device: Device, timeZone: string, now: Date = new D
     }
   }
   const { day, minute } = nowIn(timeZone, now);
-  const asleep = isAsleep(device.sleep.windows, day, minute);
-  if (!asleep && !device.playlist.some((entry) => isCurrent(entry, day, minute))) {
+  const asleep = device.sleepHeld || isAsleep(device.sleep.windows, day, minute);
+  const pinned = device.shows.screenId !== undefined;
+  if (!asleep && !pinned && !device.playlist.some((entry) => isCurrent(entry, day, minute))) {
     states.push({
       key: "nothing-scheduled",
       label: "Nothing scheduled",

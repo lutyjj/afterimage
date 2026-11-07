@@ -121,9 +121,19 @@ structure Device {
     @required
     readings: Readings
 
+    /// What the device shows while it is awake.
+    @required
+    shows: Shows
+
     /// When the device sleeps, and what it shows meanwhile.
     @required
     sleep: Sleep
+
+    /// Whether the device is held asleep outside its sleep windows until let go.
+    /// Held, it shows its sleep screen and checks in hourly to learn of the
+    /// release, since it cannot be woken from the server.
+    @required
+    sleepHeld: Boolean
 
     /// The last check-in; absent until the claimed device checks in.
     seenAt: Instant
@@ -132,6 +142,11 @@ structure Device {
     /// claimed device checks in. A device quiet long past it may be off or out
     /// of range.
     wakesAt: Instant
+
+    /// When the device counts as not seen lately should it not check in before:
+    /// its refresh interval and ten minutes past its wake. Absent until it checks
+    /// in. A device quiet past it may be off, out of range or out of battery.
+    overdueAt: Instant
 
     /// The screen the device shows now; absent before its first image.
     showing: Showing
@@ -189,6 +204,16 @@ structure Hours {
     /// of the day. An `until` before `from` runs past midnight and belongs to the
     /// day it starts; an `until` equal to `from` makes it current all day.
     until: TimeOfDay
+}
+
+/// What an awake device shows. A pinned screen stays until set back to the
+/// playlist, which waits where it was; deleting the screen sets it back.
+union Shows {
+    /// Its playlist.
+    playlist: Unit
+
+    /// One screen, at every check-in.
+    screenId: Id
 }
 
 /// When a device sleeps. While a window is current the device shows its sleep
@@ -329,6 +354,13 @@ operation UpdateDevice {
         /// `ListFirmwareBoards`. Choosing a board withdraws an install request the
         /// device has not received.
         firmwareBoard: FirmwareBoardName
+
+        /// What the device shows while awake, from its next check-in.
+        shows: Shows
+
+        /// Holds the device asleep outside its sleep windows, or lets it go. A
+        /// sleeping device learns of a release at its next hourly check-in.
+        sleepHeld: Boolean
     }
 
     output := {

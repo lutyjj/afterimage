@@ -144,12 +144,19 @@ With a broker configured, the server publishes each claimed device to Home Assis
 | Entity | Home Assistant kind | Note |
 |---|---|---|
 | Battery | Sensor | Estimated from the voltage, as under [Check-in](#check-in), where the firmware reports none |
-| Voltage, signal, last check-in, current screen | Sensor | The current screen reads "Asleep" while the device sleeps |
+| Voltage, signal, last check-in, current screen, wakes at | Sensor | The current screen reads "Asleep" while the device sleeps; wakes at is the check-in the server asked for |
+| Asleep | Binary sensor | On while the device shows its sleep screen |
+| Not seen lately | Binary sensor, problem | On once the device is quiet past its wake by its refresh interval and ten minutes, the moment the web UI uses too |
 | Firmware | Update | Its install command starts a [firmware update](#firmware-update) to the board's newest release |
+| Sleep | Switch | Holds the device [asleep](#sleep) outside its windows until turned off |
+| Showing | Select | The playlist, or one of the account's screens pinned in its place; a name two screens share is numbered |
+| Wakes every | Number | The refresh interval, 1 to 1440 minutes |
+| Button | Event | `press` when a press on the device's button woke it (firmware 1.8.18 reports `Update-Source`) |
+| Image | Image | The image the device shows, as PNG |
 
 - A device is keyed by its MAC, so it stays the same Home Assistant device across setups. Its link back leads to its page in the web UI.
 - When accounts hold devices of one MAC, as after a device set up again is claimed elsewhere, the topics belong to the one that checked in last.
-- Whoever may publish to the broker may start an install, so the broker's access control is the boundary. A retained install command is ignored, since the broker would replay it at every connection.
+- Whoever may publish to the broker may command any device, so the broker's access control is the boundary. A retained command is ignored, since the broker would replay it at every connection.
 
 ### Topics
 
@@ -157,10 +164,13 @@ With a broker configured, the server publishes each claimed device to Home Assis
 |---|---|
 | It connects to the broker | Publishes every device, and clears the retained topics of devices removed while the broker was out of reach |
 | Home Assistant announces itself on its status topic | Publishes every device |
-| A device checks in or changes | Publishes that device |
+| A device checks in or changes | Publishes that device, its image only when it changed |
+| A press on its button woke it | Publishes the button event |
+| A screen is created, renamed or deleted | Publishes every device, whose "Showing" options changed |
+| A device turns not seen lately, checked every minute | Publishes that device |
 | A device is removed | Clears its topics |
 
-- Discovery, state and firmware topics are retained.
+- Discovery, state, firmware and image topics are retained; commands and the button event are not.
 - A fact the server does not know is left out, since Home Assistant drops a payload with a null where it reads text.
 - Every entity's availability follows the server's own status topic, which its last will sets offline.
 
@@ -240,7 +250,7 @@ The components are those TRMNL's 30 published plugins use most. The design syste
 
 ### Playlists
 
-A device's playlist lists the screens it shows, each on some weekdays and between two times of day in the server's time zone. At each check-in the device shows the next current entry.
+A device's playlist lists the screens it shows, each on some weekdays and between two times of day in the server's time zone. At each check-in the device shows the next current entry. One of the account's screens can be pinned in its place: the device shows it at every check-in until set back, the playlist waits where it was, and deleting the screen sets the device back.
 
 ### Sleep
 
@@ -251,6 +261,8 @@ A device sleeps in its sleep windows, which take the same weekdays and times of 
 | Shows | Its sleep screen: one of the account's screens, or the server's own, which says when it wakes. A sleep screen that cannot be drawn gives way to the server's own, so a daytime image does not stand all night |
 | Wakes | When no window is current, a day at most, so a device asleep around the clock still takes changes daily |
 | Playlist | Waits where it was, and goes on from the same entry |
+
+A device can also be held asleep outside its windows until let go, as Home Assistant's sleep switch does. Held, it shows its sleep screen without a wake time and checks in hourly to learn of the release.
 
 A device cannot be woken from the server. A change to its sleep reaches a sleeping device at its next check-in: when it wakes, or when someone presses its button, which checks it in at once. While a window is still current that check-in shows the sleep screen again; the playlist shows once the device is awake.
 
@@ -342,7 +354,7 @@ SQLite holds the server's records, and the data and cache directories hold its i
 |---|---|
 | Accounts, sessions, personal access tokens | Their secrets only as hashes (see [Sessions and tokens](#sessions-and-tokens)) |
 | Registrations | MAC, model, access key hash, friendly ID, end time, panel size, latest readings |
-| Devices | Owner, name, display, refresh interval, current registration, playlist position, sleep screen, the image it shows and whether it is the sleep screen, when it was asked to wake, the firmware board a user chose |
+| Devices | Owner, name, display, refresh interval, current registration, playlist position, the pinned screen, sleep screen and whether it is held asleep, the image it shows and whether it is the sleep screen, when it was asked to wake, the firmware board a user chose |
 | Firmware install requests | Each device's latest |
 | Screens, playlists and sleep | Screen documents, playlist entries and sleep windows |
 | MQTT broker | The one the administrator saved (see [Broker settings](#broker-settings)) |

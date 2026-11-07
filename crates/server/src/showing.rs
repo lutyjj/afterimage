@@ -1,6 +1,6 @@
-//! What a claimed device shows at a check-in: its sleep screen while it sleeps,
-//! else the next current entry of its playlist, drawn now, or one of the server's
-//! own screens.
+//! What a claimed device shows at a check-in: its sleep screen while it sleeps
+//! or is held asleep, else its pinned screen or the next current entry of its
+//! playlist, drawn now, or one of the server's own screens.
 //!
 //! A playlist screen that cannot be drawn as written (a data source down, a
 //! template error) leaves the device on the image it shows, so a passing outage
@@ -14,7 +14,7 @@ use afterimage_render_typst::Renderer;
 use afterimage_trmnl::catalog::{Catalog, Model, Palette};
 use serde_json::{Value, json};
 
-use crate::devices::{Device, Devices, Showing};
+use crate::devices::{Device, Devices, Entry, Showing, Shows};
 use crate::drawing::{self, Drawing, Problem};
 use crate::images::Images;
 use crate::schedule;
@@ -79,9 +79,15 @@ pub async fn next(
     let at = jiff::Timestamp::from_second(now)
         .unwrap_or(jiff::Timestamp::UNIX_EPOCH)
         .to_zoned(drawing.time_zone().zone().clone());
+    let playlist: &[Entry] = match device.shows {
+        Shows::Playlist => &device.playlist,
+        Shows::Screen(_) => &[],
+    };
+    let in_window = schedule::asleep(&device.sleep.windows, &at);
     let wait = schedule::wait(
-        &device.playlist,
+        playlist,
         &device.sleep.windows,
+        device.sleep_held,
         device.refresh_minutes,
         &at,
     );
@@ -92,15 +98,24 @@ pub async fn next(
         now,
         wait,
     };
-    if schedule::asleep(&device.sleep.windows, &at) {
-        return asleep(&shown, screens, drawing, &at).await;
+    if in_window || device.sleep_held {
+        return asleep(&shown, screens, drawing, &at, in_window).await;
     }
     // The server's own screens share the check-in's time with the screen drawn first.
     let places_by = Drawing::places_deadline();
     let (model, palette) = display(device);
-    let position = schedule::next(&device.playlist, device.playlist_position, &at);
-    let drawn = if let Some(position) = position {
-        let screen_id = device.playlist[position].screen_id;
+    // A pinned screen stands in for the playlist, which waits where it was.
+    let (position, screen) = match device.shows {
+        Shows::Screen(screen_id) => (device.playlist_position, Some(screen_id)),
+        Shows::Playlist => {
+            let position = schedule::next(&device.playlist, device.playlist_position, &at);
+            (
+                position,
+                position.map(|position| device.playlist[position].screen_id),
+            )
+        }
+    };
+    let drawn = if let Some(screen_id) = screen {
         drawn_screen(device, screens, drawing, screen_id, now)
             .await?
             .map(|bytes| (bytes, Some(screen_id)))
@@ -143,12 +158,14 @@ pub async fn next(
 }
 
 /// The device's sleep screen, or the server's own when it has none or it
-/// cannot be drawn. The playlist stays where it was.
+/// cannot be drawn, which says when a sleep window ends. The playlist stays
+/// where it was.
 async fn asleep(
     shown: &Record<'_>,
     screens: &Screens,
     drawing: &Drawing,
     at: &jiff::Zoned,
+    in_window: bool,
 ) -> Result<Shown, Error> {
     let device = shown.device;
     // The server's own screen shares the check-in's time with the screen drawn first.
@@ -164,12 +181,14 @@ async fn asleep(
         }
     }
     let (model, palette) = display(device);
-    let wakes = at
-        .checked_add(jiff::SignedDuration::from_secs(shown.wait))
-        .unwrap_or_else(|_| at.clone());
+    // Held asleep outside its windows, the device does not know when it wakes.
+    let wakes = in_window.then(|| {
+        at.checked_add(jiff::SignedDuration::from_secs(shown.wait))
+            .unwrap_or_else(|_| at.clone())
+    });
     let image = drawing
         .draw_resolved(
-            sleeping(&device.name, at, &wakes),
+            sleeping(&device.name, at, wakes.as_ref()),
             model,
             palette,
             places_by,
@@ -269,20 +288,22 @@ impl Record<'_> {
     }
 }
 
-/// The server's screen for a sleeping device: that it sleeps, and when it wakes.
-fn sleeping(device: &str, at: &jiff::Zoned, wakes: &jiff::Zoned) -> Value {
-    let time = wakes.strftime("%H:%M").to_string();
-    let when = if wakes.date() == at.date() {
-        format!("Wakes at {time}")
-    } else {
-        format!("Wakes tomorrow at {time}")
-    };
+/// The server's screen for a sleeping device: that it sleeps, and when it wakes
+/// where that is known.
+fn sleeping(device: &str, at: &jiff::Zoned, wakes: Option<&jiff::Zoned>) -> Value {
+    let mut children = vec![json!({ "title": { "text": "Asleep", "size": "large" } })];
+    if let Some(wakes) = wakes {
+        let time = wakes.strftime("%H:%M").to_string();
+        let when = if wakes.date() == at.date() {
+            format!("Wakes at {time}")
+        } else {
+            format!("Wakes tomorrow at {time}")
+        };
+        children.push(json!({ "description": { "text": when } }));
+    }
     json!({
         "titleBar": { "title": "Afterimage", "instance": device },
-        "content": { "column": { "align": "center", "justify": "center", "gap": "medium", "grow": false, "children": [
-            { "title": { "text": "Asleep", "size": "large" } },
-            { "description": { "text": when } }
-        ] } }
+        "content": { "column": { "align": "center", "justify": "center", "gap": "medium", "grow": false, "children": children } }
     })
 }
 

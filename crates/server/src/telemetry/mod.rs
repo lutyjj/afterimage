@@ -1,34 +1,45 @@
 //! Device state over MQTT, with Home Assistant's MQTT discovery. Each claimed
 //! device becomes a Home Assistant device: its battery, voltage, signal, last
-//! check-in and current screen are sensors, and its firmware is an update entity
-//! whose install asks the device to install its board's newest release (step 4 of
-//! the design's Devices).
+//! check-in, current screen and next wake are sensors; whether it sleeps and
+//! whether it counts as not seen lately are binary sensors; its firmware is an
+//! update entity whose install asks the device to install its board's newest
+//! release (step 4 of the design's Devices); a switch holds it asleep, a select
+//! pins one of its account's screens in place of its playlist, a number sets
+//! how often it wakes, a press on its button is an event, and the image it
+//! shows is an image entity.
 //!
 //! Topics, under the base topic (`afterimage` unless configured), where `<device>`
 //! is the device's MAC in lowercase hexadecimal:
 //!
 //! - `<base>/status`: `online` while the server is connected, and `offline`, its
 //!   last will. Every entity's availability follows it.
-//! - `<base>/<device>/state`: the readings and the screen, as JSON.
+//! - `<base>/<device>/state`: the readings, the screen, sleep, wake and the
+//!   settings the controls show, as JSON.
 //! - `<base>/<device>/firmware`: the installed and newest release, as Home
 //!   Assistant's update entity reads them.
-//! - `<base>/<device>/firmware/install`: `install` asks for the newest release.
+//! - `<base>/<device>/image`: the image the device shows, as PNG.
+//! - `<base>/<device>/button`: `{"event_type": "press"}` when its button woke it.
+//! - Commands: `<base>/<device>/firmware/install` (`install`),
+//!   `<base>/<device>/held/set` (`ON` or `OFF`), `<base>/<device>/showing/set`
+//!   (an option of the select) and `<base>/<device>/refresh/set` (minutes).
 //! - `<prefix>/device/<base>_<device>/config`: the device's discovery payload.
 //!
-//! Everything but the install command is retained, so a subscriber that joins
-//! later reads the last state. The server publishes every device again when it
-//! connects and when Home Assistant announces itself on `<prefix>/status`, and
-//! one device whenever it checks in or changes. On connecting it also reads the
-//! retained state topics back and clears those of devices that are gone, so a
-//! device removed while the broker was out of reach does not linger. History
-//! belongs to whoever subscribes.
+//! Everything but the commands and the button is retained, so a subscriber that
+//! joins later reads the last state. The server publishes every device again
+//! when it connects, when Home Assistant announces itself on
+//! `<prefix>/status`, and when an account's screens change, since they are the
+//! select's options; one device whenever it checks in or changes; and a device
+//! whose not-seen-lately state turns, checked every minute. On connecting it
+//! also reads the retained state topics back and clears those of devices that
+//! are gone, so a device removed while the broker was out of reach does not
+//! linger. History belongs to whoever subscribes.
 //!
 //! Accounts may hold devices of one MAC, as when a device set up again is claimed
 //! by another account; its topics belong to the one that checked in last.
 //!
-//! Whoever may publish to the broker may ask any device to install firmware: the
-//! broker's access control is the boundary. A retained install command is
-//! ignored, since the broker would replay it at every connection.
+//! Whoever may publish to the broker may command any device: the broker's
+//! access control is the boundary. A retained command is ignored, since the
+//! broker would replay it at every connection.
 //!
 //! The broker is the deployment's, or else the one the administrator saved in
 //! the web UI ([`Saved`]). A change of broker or topics takes effect at once: the
@@ -45,8 +56,10 @@ use tokio::sync::{mpsc, oneshot, watch};
 
 pub use saved::{Saved, SavedBroker};
 
+use crate::clock::Clock;
 use crate::devices::Devices;
 use crate::firmware::Firmware;
+use crate::images::Images;
 use crate::screens::Screens;
 
 /// Where and how to publish.
@@ -132,6 +145,10 @@ enum Change {
     Device(i64),
     /// A removed device, by its MAC.
     Removed(String),
+    /// A press on the device's button woke it.
+    Pressed(i64),
+    /// Every device, such as when screens, the select's options, change.
+    All,
 }
 
 enum Command {
@@ -145,6 +162,8 @@ struct Parts {
     devices: Arc<Devices>,
     screens: Arc<Screens>,
     firmware: Arc<Firmware>,
+    images: Arc<Images>,
+    clock: Arc<dyn Clock>,
 }
 
 /// The way in for everything that changes a device, and for the broker's
@@ -168,11 +187,15 @@ impl Telemetry {
         devices: Devices,
         screens: Screens,
         firmware: Arc<Firmware>,
+        images: Arc<Images>,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, String> {
         let parts = Parts {
             devices: Arc::new(devices),
             screens: Arc::new(screens),
             firmware,
+            images,
+            clock,
         };
         let (state, connection) = watch::channel(Connection::Off);
         let (commands, mut received) = mpsc::unbounded_channel();
@@ -237,6 +260,17 @@ impl Telemetry {
     /// Takes a removed device out of Home Assistant.
     pub fn removed(&self, mac: &str) {
         self.send(Command::Change(Change::Removed(mac.to_owned())));
+    }
+
+    /// Tells Home Assistant that a press on the device's button woke it.
+    pub fn pressed(&self, id: i64) {
+        self.send(Command::Change(Change::Pressed(id)));
+    }
+
+    /// Publishes every device again, such as after an account's screens, which
+    /// the select offers, changed.
+    pub fn screens_changed(&self) {
+        self.send(Command::Change(Change::All));
     }
 
     /// The connection to the broker now.

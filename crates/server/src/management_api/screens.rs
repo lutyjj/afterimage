@@ -59,6 +59,8 @@ pub async fn create_screen(
         .create(caller.account.id, input.name.as_str(), &document)
         .await
         .map_err(|error| internal(&error))?;
+    // Screens are the options of each device's "Showing" select.
+    state.telemetry.screens_changed();
     Ok(output::CreateScreenOutput {
         screen: wire::screen(screen)?,
     })
@@ -98,6 +100,8 @@ pub async fn update_screen(
         .await
         .map_err(|error| internal(&error))?
         .ok_or_else(not_found)?;
+    // Screens are the options of each device's "Showing" select.
+    state.telemetry.screens_changed();
     Ok(output::UpdateScreenOutput {
         screen: wire::screen(screen)?,
     })
@@ -116,6 +120,8 @@ pub async fn delete_screen(
     if !deleted {
         return Err(not_found().into());
     }
+    // Screens are the options of each device's "Showing" select.
+    state.telemetry.screens_changed();
     Ok(output::DeleteScreenOutput {})
 }
 

@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import {
   Actions,
   Button,
+  Select,
   Card,
   CardBody,
   CardHead,
@@ -94,6 +95,7 @@ export function PlaylistEditor({
         }
       />
       <CardBody className="grid gap-4">
+        {screens !== undefined && screens.length > 0 && <PinPicker device={device} screens={screens} />}
         {now && (
           <div className="grid gap-2">
             <span className="text-sm font-medium text-text-secondary">Today</span>
@@ -244,5 +246,51 @@ function EntryRow({
         </span>
       </div>
     </SettlingItem>
+  );
+}
+
+/** What the display shows while awake: its playlist, or one screen pinned in its
+ * place until set back. It saves as it changes. */
+function PinPicker({ device, screens }: { device: Device; screens: ScreenSummary[] }) {
+  const toast = useToast();
+  const pinned = device.shows.screenId;
+  const pin = useMutation({
+    mutationFn: (screenId: number | undefined) =>
+      client.updateDevice({
+        deviceId: device.id,
+        shows: screenId === undefined ? { playlist: {} } : { screenId },
+      }),
+    onSuccess: ({ device: updated }) => {
+      queryClient.setQueryData(deviceQuery(updated.id).queryKey, updated);
+      void queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
+      toast.show({
+        text:
+          updated.shows.screenId === undefined
+            ? "Back to its playlist at its next check-in."
+            : "Pinned. The display shows it from its next check-in.",
+      });
+    },
+    onError: (error) => toast.show({ text: `Not changed. ${messageOf(error)}`, sticky: true }),
+  });
+  const known = pinned === undefined || screens.some((screen) => screen.id === pinned);
+  return (
+    <div className="max-w-md">
+      <Select
+        label="Showing"
+        hint={
+          pinned === undefined
+            ? "Pin a screen to show it at every check-in in place of the playlist."
+            : "The playlist waits where it was until this is set back."
+        }
+        placeholder="Its playlist"
+        choices={[
+          ...(known ? [] : [{ value: String(pinned), label: "A deleted screen" }]),
+          ...screens.map((screen) => ({ value: String(screen.id), label: screen.name })),
+        ]}
+        value={pinned === undefined ? "" : String(pinned)}
+        disabled={pin.isPending}
+        onValueChange={(value) => pin.mutate(value === "" ? undefined : Number(value))}
+      />
+    </div>
   );
 }

@@ -16,10 +16,13 @@ function device(change: Partial<Device>): Device {
     display: { model: "og_png", palette: "bw" },
     refreshMinutes: 15,
     playlist: [{ screenId: 1 }],
+    shows: { playlist: {} },
     sleep: { windows: [] },
+    sleepHeld: false,
     readings: {},
     seenAt: new Date(NOW.getTime() - 60_000),
     wakesAt: new Date(NOW.getTime() + 14 * 60_000),
+    overdueAt: new Date(NOW.getTime() + 39 * 60_000),
     firmware: { boardChosen: false, updateAvailable: false },
     ...change,
   };
@@ -36,13 +39,10 @@ describe("deviceStates", () => {
     expect(keys(deviceStates(device({ seenAt: undefined }), ZONE, NOW))).toEqual(["never-seen"]);
   });
 
-  it("calls a device quiet past its wake by its interval and ten minutes not seen lately", () => {
-    const quiet = (minutes: number) => {
-      const seenAt = new Date(NOW.getTime() - minutes * 60_000);
-      return device({ seenAt, wakesAt: new Date(seenAt.getTime() + 15 * 60_000) });
-    };
-    expect(keys(deviceStates(quiet(40), ZONE, NOW))).toEqual([]);
-    expect(keys(deviceStates(quiet(41), ZONE, NOW))).toEqual(["not-seen"]);
+  it("calls a device quiet past the moment the server names not seen lately", () => {
+    const at = (minutes: number) => device({ overdueAt: new Date(NOW.getTime() + minutes * 60_000) });
+    expect(keys(deviceStates(at(0), ZONE, NOW))).toEqual([]);
+    expect(keys(deviceStates(at(-1), ZONE, NOW))).toEqual(["not-seen"]);
   });
 
   it("says nothing is scheduled when no entry is current in the server's time zone", () => {
@@ -68,11 +68,12 @@ describe("endedStates", () => {
 
   it("lets a device sleep through the night unmissed, with nothing missing from its playlist", () => {
     // 06:30 Friday in Berlin: asleep since its check-in at 23:00 Thursday, due at
-    // 07:00. Counted from the check-in alone it would be hours overdue.
+    // 07:00, so the server counts it not seen lately only from 07:25.
     const dawn = new Date("2026-11-06T05:30:00Z");
     const sleeping = device({
       seenAt: new Date("2026-11-05T22:00:00Z"),
       wakesAt: new Date("2026-11-06T06:00:00Z"),
+      overdueAt: new Date("2026-11-06T06:25:00Z"),
       playlist: [{ screenId: 1, from: "08:00", until: "20:00" }],
       sleep: { windows: [{ from: "23:00", until: "07:00" }] },
     });

@@ -143,6 +143,8 @@ pub async fn build(
         Devices::new(pool.clone(), Arc::clone(&clock)),
         Screens::new(pool.clone(), Arc::clone(&clock)),
         Arc::clone(&firmware),
+        Arc::clone(&images),
+        Arc::clone(&clock),
     )
     .map_err(|error| Error::Settings(format!("the MQTT broker: {error}")))?;
     let device_state = Arc::new(device_api::State {

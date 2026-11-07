@@ -2,6 +2,7 @@
 //! that answers the broker and publishes each change. Retiring a connection
 //! clears what it published and disconnects.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,10 +14,14 @@ use rumqttc::{
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 
-use super::payloads::{device_key, discovery, firmware_state, key, mac_of, state};
+use super::payloads::{
+    PLAYLIST, device_key, discovery, firmware_state, key, mac_of, overdue, screen_options, state,
+};
 use super::{Change, Connection, Parts, Settings, Telemetry};
-use crate::devices::{Device, Devices};
+use crate::clock::Clock;
+use crate::devices::{Changes, Device, Devices, Shows};
 use crate::firmware::{Board, Firmware};
+use crate::images::Images;
 use crate::screens::Screens;
 
 /// How long the connection waits after it failed before it tries again.
@@ -26,6 +31,9 @@ const QUEUE: usize = 64;
 /// How long a retiring connection waits for the broker to take its clearing and
 /// its goodbye; past it, the connection ends all the same.
 const RETIRE: Duration = Duration::from_secs(5);
+/// How often the publisher checks whether a device has come to count as not
+/// seen lately, which no check-in announces.
+const OVERDUE_CHECK: Duration = Duration::from_secs(60);
 
 /// The client's options for these settings, whose address
 /// [`super::broker_url`] read: a host and a port, and TLS for `mqtts://`.
@@ -148,10 +156,14 @@ impl Open {
             devices: Arc::clone(&parts.devices),
             screens: Arc::clone(&parts.screens),
             firmware: Arc::clone(&parts.firmware),
+            images: Arc::clone(&parts.images),
+            clock: Arc::clone(&parts.clock),
             telemetry,
             connected: false,
+            published: HashMap::new(),
         };
         let publisher = tokio::spawn(async move {
+            let mut overdue_check = tokio::time::interval(OVERDUE_CHECK);
             loop {
                 // What the broker sent first, so a connection it has just
                 // acknowledged counts as connected when a retirement follows.
@@ -165,6 +177,7 @@ impl Open {
                             return;
                         }
                     },
+                    _ = overdue_check.tick() => publisher.check_overdue().await,
                     else => return,
                 }
             }
@@ -239,6 +252,21 @@ enum Incoming {
     },
 }
 
+/// What the publisher last published of a device, to publish again only what
+/// changed.
+struct Published {
+    image: Option<String>,
+    overdue: bool,
+}
+
+/// A setting a command changes.
+enum Setting {
+    Held(bool),
+    /// An option of the "Showing" select.
+    Showing(String),
+    Refresh(i64),
+}
+
 struct Publisher {
     client: AsyncClient,
     settings: Settings,
@@ -246,9 +274,13 @@ struct Publisher {
     devices: Arc<Devices>,
     screens: Arc<Screens>,
     firmware: Arc<Firmware>,
+    images: Arc<Images>,
+    clock: Arc<dyn Clock>,
     /// Its own way in, for changes it causes.
     telemetry: Telemetry,
     connected: bool,
+    /// By device id, for this connection.
+    published: HashMap<i64, Published>,
 }
 
 impl Publisher {
@@ -295,6 +327,9 @@ impl Publisher {
                 let subscriptions = [
                     format!("{}/status", self.settings.discovery_prefix),
                     format!("{}/+/firmware/install", self.settings.topic),
+                    format!("{}/+/held/set", self.settings.topic),
+                    format!("{}/+/showing/set", self.settings.topic),
+                    format!("{}/+/refresh/set", self.settings.topic),
                     // The retained ones arrive on subscribing, which clears what
                     // devices since removed left. The subscription stays, and the
                     // server's own state comes back to it unflagged and is ignored.
@@ -323,6 +358,10 @@ impl Publisher {
                     if payload == b"install" && !retained {
                         self.install(key);
                     }
+                } else if let Some((key, setting)) = setting(base, &topic, &payload)
+                    && !retained
+                {
+                    self.set(key, setting);
                 } else if let Some(key) = device_key(base, &topic, "state")
                     && retained
                     && !payload.is_empty()
@@ -355,6 +394,20 @@ impl Publisher {
                     tracing::error!(%error, device = id, "a device to publish could not be read");
                 }
             },
+            Change::Pressed(id) => match self.devices.any(id).await {
+                Ok(Some(device)) => {
+                    if let Some(key) = key(&device.mac) {
+                        let topic = self.device_topic(&key, "button");
+                        self.send(&topic, br#"{"event_type":"press"}"#.to_vec(), false)
+                            .await;
+                    }
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    tracing::error!(%error, device = id, "a pressed device could not be read");
+                }
+            },
+            Change::All => self.publish_all().await,
             Change::Removed(mac) => match self.live(&mac).await {
                 Ok(Some(other)) => {
                     let boards = self.firmware.boards_on_hand();
@@ -413,22 +466,31 @@ impl Publisher {
             self.discovery_topic(key),
             self.device_topic(key, "state"),
             self.device_topic(key, "firmware"),
+            self.device_topic(key, "image"),
         ] {
             self.publish(&topic, "").await;
         }
     }
 
-    async fn publish_device(&self, device: &Device, boards: Option<&[Board]>) {
+    async fn publish_device(&mut self, device: &Device, boards: Option<&[Board]>) {
         let Some(key) = key(&device.mac) else {
             return;
         };
+        let now = self.clock.now();
         let screen = self.screen_name(device).await;
-        let config = discovery(&self.settings, &key, device);
+        let options = match self.screens.list(device.account_id).await {
+            Ok(screens) => screen_options(&screens),
+            Err(error) => {
+                tracing::error!(%error, device = device.id, "the screens to offer could not be read");
+                Vec::new()
+            }
+        };
+        let config = discovery(&self.settings, &key, device, &options);
         self.publish(&self.discovery_topic(&key), &config.to_string())
             .await;
         self.publish(
             &self.device_topic(&key, "state"),
-            &state(device, &screen).to_string(),
+            &state(device, &screen, &options, now).to_string(),
         )
         .await;
         self.publish(
@@ -436,6 +498,129 @@ impl Publisher {
             &firmware_state(device, boards).to_string(),
         )
         .await;
+        let image = device.showing.as_ref().map(|showing| showing.image.clone());
+        let before = self
+            .published
+            .get(&device.id)
+            .and_then(|published| published.image.clone());
+        if image.is_some() && image != before {
+            self.publish_image(device.id, &key, image.as_deref()).await;
+        }
+        self.published.insert(
+            device.id,
+            Published {
+                image,
+                overdue: overdue(device, now),
+            },
+        );
+    }
+
+    async fn publish_image(&self, id: i64, key: &str, image: Option<&str>) {
+        let Some(image) = image else {
+            return;
+        };
+        match self.images.read(id, image) {
+            Ok(Some(bytes)) => {
+                self.send(&self.device_topic(key, "image"), bytes, true)
+                    .await;
+            }
+            Ok(None) => {}
+            Err(error) => {
+                tracing::warn!(%error, device = id, "the image to publish could not be read");
+            }
+        }
+    }
+
+    /// Publishes each device whose not-seen-lately state has turned since it
+    /// was last published, which no check-in announces.
+    async fn check_overdue(&mut self) {
+        if !self.connected {
+            return;
+        }
+        let now = self.clock.now();
+        let turned: Vec<(i64, bool)> = self
+            .published
+            .iter()
+            .map(|(id, published)| (*id, published.overdue))
+            .collect();
+        for (id, was) in turned {
+            let device = match self.devices.any(id).await {
+                Ok(Some(device)) => device,
+                Ok(None) => {
+                    self.published.remove(&id);
+                    continue;
+                }
+                Err(error) => {
+                    tracing::error!(%error, device = id, "a device to check could not be read");
+                    continue;
+                }
+            };
+            if overdue(&device, now) != was {
+                let boards = self.firmware.boards_on_hand();
+                self.publish_device(&device, boards.as_deref()).await;
+            }
+        }
+    }
+
+    /// Applies a command to the device with this key, as the web UI would, in a
+    /// task of its own, and publishes the device again.
+    fn set(&self, key: &str, setting: Setting) {
+        let Some(mac) = mac_of(key) else {
+            return;
+        };
+        let devices = Arc::clone(&self.devices);
+        let screens = Arc::clone(&self.screens);
+        let telemetry = self.telemetry.clone();
+        tokio::spawn(async move {
+            let device = match devices.with_mac(&mac).await {
+                Ok(Some(device)) => device,
+                Ok(None) => return,
+                Err(error) => {
+                    tracing::error!(%error, "the device to set could not be read");
+                    return;
+                }
+            };
+            let changes = match setting {
+                Setting::Held(held) => Changes {
+                    sleep_held: Some(held),
+                    ..Changes::default()
+                },
+                Setting::Refresh(minutes) => Changes {
+                    refresh_minutes: Some(minutes),
+                    ..Changes::default()
+                },
+                Setting::Showing(option) => {
+                    let shows = if option == PLAYLIST {
+                        Some(Shows::Playlist)
+                    } else {
+                        match screens.list(device.account_id).await {
+                            Ok(screens) => screen_options(&screens)
+                                .into_iter()
+                                .find(|(name, _)| *name == option)
+                                .map(|(_, id)| Shows::Screen(id)),
+                            Err(error) => {
+                                tracing::error!(%error, "the screens to pin from could not be read");
+                                return;
+                            }
+                        }
+                    };
+                    let Some(shows) = shows else {
+                        tracing::warn!(device = device.id, option, "no screen has that option");
+                        // Home Assistant shows the option it sent until told.
+                        telemetry.device(device.id);
+                        return;
+                    };
+                    Changes {
+                        shows: Some(shows),
+                        ..Changes::default()
+                    }
+                }
+            };
+            if let Err(error) = devices.update(device.account_id, device.id, changes).await {
+                tracing::warn!(%error, device = device.id, "a setting over MQTT was refused");
+            }
+            telemetry.device(device.id);
+        });
     }
 
     /// Asks the device with this key for its board's newest release, as the web
@@ -484,9 +669,13 @@ impl Publisher {
     }
 
     async fn publish(&self, topic: &str, payload: &str) {
+        self.send(topic, payload.as_bytes().to_vec(), true).await;
+    }
+
+    async fn send(&self, topic: &str, payload: Vec<u8>, retain: bool) {
         let result = self
             .client
-            .publish(topic, QoS::AtLeastOnce, true, payload.as_bytes().to_vec())
+            .publish(topic, QoS::AtLeastOnce, retain, payload)
             .await;
         if let Err(error) = result {
             tracing::warn!(%error, topic, "an MQTT message was not sent");
@@ -503,4 +692,31 @@ impl Publisher {
             self.settings.discovery_prefix, self.settings.topic
         )
     }
+}
+
+/// The device and the setting of a command topic, when its payload reads as
+/// one: `ON` or `OFF` to hold sleep, an option to show, minutes between wakes.
+fn setting<'a>(base: &str, topic: &'a str, payload: &[u8]) -> Option<(&'a str, Setting)> {
+    let text = std::str::from_utf8(payload).ok()?.trim();
+    if let Some(key) = device_key(base, topic, "held/set") {
+        let held = match text {
+            "ON" => true,
+            "OFF" => false,
+            _ => return None,
+        };
+        return Some((key, Setting::Held(held)));
+    }
+    if let Some(key) = device_key(base, topic, "showing/set") {
+        return Some((key, Setting::Showing(text.to_owned())));
+    }
+    if let Some(key) = device_key(base, topic, "refresh/set") {
+        // Home Assistant's number entity may send a whole number as `15.0`.
+        let minutes = text.parse::<f64>().ok()?.round();
+        if !(1.0..=f64::from(1440)).contains(&minutes) {
+            return None;
+        }
+        #[allow(clippy::cast_possible_truncation)]
+        return Some((key, Setting::Refresh(minutes as i64)));
+    }
+    None
 }

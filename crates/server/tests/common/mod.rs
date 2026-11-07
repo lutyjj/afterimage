@@ -404,12 +404,29 @@ impl Server {
         firmware: &str,
         model: &str,
     ) -> Value {
+        self.check_in(key, readings, firmware, model, "timer").await
+    }
+
+    /// A check-in a press on the device's button woke.
+    pub async fn press(&self, key: &str) -> Value {
+        self.check_in(key, &READINGS, FIRMWARE, MODEL, "button")
+            .await
+    }
+
+    async fn check_in(
+        &self,
+        key: &str,
+        readings: &Readings,
+        firmware: &str,
+        model: &str,
+        woken_by: &str,
+    ) -> Value {
         let response = self
             .http
             .get(format!("{}/api/display", self.url))
             .header("ID", "41:B4:10:39:A1:01")
             .header("Content-Type", "application/json")
-            .header("Update-Source", "timer")
+            .header("Update-Source", woken_by)
             .header("Access-Token", key)
             .header("Refresh-Rate", "900")
             .header("Battery-Voltage", readings.voltage)

@@ -38,7 +38,7 @@ One small server and one contract: the Smithy model defines every API, and scree
 - Secrets for data sources live in the server's environment; the UI shows only their names.
 - Scripts and agents act for an account with personal access tokens, created and revoked in the settings; a token's secret is shown once. Agents may use one to connect over MCP.
 - Firmware comes from TRMNL's published releases. A device's board is matched by the model its firmware reports or chosen once; an install happens at the device's next check-in, and the check-in after it shows whether it worked.
-- With an MQTT broker, every claimed device appears in Home Assistant with its battery, signal, last check-in, current screen and a firmware update it can install. The deployment sets the broker in its environment, or else the administrator (the first account) sets it in the settings' Home Assistant section, where it takes effect at once.
+- With an MQTT broker, every claimed device appears in Home Assistant with its battery, signal, last check-in, current screen, image, whether it sleeps or is not seen lately, and a firmware update it can install; Home Assistant can hold it asleep, pin a screen on it, set how often it wakes, and act on a press of its button. The deployment sets the broker in its environment, or else the administrator (the first account) sets it in the settings' Home Assistant section, where it takes effect at once.
 
 ## Brand Commitments
 

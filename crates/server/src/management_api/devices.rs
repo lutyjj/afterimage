@@ -122,6 +122,8 @@ pub async fn update_device(
             .refresh_minutes
             .map(|minutes| i64::from(minutes.into_inner())),
         firmware_board: input.firmware_board.map(FirmwareBoardName::into_inner),
+        shows: input.shows.as_ref().map(wire::stored_shows),
+        sleep_held: input.sleep_held,
     };
     let board_chosen = changes.firmware_board.is_some();
     let device = match state
@@ -130,7 +132,9 @@ pub async fn update_device(
         .await
     {
         Ok(device) => device.ok_or_else(not_found)?,
-        Err(error @ devices::Error::UnsupportedDisplay { .. }) => {
+        Err(
+            error @ (devices::Error::UnsupportedDisplay { .. } | devices::Error::UnknownScreen(_)),
+        ) => {
             return Err(invalid(error.to_string()).into());
         }
         Err(error) => return Err(internal(&error).into()),

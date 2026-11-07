@@ -96,7 +96,7 @@ fn answers_every_response_field_with_the_same_type() {
 
 /// Members the firmware uses and TRMNL's document does not list, each with the
 /// firmware 1.8.18 source that establishes it.
-const FIRMWARE_ADDITIONS: [(&str, &str, &str); 3] = [
+const FIRMWARE_ADDITIONS: [(&str, &str, &str); 4] = [
     (
         "GET /api/display",
         "ID",
@@ -111,6 +111,11 @@ const FIRMWARE_ADDITIONS: [(&str, &str, &str); 3] = [
         "GET /api/display",
         "special_function",
         "lib/trmnl/src/api-client/request_headers.cpp: buildDisplayHeaders spells it so",
+    ),
+    (
+        "GET /api/display",
+        "Update-Source",
+        "lib/trmnl/src/api-client/request_headers.cpp: buildDisplayHeaders sends the wake reason",
     ),
 ];
 

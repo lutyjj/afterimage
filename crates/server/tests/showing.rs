@@ -951,3 +951,96 @@ async fn the_current_screen_counts_down_to_the_wake_the_check_in_asked_for() {
         "past the wake, its refresh interval"
     );
 }
+
+async fn update(server: &common::Server, id: i64, changes: Value) -> (StatusCode, Value) {
+    server
+        .call("PATCH", &format!("/manage/devices/{id}"), Some(changes))
+        .await
+}
+
+#[tokio::test]
+async fn a_pinned_screen_stands_in_for_the_playlist_until_set_back() {
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, key) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    let text = |label: &str| json!({ "content": { "title": { "text": label } } });
+    let first = screen(&server, "First", text("First")).await;
+    let second = screen(&server, "Second", text("Second")).await;
+    let guests = screen(&server, "Guests", text("Wi-Fi")).await;
+    play(
+        &server,
+        id,
+        json!([{ "screenId": first }, { "screenId": second }]),
+    )
+    .await;
+    server.display(&key, &READINGS).await;
+    assert_eq!(device(&server, id).await["showing"]["screenId"], first);
+
+    let (status, body) = update(&server, id, json!({ "shows": { "screenId": guests } })).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["device"]["shows"], json!({ "screenId": guests }));
+    for _ in 0..2 {
+        server.display(&key, &READINGS).await;
+        assert_eq!(device(&server, id).await["showing"]["screenId"], guests);
+    }
+
+    update(&server, id, json!({ "shows": { "playlist": {} } })).await;
+    server.display(&key, &READINGS).await;
+    assert_eq!(
+        device(&server, id).await["showing"]["screenId"],
+        second,
+        "the playlist goes on from where the pin found it"
+    );
+
+    update(&server, id, json!({ "shows": { "screenId": guests } })).await;
+    server
+        .call("DELETE", &format!("/manage/screens/{guests}"), None)
+        .await;
+    assert_eq!(
+        device(&server, id).await["shows"],
+        json!({ "playlist": {} }),
+        "deleting the pinned screen sets the device back to its playlist"
+    );
+
+    let eve = server.second_account().await;
+    let theirs = screen(&eve, "Theirs", text("Theirs")).await;
+    let (status, _) = update(&server, id, json!({ "shows": { "screenId": theirs } })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn a_device_held_asleep_checks_in_hourly_until_let_go() {
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, key) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    let first = screen(
+        &server,
+        "First",
+        json!({ "content": { "title": { "text": "First" } } }),
+    )
+    .await;
+    play(&server, id, json!([{ "screenId": first }])).await;
+
+    let (status, body) = update(&server, id, json!({ "sleepHeld": true })).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["device"]["sleepHeld"], true);
+    assert_eq!(
+        server.display(&key, &READINGS).await["refresh_rate"],
+        60 * 60
+    );
+    let held = device(&server, id).await;
+    assert_eq!(held["showing"]["asleep"], true);
+    assert!(held["showing"].get("screenId").is_none(), "{held}");
+
+    update(&server, id, json!({ "sleepHeld": false })).await;
+    server.clock.advance(60 * 60);
+    assert_eq!(
+        server.display(&key, &READINGS).await["refresh_rate"],
+        15 * 60
+    );
+    let awake = device(&server, id).await;
+    assert_eq!(awake["showing"]["asleep"], false);
+    assert_eq!(awake["showing"]["screenId"], first);
+}

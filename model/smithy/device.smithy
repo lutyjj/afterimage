@@ -161,6 +161,13 @@ operation GetDisplay {
         @httpHeader("Width")
         width: String
 
+        /// Why the device woke: `timer`, `button`, or `EXT0` and `EXT1` for a
+        /// press on boards that wake on an external pin; `powercycle` after power
+        /// on. TRMNL's document does not list it, but firmware 1.8.18 sends it on
+        /// every check-in (`buildDisplayHeaders`, `parseWakeupReasonToStr`).
+        @httpHeader("Update-Source")
+        updateSource: String
+
         /// TRMNL's document names this header; firmware 1.8.18 sends
         /// `special_function` instead (below).
         @httpHeader("Special-Function")

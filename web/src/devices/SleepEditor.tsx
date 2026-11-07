@@ -8,6 +8,7 @@ import {
   CardHead,
   IconButton,
   Select,
+  SettingToggle,
   SettlingItem,
   SettlingRows,
   useToast,
@@ -85,6 +86,7 @@ export function SleepEditor({
           </>
         }
       />
+      <HoldToggle device={device} />
       <CardBody className="grid gap-4">
         <div className="max-w-md">
           <Select
@@ -189,5 +191,29 @@ function WindowRow({
         </span>
       </div>
     </SettlingItem>
+  );
+}
+
+/** Holds the display asleep outside its windows until let go, as Home
+ * Assistant's switch does. It saves as it turns. */
+function HoldToggle({ device }: { device: Device }) {
+  const toast = useToast();
+  const hold = useMutation({
+    mutationFn: (held: boolean) => client.updateDevice({ deviceId: device.id, sleepHeld: held }),
+    onSuccess: ({ device: updated }) => {
+      queryClient.setQueryData(deviceQuery(updated.id).queryKey, updated);
+      void queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
+    },
+    onError: (error) => toast.show({ text: `Not changed. ${messageOf(error)}`, sticky: true }),
+  });
+  return (
+    <SettingToggle
+      title="Asleep now"
+      description="Holds the display asleep outside its windows until turned off. It falls asleep at its next check-in, and learns it may wake at its next hourly one."
+      label="Asleep now"
+      checked={hold.isPending ? (hold.variables ?? device.sleepHeld) : device.sleepHeld}
+      disabled={hold.isPending}
+      onCheckedChange={(held) => hold.mutate(held)}
+    />
   );
 }
