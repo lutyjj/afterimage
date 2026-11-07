@@ -4,7 +4,8 @@
 //!
 //! A playlist screen that cannot be drawn as written (a data source down, a
 //! template error) leaves the device on the image it shows, so a passing outage
-//! does not blank the display; a device with no image yet shows what went wrong.
+//! does not blank the display; a device with no image yet, or one just woken
+//! from its sleep screen, shows what went wrong.
 //! With no current entry, the device shows a screen saying so. A sleep screen
 //! that cannot be drawn gives way to the server's own, which says when the
 //! device wakes, so a daytime image does not stand all night.
@@ -100,10 +101,9 @@ pub async fn next(
     let position = schedule::next(&device.playlist, device.playlist_position, &at);
     let drawn = if let Some(position) = position {
         let screen_id = device.playlist[position].screen_id;
-        match drawn_screen(device, screens, drawing, screen_id, now).await? {
-            Ok(bytes) => Ok((bytes, Some(screen_id))),
-            Err(failed) => Err(failed),
-        }
+        drawn_screen(device, screens, drawing, screen_id, now)
+            .await?
+            .map(|bytes| (bytes, Some(screen_id)))
     } else {
         let image = drawing
             .draw_resolved(nothing_to_show(&device.name), model, palette, places_by)
@@ -115,10 +115,12 @@ pub async fn next(
         Ok(drawn) => drawn,
         Err(Failed { name, problems }) => {
             log_problems(device.id, &name, &problems);
+            // A sleep image is not kept: the device is awake, and says what went
+            // wrong rather than that it sleeps.
             if let Some(showing) = device
                 .showing
                 .as_ref()
-                .filter(|showing| images.has(device.id, &showing.image))
+                .filter(|showing| !showing.asleep && images.has(device.id, &showing.image))
             {
                 // The device keeps its image, and the playlist moves past the entry
                 // that failed, so the next check-in shows the entry after it.
@@ -149,6 +151,8 @@ async fn asleep(
     at: &jiff::Zoned,
 ) -> Result<Shown, Error> {
     let device = shown.device;
+    // The server's own screen shares the check-in's time with the screen drawn first.
+    let places_by = Drawing::places_deadline();
     if let Some(screen_id) = device.sleep.screen_id {
         match drawn_screen(device, screens, drawing, screen_id, shown.now).await? {
             Ok(bytes) => {
@@ -168,7 +172,7 @@ async fn asleep(
             sleeping(&device.name, at, &wakes),
             model,
             palette,
-            Drawing::places_deadline(),
+            places_by,
         )
         .await
         .map_err(Error::Fallback)?;

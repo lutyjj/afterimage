@@ -66,14 +66,20 @@ describe("endedStates", () => {
     expect(keys(endedStates(ended, [], [state("never-seen")]))).toEqual([]);
   });
 
-  it("lets a sleeping device be quiet, and finds nothing missing from its playlist", () => {
-    // Asleep since 23:00 Thursday, waking at 07:00 Friday; it is 12:00 Friday.
+  it("lets a device sleep through the night unmissed, with nothing missing from its playlist", () => {
+    // 06:30 Friday in Berlin: asleep since its check-in at 23:00 Thursday, due at
+    // 07:00. Counted from the check-in alone it would be hours overdue.
+    const dawn = new Date("2026-11-06T05:30:00Z");
     const sleeping = device({
       seenAt: new Date("2026-11-05T22:00:00Z"),
-      wakesAt: new Date("2026-11-06T13:00:00Z"),
-      playlist: [],
-      sleep: { windows: [{ days: ["friday"], from: "11:00", until: "14:00" }] },
+      wakesAt: new Date("2026-11-06T06:00:00Z"),
+      playlist: [{ screenId: 1, from: "08:00", until: "20:00" }],
+      sleep: { windows: [{ from: "23:00", until: "07:00" }] },
     });
-    expect(keys(deviceStates(sleeping, ZONE, NOW))).toEqual([]);
+    expect(keys(deviceStates(sleeping, ZONE, dawn))).toEqual([]);
+    expect(
+      keys(deviceStates({ ...sleeping, sleep: { windows: [] } }, ZONE, dawn)),
+      "awake at that hour, its playlist has nothing current",
+    ).toEqual(["nothing-scheduled"]);
   });
 });

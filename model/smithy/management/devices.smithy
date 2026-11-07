@@ -163,7 +163,8 @@ integer RefreshMinutes
 
 /// The screens a device shows, in order. At each check-in the device shows the
 /// next entry whose days and hours include now, and wakes again after its refresh
-/// interval or when the set of current entries changes, whichever comes first.
+/// interval, when the set of current entries changes, or when it falls asleep,
+/// whichever comes first.
 @length(max: 32)
 list Playlist {
     member: PlaylistEntry
@@ -367,7 +368,8 @@ operation SetPlaylist {
 }
 
 /// Replaces when the device sleeps and what it shows meanwhile. A device takes it
-/// at its next check-in, which a sleeping device makes when its sleep ends.
+/// at its next check-in: a sleeping device makes that when its sleep ends, or
+/// when someone presses its button.
 @idempotent
 @http(method: "PUT", uri: "/manage/devices/{deviceId}/sleep")
 @optionalAuth

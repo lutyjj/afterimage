@@ -174,8 +174,10 @@ impl Devices {
         .fetch_optional(&mut *tx)
         .await?;
         let (device_id, replaced) = if let Some(existing) = existing {
+            // The new setup has not been asked to wake yet.
             sqlx::query!(
-                "UPDATE devices SET registration_id = ?, name = COALESCE(?, name) WHERE id = ?",
+                "UPDATE devices SET registration_id = ?, name = COALESCE(?, name), wakes_at = NULL
+                 WHERE id = ?",
                 registration.id,
                 name,
                 existing.id

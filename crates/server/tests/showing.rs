@@ -862,3 +862,64 @@ async fn sleep_takes_only_the_accounts_screens_and_loses_a_deleted_one() {
         "the server's own screen stands in"
     );
 }
+
+#[tokio::test]
+async fn a_device_that_wakes_into_a_failing_screen_says_so_rather_than_that_it_sleeps() {
+    let source = Source::default();
+    let url = source.serve().await;
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, key) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    let weather = screen(&server, "Weather", weather(&url)).await;
+    source.set(Some(json!({ "temperature": 4, "hourly": [1, 2, 3] })));
+    play(&server, id, json!([{ "screenId": weather }])).await;
+    set_sleep(
+        &server,
+        id,
+        json!({ "windows": [{ "from": "08:00", "until": "09:00" }] }),
+    )
+    .await;
+    server.display(&key, &READINGS).await;
+    assert_eq!(device(&server, id).await["showing"]["asleep"], true);
+
+    source.set(None);
+    server.clock.advance(60 * 60);
+    server.display(&key, &READINGS).await;
+    let awake = device(&server, id).await;
+    assert_eq!(
+        awake["showing"]["asleep"], false,
+        "the sleep image does not stand through the day: {awake}"
+    );
+    assert!(awake["showing"].get("screenId").is_none(), "{awake}");
+}
+
+#[tokio::test]
+async fn only_the_devices_account_sets_its_sleep() {
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, _) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    let eve = server.second_account().await;
+    let (status, _) = set_sleep(&eve, id, json!({ "windows": [{}] })).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(device(&server, id).await["sleep"], json!({ "windows": [] }));
+}
+
+#[tokio::test]
+async fn a_device_set_up_again_waits_for_its_first_wake() {
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, key) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    server.display(&key, &READINGS).await;
+    assert_eq!(device(&server, id).await["wakesAt"], EIGHT + 15 * 60);
+
+    let (again, _) = server.claim(&mac(1)).await;
+    assert_eq!(again["id"], id, "the same device, set up again");
+    let shown = device(&server, id).await;
+    assert!(
+        shown.get("wakesAt").is_none(),
+        "the old setup's wake does not stand for the new one: {shown}"
+    );
+}

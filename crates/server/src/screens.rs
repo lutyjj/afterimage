@@ -119,8 +119,9 @@ impl Screens {
         .await
     }
 
-    /// Deletes the screen, and with it every playlist entry that shows it; `false`
-    /// when the account has no such screen.
+    /// Deletes the screen, and with it every playlist entry that shows it; a
+    /// device that slept on it shows the server's own sleep screen instead.
+    /// `false` when the account has no such screen.
     ///
     /// # Errors
     ///

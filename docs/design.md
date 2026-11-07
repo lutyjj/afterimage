@@ -252,7 +252,7 @@ A device sleeps in its sleep windows, which take the same weekdays and times of 
 | Wakes | When no window is current, a day at most, so a device asleep around the clock still takes changes daily |
 | Playlist | Waits where it was, and goes on from the same entry |
 
-A device cannot be woken from the server, so a change made while it sleeps reaches it when it wakes, or when someone presses its button.
+A device cannot be woken from the server. A change to its sleep reaches a sleeping device at its next check-in: when it wakes, or when someone presses its button, which checks it in at once. While a window is still current that check-in shows the sleep screen again; the playlist shows once the device is awake.
 
 ## Rendering
 

@@ -113,7 +113,7 @@ function DeviceCard({
                   device.playlist.map((entry) => ({ hours: entry, name: screenName(entry.screenId) })),
                   device.sleep.windows,
                 )}
-                label={`${device.name}'s playlist today`}
+                label={`${device.name}'s playlist and sleep today`}
               />
             </div>
           )}

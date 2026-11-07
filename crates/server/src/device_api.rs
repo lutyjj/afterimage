@@ -13,7 +13,7 @@ use http::{Request, Response};
 use tower::Service;
 
 use crate::clock::Clock;
-use crate::devices::Devices;
+use crate::devices::{Device, Devices};
 use crate::drawing::Drawing;
 use crate::firmware::Firmware;
 use crate::images::Images;
@@ -260,7 +260,7 @@ async fn get_current_screen(
     Ok(match showing {
         Some((device, showing)) => output::GetCurrentScreenOutput {
             status: DisplayStatus::Show.code(),
-            refresh_rate: i32::try_from(device.refresh_minutes * 60).unwrap_or(i32::MAX),
+            refresh_rate: i32::try_from(until_wake(device, state.clock.now())).unwrap_or(i32::MAX),
             image_url: Some(format!("{origin}/api/images/{}", showing.image)),
             filename: Some(filename(&showing.image)),
             rendered_at: Some(aws_smithy_types::DateTime::from_secs(showing.rendered_at)),
@@ -273,6 +273,16 @@ async fn get_current_screen(
             rendered_at: None,
         },
     })
+}
+
+/// Seconds until the wake the last check-in asked for, which counts the playlist
+/// and sleep; the refresh interval once that has passed, or before it is known.
+fn until_wake(device: &Device, now: i64) -> i64 {
+    device
+        .wakes_at
+        .map(|wakes_at| wakes_at - now)
+        .filter(|seconds| *seconds > 0)
+        .unwrap_or(device.refresh_minutes * 60)
 }
 
 async fn get_screen_image(

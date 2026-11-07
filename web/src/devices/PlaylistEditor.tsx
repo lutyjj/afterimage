@@ -1,4 +1,4 @@
-import type { Device, PlaylistEntry, ScreenSummary, Weekday } from "@afterimage/management-client";
+import type { Device, PlaylistEntry, ScreenSummary } from "@afterimage/management-client";
 import { useMutation } from "@tanstack/react-query";
 import {
   Actions,
@@ -6,10 +6,7 @@ import {
   Card,
   CardBody,
   CardHead,
-  CellInput,
   CellSelect,
-  Checkbox,
-  classes,
   IconButton,
   LINK_CLASS,
   SettlingItem,
@@ -24,7 +21,7 @@ import { client, messageOf, queryClient } from "../app/client";
 import { DayStrip, dayLanes } from "./DayStrip";
 import { HoursFields } from "./HoursFields";
 import { draftOf, entryOf, newKey, sameAs, type Draft } from "./scheduleDraft";
-import { daysLabel, isAllDay, nowIn, shortDay, WEEK, windowLabel } from "./schedule";
+import { daysLabel, nowIn, windowLabel } from "./schedule";
 import { deviceQuery, devicesQuery } from "./queries";
 
 /** The window an entry takes when it stops being all day, as a start to edit. */
@@ -107,7 +104,7 @@ export function PlaylistEditor({
                 draft.map((entry) => ({ hours: entryOf(entry), name: name(entry.screenId) })),
                 device.sleep.windows,
               )}
-              label="Today's playlist"
+              label="Today's playlist and sleep"
             />
           </div>
         )}

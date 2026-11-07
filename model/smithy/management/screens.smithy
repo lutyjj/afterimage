@@ -683,7 +683,8 @@ operation UpdateScreen {
     ]
 }
 
-/// Deletes the screen and takes it out of every playlist.
+/// Deletes the screen and takes it out of every playlist; a device that slept on
+/// it shows the server's own sleep screen instead.
 @idempotent
 @http(method: "DELETE", uri: "/manage/screens/{screenId}", code: 204)
 @optionalAuth

@@ -70,7 +70,8 @@ export function SleepEditor({
   const remove = (key: number) => setWindows((all) => all.filter((window) => window.key !== key));
   const add = () => setWindows((all) => [...all, { key: newKey(), ...NIGHT, allDay: false }]);
   const noDays = windows.some((window) => window.days?.length === 0);
-  const known = screenId === undefined || screens?.some((screen) => screen.id === screenId);
+  // Until the screens have loaded, a saved sleep screen is not taken for deleted.
+  const known = screenId === undefined || screens === undefined || screens.some((screen) => screen.id === screenId);
 
   return (
     <Card>

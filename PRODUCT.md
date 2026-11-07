@@ -26,7 +26,7 @@ One small server and one contract: the Smithy model defines every API, and scree
 
 - Claiming: a new device shows a six-character code; the user types it into the web UI.
 - Screens: a YAML document (data sources, a title bar, components with Jinja templates), edited beside a preview drawn by the server at the device's real size, with what each source answered and every problem located in the document.
-- Playlists: each device shows its screens in order, on chosen weekdays and between times of day; it wakes when its refresh interval ends or the set of current screens changes.
+- Playlists: each device shows its screens in order, on chosen weekdays and between times of day; it wakes when its refresh interval ends, the set of current screens changes, or it falls asleep.
 - Sleep: each device sleeps in windows of the same weekdays and times, showing a sleep screen and waking when they end, which saves its battery.
 - Devices report battery, signal and firmware at each check-in; displays sleep between check-ins and cannot be woken from the server.
 - Sign-in: a password for the first account, and an OIDC provider for everyone else when configured.

@@ -65,10 +65,10 @@ export function DayStrip({ lanes, day, now, hours = true, names = true, label }:
         {lanes.map(({ hours: windows, name }, lane) => (
           <div key={lane} className="relative">
             {windows
-              .flatMap((window) => spansOn(window, day))
-              .map(([start, end]) => (
+              .flatMap((window, index) => spansOn(window, day).map((span) => ({ index, span })))
+              .map(({ index, span: [start, end] }) => (
                 <span
-                  key={`${start}-${end}`}
+                  key={`${index}-${start}`}
                   className="absolute inset-y-[5px] min-w-0.5 rounded-full bg-[color-mix(in_oklch,var(--color-text-muted)_70%,var(--color-surface))]"
                   style={{ left: percent(start), width: percent(end - start) }}
                   title={name || undefined}
