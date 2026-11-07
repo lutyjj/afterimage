@@ -923,3 +923,31 @@ async fn a_device_set_up_again_waits_for_its_first_wake() {
         "the old setup's wake does not stand for the new one: {shown}"
     );
 }
+
+#[tokio::test]
+async fn the_current_screen_counts_down_to_the_wake_the_check_in_asked_for() {
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, key) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    set_sleep(
+        &server,
+        id,
+        json!({ "windows": [{ "from": "08:00", "until": "09:00" }] }),
+    )
+    .await;
+    server.display(&key, &READINGS).await;
+
+    server.clock.advance(20 * 60);
+    assert_eq!(
+        server.current(&key).await["refresh_rate"],
+        40 * 60,
+        "forty minutes of its sleep are left"
+    );
+    server.clock.advance(50 * 60);
+    assert_eq!(
+        server.current(&key).await["refresh_rate"],
+        15 * 60,
+        "past the wake, its refresh interval"
+    );
+}
