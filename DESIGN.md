@@ -1,325 +1,427 @@
 ---
 name: Afterimage
-description: The web UI of a self-hosted server for TRMNL e-paper displays, drawn as a proofroom.
+description: The web UI of a self-hosted server for TRMNL e-paper displays, a quiet room of cool paper where each display shows at its true pixels and one teal-blue ink marks what a hand can act on.
 colors:
-  paper: "#f7f6f1"
-  white: "#ffffff"
-  ink: "#1b1b19"
-  ink-soft: "#4b4a45"
-  blue: "#2f6fd6"
-  blue-text: "#2659b8"
-  blue-deep: "#1f4d9f"
-  blue-wash: "#e6eefb"
-  blue-rule: "#c7d8f5"
-  blue-edge: "#9bb8eb"
-  blue-gray: "#5f6f8f"
-  blue-faint: "#8aa6d9"
-  red: "#e2483d"
-  red-text: "#c2372d"
-  red-wash: "#fbe9e7"
-  red-deep: "#a82d24"
+  ink: "oklch(48% 0.1 218)"
+  ink-dark: "oklch(78% 0.085 218)"
+  ink-strong: "oklch(41% 0.1 218)"
+  ink-strong-dark: "oklch(85% 0.07 218)"
+  ink-weak: "oklch(94.8% 0.01 218)"
+  ink-weak-dark: "oklch(32% 0.024 218)"
+  on-ink: "oklch(99% 0.003 218)"
+  on-ink-dark: "oklch(18% 0.02 218)"
+  warn: "oklch(55% 0.115 72)"
+  warn-dark: "oklch(79% 0.105 80)"
+  danger: "oklch(51.5% 0.155 27)"
+  danger-dark: "oklch(71% 0.13 25)"
+  danger-strong: "oklch(45% 0.155 27)"
+  danger-strong-dark: "oklch(78% 0.11 25)"
+  danger-weak: "oklch(95.6% 0.014 27)"
+  danger-weak-dark: "oklch(29.6% 0.016 19)"
+  bg: "oklch(97.6% 0.0045 218)"
+  bg-dark: "oklch(16.5% 0.008 218)"
+  surface: "oklch(100% 0 218)"
+  surface-dark: "oklch(20.5% 0.009 218)"
+  sunken: "oklch(95.6% 0.006 218)"
+  sunken-dark: "oklch(14% 0.007 218)"
+  border: "oklch(91.5% 0.008 218)"
+  border-dark: "oklch(28.5% 0.011 218)"
+  border-strong: "oklch(85.5% 0.013 218)"
+  border-strong-dark: "oklch(36% 0.015 218)"
+  text: "oklch(23% 0.015 218)"
+  text-dark: "oklch(93.5% 0.006 218)"
+  text-secondary: "oklch(43% 0.02 218)"
+  text-secondary-dark: "oklch(75% 0.013 218)"
+  text-muted: "oklch(52% 0.02 218)"
+  text-muted-dark: "oklch(64% 0.013 218)"
+  display-white: "#ffffff"
 typography:
-  wordmark:
-    fontFamily: "Archivo Variable, Archivo, system-ui, sans-serif"
-    fontSize: "1.25rem"
-    fontWeight: 640
-    letterSpacing: "-0.015em"
-    fontVariation: "'wdth' 118"
   headline:
-    fontFamily: "Archivo Variable, Archivo, system-ui, sans-serif"
-    fontSize: "1.5rem"
+    fontFamily: "Schibsted Grotesk Variable, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"
+    fontSize: "1.625rem"
     fontWeight: 620
-    lineHeight: 1.15
-    letterSpacing: "-0.01em"
+    lineHeight: 1.2
+    letterSpacing: "-0.022em"
   title:
-    fontFamily: "Archivo Variable, Archivo, system-ui, sans-serif"
+    fontFamily: "Schibsted Grotesk Variable, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"
     fontSize: "1.25rem"
+    fontWeight: 600
+    lineHeight: 1.2
+    letterSpacing: "-0.018em"
+  section-title:
+    fontFamily: "Schibsted Grotesk Variable, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"
+    fontSize: "1rem"
     fontWeight: 620
-    lineHeight: 1.15
-    letterSpacing: "-0.01em"
+    lineHeight: 1.2
+    letterSpacing: "-0.012em"
   body:
-    fontFamily: "Archivo Variable, Archivo, system-ui, sans-serif"
-    fontSize: "0.9375rem"
+    fontFamily: "Schibsted Grotesk Variable, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"
+    fontSize: "0.875rem"
     fontWeight: 400
-    lineHeight: 1.45
-    fontFeature: "'tnum' 1"
-  body-small:
-    fontFamily: "Archivo Variable, Archivo, system-ui, sans-serif"
+    lineHeight: 1.55
+  label:
+    fontFamily: "Schibsted Grotesk Variable, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"
     fontSize: "0.8125rem"
+    fontWeight: 540
+    lineHeight: 1.55
+  caption:
+    fontFamily: "Schibsted Grotesk Variable, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"
+    fontSize: "0.75rem"
     fontWeight: 400
-    lineHeight: 1.45
-  annotation:
-    fontFamily: "Archivo Variable, Archivo, system-ui, sans-serif"
-    fontSize: "0.6875rem"
-    fontWeight: 560
-    letterSpacing: "0.06em"
-    fontVariation: "'wdth' 72"
-  stamp:
-    fontFamily: "Archivo Variable, Archivo, system-ui, sans-serif"
-    fontSize: "0.6875rem"
-    fontWeight: 720
-    lineHeight: 1.3
-    letterSpacing: "0.08em"
-    fontVariation: "'wdth' 68"
-  code-cell:
-    fontFamily: "Archivo Variable, Archivo, system-ui, sans-serif"
-    fontSize: "1.5rem"
-    fontWeight: 640
-    fontVariation: "'wdth' 75"
-  axis:
-    fontFamily: "Archivo Variable, Archivo, system-ui, sans-serif"
-    fontSize: "0.625rem"
-    fontWeight: 560
-    letterSpacing: "0.04em"
-    fontVariation: "'wdth' 72"
+    lineHeight: 1.55
   code:
-    fontFamily: "ui-monospace, SF Mono, Menlo, Cascadia Mono, Consolas, DejaVu Sans Mono, Liberation Mono, monospace"
-    fontSize: "13.5px"
-    lineHeight: 1.6
-  code-small:
-    fontFamily: "ui-monospace, SF Mono, Menlo, Cascadia Mono, Consolas, DejaVu Sans Mono, Liberation Mono, monospace"
-    fontSize: "12px"
-    lineHeight: 1.6
+    fontFamily: "JetBrains Mono Variable, ui-monospace, SF Mono, Menlo, Consolas, monospace"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: 1.65
+  wordmark:
+    fontFamily: "Schibsted Grotesk Variable, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"
+    fontSize: "1rem"
+    fontWeight: 620
+    letterSpacing: "-0.02em"
 rounded:
-  none: "0"
-  hairline: "2px"
+  inner: "5px"
+  control: "8px"
+  card: "12px"
+  dialog: "16px"
+  pill: "999px"
 spacing:
-  "1": "0.25rem"
-  "2": "0.5rem"
-  "3": "0.75rem"
-  "4": "1rem"
-  "5": "1.5rem"
-  "6": "2rem"
-  "7": "3rem"
-  "8": "4rem"
+  "1": "4px"
+  "2": "8px"
+  "3": "12px"
+  "4": "16px"
+  "5": "24px"
+  "6": "32px"
+  "7": "48px"
+  "8": "64px"
+  gutter: "16px"
+  gutter-wide: "24px"
 components:
   button:
-    backgroundColor: "{colors.white}"
-    textColor: "{colors.blue-text}"
-    typography: "{typography.body-small}"
-    rounded: "{rounded.hairline}"
-    padding: "0 1rem"
-    height: "2.25rem"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    typography: "{typography.label}"
+    rounded: "{rounded.control}"
+    padding: "0 14px"
+    height: "34px"
   button-hover:
-    backgroundColor: "{colors.blue-wash}"
-    textColor: "{colors.blue-text}"
+    backgroundColor: "{colors.ink-weak}"
+    textColor: "{colors.text}"
   button-primary:
-    backgroundColor: "{colors.blue-text}"
-    textColor: "{colors.white}"
-    typography: "{typography.body-small}"
-    rounded: "{rounded.hairline}"
-    padding: "0 1rem"
-    height: "2.25rem"
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.on-ink}"
+    typography: "{typography.label}"
+    rounded: "{rounded.control}"
+    padding: "0 14px"
+    height: "34px"
   button-primary-hover:
-    backgroundColor: "{colors.blue-deep}"
-    textColor: "{colors.white}"
+    backgroundColor: "{colors.ink-strong}"
+    textColor: "{colors.on-ink}"
+  button-quiet:
+    textColor: "{colors.text-secondary}"
+    typography: "{typography.label}"
+    rounded: "{rounded.control}"
+    padding: "0 14px"
+    height: "34px"
+  button-quiet-hover:
+    backgroundColor: "{colors.ink-weak}"
+    textColor: "{colors.text}"
   button-danger:
-    backgroundColor: "{colors.white}"
-    textColor: "{colors.red-text}"
-    rounded: "{rounded.hairline}"
-    padding: "0 1rem"
-    height: "2.25rem"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.danger}"
+    typography: "{typography.label}"
+    rounded: "{rounded.control}"
+    padding: "0 14px"
+    height: "34px"
   button-danger-hover:
-    backgroundColor: "{colors.red-wash}"
-    textColor: "{colors.red-text}"
+    backgroundColor: "{colors.danger-weak}"
+    textColor: "{colors.danger}"
+  button-danger-solid:
+    backgroundColor: "{colors.danger}"
+    textColor: "{colors.on-ink}"
+    typography: "{typography.label}"
+    rounded: "{rounded.control}"
+    padding: "0 14px"
+    height: "34px"
+  button-danger-solid-hover:
+    backgroundColor: "{colors.danger-strong}"
+    textColor: "{colors.on-ink}"
   button-disabled:
-    backgroundColor: "{colors.paper}"
-    textColor: "{colors.blue-faint}"
+    backgroundColor: "{colors.sunken}"
+    textColor: "{colors.text-muted}"
+  icon-button:
+    textColor: "{colors.text-secondary}"
+    rounded: "{rounded.control}"
+    size: "34px"
   input:
-    backgroundColor: "{colors.white}"
-    textColor: "{colors.ink}"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
     typography: "{typography.body}"
-    rounded: "{rounded.hairline}"
-    padding: "0 0.75rem"
-    height: "2.25rem"
-  field-label:
-    textColor: "{colors.blue-text}"
-    typography: "{typography.annotation}"
-  stamp:
-    textColor: "{colors.red-text}"
-    typography: "{typography.stamp}"
-    rounded: "{rounded.none}"
-    padding: "0.125rem 0.4375rem"
+    rounded: "{rounded.control}"
+    padding: "0 12px"
+    height: "34px"
+  card:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.card}"
+    padding: "{spacing.gutter}"
   sheet:
-    backgroundColor: "{colors.white}"
-    rounded: "{rounded.none}"
-    padding: "1.5rem"
-  proof-plate:
-    backgroundColor: "{colors.white}"
-    rounded: "{rounded.none}"
+    backgroundColor: "{colors.surface}"
+    rounded: "{rounded.dialog}"
+    padding: "32px"
+    width: "23rem"
+  notice:
+    backgroundColor: "{colors.ink-weak}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.control}"
+    padding: "12px 16px"
+  rail:
+    backgroundColor: "{colors.sunken}"
+    width: "15rem"
+  rail-place:
+    textColor: "{colors.text-secondary}"
+    rounded: "{rounded.control}"
+    padding: "0 8px"
+    height: "36px"
+  rail-place-current:
+    backgroundColor: "{colors.ink-weak}"
+    textColor: "{colors.ink-strong}"
+  tab:
+    textColor: "{colors.text-secondary}"
+    rounded: "{rounded.control}"
+    padding: "0 12px"
+    height: "32px"
+  tab-current:
+    backgroundColor: "{colors.ink-weak}"
+    textColor: "{colors.ink-strong}"
+  segment-checked:
+    backgroundColor: "{colors.ink-weak}"
+    textColor: "{colors.ink-strong}"
+    typography: "{typography.label}"
+    rounded: "{rounded.inner}"
+  day-toggle-pressed:
+    backgroundColor: "oklch(87.5% 0.024 218)"
+    textColor: "{colors.ink-strong}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.inner}"
+    width: "32px"
+    height: "26px"
+  state-badge:
+    backgroundColor: "oklch(93.7% 0.016 72)"
+    textColor: "oklch(48% 0.087 73)"
+    typography: "{typography.caption}"
+    rounded: "{rounded.pill}"
+    padding: "0 8px"
+    height: "24px"
+  tag:
+    backgroundColor: "{colors.sunken}"
+    textColor: "{colors.text-secondary}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.pill}"
+    padding: "0 8px"
+    height: "22px"
   code-cell:
-    backgroundColor: "{colors.white}"
-    textColor: "{colors.ink}"
-    typography: "{typography.code-cell}"
-    rounded: "{rounded.hairline}"
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    typography: "{typography.title}"
+    rounded: "{rounded.control}"
+  display-screen:
+    backgroundColor: "{colors.display-white}"
+    rounded: "{rounded.inner}"
+    width: "800px"
 ---
 
 # Design System: Afterimage
 
 ## Overview
 
-**Creative North Star: "The Proofroom"**
+**Creative North Star: "The Quiet Room"**
 
-Every screen a display shows is a proof before it goes to ink, and the web UI is the room where those proofs are checked. Two voices share the room and never mix. Everything a display will show is true ink on white, at its real pixels. Everything Afterimage itself says (navigation, labels, measurements, annotations) is drawn in non-repro blue, the pencil colour that a print camera does not see. A third voice, proofer's red, appears only to stamp a state or to mark an action that changes a device.
+The displays are the subject, and the room around them is quiet. Every screen a device shows sits at its true pixels, white as e-paper is, on a cool paper ground; everything else steps back so a display's own black and white stay the loudest thing on the page. All neutrals share the ink's hue (218) at a whisper of chroma, so the room is one temperature, and the only colour that speaks is a single teal-blue ink that marks what a hand can act on. Amber appears only where a state wants attention; red only where something is removed or has gone wrong.
 
-The room is calm and precise. Pages are warm proofing paper with hairline blue rules, generous whitespace and no shadows. The displays' images carry the visual weight; the chrome around them stays light, narrow and blue, so the eye lands on what a household will actually see. The UI is an Operate surface: patterns a visitor already knows (a top bar, tabs, forms, a code editor) keep their usual places, and the world shows in the details: crop marks, step wedges, stamps and a day strip.
+The density is that of a calm working tool. A sunken rail holds the wordmark, three places and the account; the content column holds white cards on hairlines, one card per concern, and text ranks by weight and colour before size. Light and dark are one system: each colour is a single `light-dark()` pair in `web/src/app/global.css`, the page follows the system scheme, and Settings can pin either theme.
 
-PRODUCT.md rules out mascots, playful copy and anything that reads as a toy; the proofroom is a tool. It rejects the category's default of a dark sidebar with a grid of equal cards.
+The world refuses the category's dashboard of status tiles and pills. A device's facts are a quiet two-column list, its day is a grey strip with a line at now, and a badge appears only for a state that needs the person. There are no mascots, illustrations or playful flourishes. The ornament the system allows is its name made visible: the mark is a square and the fainter square it leaves behind, and when a display's image changes, the one before lingers under it and fades, as e-paper ghosts after a refresh.
 
 **Key Characteristics:**
-
-- Warm paper ground, white sheets for anything a person fills in or a display shows.
-- Ink only for display content and primary text; blue for everything Afterimage says.
-- Red reserved for stamps and destructive actions.
-- One variable grotesk (Archivo), with its narrow cut for annotations, stamps and codes.
-- Display images at 1:1 wherever the viewport can hold them, framed with crop marks and the palette's step wedge.
-- Flat: no shadows, no rounded cards.
+- Displays at 1:1 (up to 800 pixels wide) on white, edged by a hairline, with palette, size and scale beneath.
+- One teal-blue ink at hue 218 for links, the current place, focus, the primary action and what a hand has set.
+- Cool paper neutrals at the ink's hue; white cards on 1px hairlines with 12px corners.
+- Schibsted Grotesk for everything; JetBrains Mono only for what is typed or copied verbatim.
+- Flat at rest; the one shadow belongs to what floats.
+- Light and dark from one `light-dark()` pair per colour.
 
 ## Colors
 
-A warm neutral paper, one ink, one family of non-repro blues, and one proofer's red.
+One ink on cool paper, with two state colours held in reserve. Each frontmatter key is the light value of a custom property in `web/src/app/global.css` (`ink` is `--ink`), and its `-dark` sibling is the same property's dark value; the two are always declared together in one `light-dark()`.
 
 ### Primary
-
-- **Non-repro Blue** (#2f6fd6): marks and lines: crop marks, the active tab's underline, focus rings, the day strip's "now" marker, the layout grid over a proof, the code field's active cell.
-- **Pencil Blue** (#2659b8): blue as text and as a solid fill: navigation, labels, annotations, links, secondary buttons and the primary button's fill. It holds 6.1:1 on paper and 6.6:1 on white.
-- **Deep Pencil Blue** (#1f4d9f): the hover state of blue text and of the primary button.
-- **Blue Wash** (#e6eefb): hover fill of quiet controls, the active editor line, text selection on the page.
-- **Hairline Blue** (#c7d8f5): every rule, input border, the step wedge's outline, and the editor's selection.
-- **Edge Blue** (#9bb8eb): the border of an input or a starter on hover, and of a filled code cell.
-- **Blue Gray** (#5f6f8f): quiet text that is not ink: placeholders, editor comments and punctuation, line numbers. It holds 4.7:1 on paper and 5.1:1 on white.
-- **Faint Blue** (#8aa6d9): the text of a disabled control, and nothing else.
+- **Afterimage Teal** (`ink`): the hue an afterimage takes, the cool complement a warm light leaves behind. It fills the primary button, colours links, draws every focus outline, marks the active code cell, the editor's caret and layout guides, the finished legs of a firmware install, and the wordmark's square.
+- **Deep Teal** (`ink-strong`): the ink one step firmer, for the primary button and links on hover, and for the text of the current place, the current settings tab and a checked segment.
+- **Teal Wash** (`ink-weak`): the ink mixed into the surface (10% light, 20% dark, in oklch). The fill of the current place, of hovered buttons, places and rows, of notices, the token shown once, and the account initial.
+- **On Ink** (`on-ink`): text on an ink or danger fill.
 
 ### Secondary
+- **Attention Amber** (`warn`): a state that wants the person's attention and nothing else. It colours the dot and, mixed into the surface and the text in oklab, the wash and label of a state badge (not checked in, not seen lately, nothing scheduled), and the dot beside unsaved changes in the editor.
 
-- **Proofer's Red** (#e2483d): a stamp's double rule, the editor's error underline.
-- **Red Pencil** (#c2372d): red as text: stamp lettering, destructive buttons, error messages (5.0:1 on paper).
-- **Red Wash** (#fbe9e7): hover fill of a destructive button.
-- **Deep Red Pencil** (#a82d24): hover fill of the solid destructive button that confirms a removal.
+### Tertiary
+- **Removal Red** (`danger`, `danger-strong`, `danger-weak`): removal and errors. The outlined danger button, the solid button that confirms a removal, the wash behind a destructive confirmation or a chosen removal option, invalid fields, error text, editor problems and a failed firmware leg.
 
 ### Neutral
-
-- **Proofing Paper** (#f7f6f1): the page ground and the top bar.
-- **Sheet White** (#ffffff): plates, the claim sheet, the sign-in sheet, inputs, the editor.
-- **True Ink** (#1b1b19): what displays show, primary text, values in the sources tree.
-- **Soft Ink** (#4b4a45): secondary text: hints, asides such as "3.71 V", numbers and booleans in the sources tree.
+- **Cool Paper** (`bg`): the page ground.
+- **Card White** (`surface`): cards, fields, buttons, the editor and the sign-in sheet. In the dark theme it is the lifted near-black that cards sit on.
+- **Sunken Paper** (`sunken`): below the page: the rail, an empty display, day-strip tracks, wells for inline code and copyable values, disabled buttons and tags.
+- **Hairline** (`border`): card edges, row dividers and rules.
+- **Strong Hairline** (`border-strong`): control borders, the ring around a display, the major hours of a day strip.
+- **Deep Slate** (`text`): names, values and running text.
+- **Slate** (`text-secondary`): descriptions, hints, field labels and places at rest.
+- **Muted Slate** (`text-muted`): text about a thing rather than the thing: fact labels, captions, units, times, table headings.
+- **Display White** (`display-white`): the ground of every display's screen in both themes. E-paper is white even when the room is dark.
 
 ### Named Rules
+**The One Ink Rule.** The ink marks what a hand can act on or has set, and nothing else. If a surface needs ink to look finished, it is decorating.
 
-**The Two Voices Rule.** Ink belongs to what a display shows and to the primary text a person reads; blue belongs to what Afterimage says about it. A label, a measurement or a navigation item is never ink; a screen's content is never blue.
+**The One Temperature Rule.** Every neutral is hue 218 at chroma 0.02 or less. A new neutral takes the same hue; pure greys and warm greys do not belong in the room.
 
-**The Red Is Earned Rule.** Red appears only on a stamp or on an action that changes a device or deletes a screen. No red for emphasis, decoration or validation hints.
+**The Held Reserve Rule.** Amber appears only where a state wants attention; red only for removal and errors. Neither colours a heading, an icon, a chart or a decoration.
 
 ## Typography
 
-**Display Font:** none; Afterimage has no display voice beyond its wordmark.
-**Body Font:** Archivo Variable (self-hosted through `@fontsource-variable/archivo`, with its width axis), falling back to system-ui.
-**Label/Mono Font:** Archivo's narrow cut (width 68 to 75%) for annotations, stamps and codes; the platform monospace stack for YAML only.
+**Body Font:** Schibsted Grotesk Variable (with ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif)
+**Label/Mono Font:** JetBrains Mono Variable (with ui-monospace, SF Mono, Menlo, Consolas, monospace)
 
-**Character:** one sturdy grotesk at three widths: wide for the wordmark, normal for reading, narrow for the measurements and stamps a proofer writes in the margin. Every figure is tabular so readings line up.
+**Character:** A sturdy grotesk with a newspaper's firmness sets everything from the page title to the caption; there is no display face. Its variable weight carries the hierarchy in small steps. The mono is a tool, not a voice: it appears only where characters must be read exactly.
 
 ### Hierarchy
-
-- **Wordmark** (640, 1.25rem, width 118%): "Afterimage" in the top bar and on the sign-in sheet.
-- **Headline** (620, 1.5rem, 1.15): a page's name, such as "Devices". A device's own page sets its name at 2rem.
-- **Title** (620, 1.25rem, 1.15): a device's name in the list, section headings such as "Playlist".
-- **Body** (400, 0.9375rem, 1.45): reading text and form values.
-- **Body small** (400, 0.8125rem): facts, hints, buttons, error text.
-- **Annotation** (560, 0.6875rem, width 72%, 0.06em, uppercase): field labels, fact labels, a proof's caption, "Times in Europe/Berlin".
-- **Stamp** (720, 0.6875rem, width 68%, 0.08em, uppercase): device states only.
-- **Code cell** (640, 1.5rem, width 75%): the six characters of a claim code.
-- **Axis** (560, 0.625rem, width 72%, 0.04em): the hour figures under a day strip.
-- **Code** (13.5px, 1.6): the YAML editor.
-- **Code small** (12px, 1.6): the sources tree and the secrets' names beside it.
+- **Headline** (620, 1.625rem, 1.2, -0.022em): the page title, one per page, with a line in Slate beneath it.
+- **Title** (600, 1.25rem, 1.2, -0.018em): a display's name on its card, the screen's name in the editor (620), the title of an empty state.
+- **Section title** (620, 1rem, 1.2, -0.012em): a card's title, the claim panel's and the sign-in form's.
+- **Body** (400, 0.875rem, 1.55): running text, fact values and table cells. Forms and settings hold to a 44rem measure.
+- **Label** (540, 0.8125rem, 1.55): buttons, field labels and table headings. Hints and notes take the same size at 400 in Slate or Muted Slate.
+- **Caption** (400, 0.75rem, 1.55): a display's caption, a day strip's names and hours. Badges and tags take it at 560 to 580.
+- **Code** (JetBrains Mono, 400, 13px, 1.65): the YAML editor; inline at 0.9em; a source's data at 12px.
+- **Wordmark** (620, 1rem, -0.02em): the lowercase name after its mark.
 
 ### Named Rules
+**The Weight Before Size Rule.** Hierarchy comes from weight and colour before size. The scale tops out at 26px, and a step down in importance is a step from Deep Slate to Slate to Muted Slate before it is a smaller size.
 
-**The Narrow Margin Rule.** Anything written about a thing (its label, size, scale, time zone) uses the narrow annotation style in blue; anything that is the thing uses the normal width.
+**The Verbatim Mono Rule.** JetBrains Mono sets only what is typed or copied exactly: YAML, addresses, commands, secret and source names, a source's data, a problem's location. Prose, labels and headings never take it.
+
+**The Sentence Case Rule.** Everything is in sentence case. Letter-spacing only tightens headings and the wordmark; nothing is uppercased or tracked out.
+
+Figures that are read in columns (times, hours, a claim code) are tabular; prose keeps proportional figures.
 
 ## Layout
 
-The page sits inside a gutter of `clamp(1rem, 3vw, 2.5rem)` under a sticky top bar 3.25rem tall. Every page opens with its name, a note in the annotation style beneath it and its actions at the right; pages of forms (the account, the server) keep to a 48rem measure. A plate lines up with the content around it on both edges, its crop marks standing in the gutter or the gap beside it. Spacing follows one scale from 0.25rem to 4rem; groups sit tight (0.25 to 0.75rem) and sections stand apart (1.5 to 4rem), each section opened by a hairline rule rather than a box.
+The signed-in frame is a two-column grid: a 15rem rail on Sunken Paper, its right edge a 1px hairline that runs the full height, and the content column. The rail is sticky at full viewport height: the wordmark at the top, the places (Devices, Screens, Settings) beneath, and the account at the foot above a hairline. The screen editor folds the rail to 3.75rem of icons so the YAML and the preview share the width.
 
-The devices list is a proof sheet, not a card grid. Each display is a row: its plate in a shared track 800px wide, so an 800-pixel display shows at 1:1 on a 1440-pixel screen, with its crop marks standing in the gap beside it, its facts in a single column of at least 13rem beside it, and its day strip under the plate. Every row starts its facts and its strip's track at one edge. The claim sheet takes a 17.5rem column at the right, level with the first plate, and stays in view while the list scrolls.
+The content column caps at 74rem plus 32px of padding each side, padded 32px at the top and 64px at the foot. A page's head holds its title and a line about it at the left and its actions at the right, aligned at the bottom, and its sections follow 24px apart. A page of forms keeps the same left edge at a 44rem measure. Within a card, a gutter of 16px (24px from 48rem) is the inset every title and value starts on; rows run edge to edge under hairlines.
 
-Below 72rem a row stacks: plate, facts in two columns, then the strip. Below 52rem the claim sheet moves above the list. Below 40rem crop marks shrink to fit the narrower gutter.
+A display's card sets its screen (up to 800px, 1:1) beside a details column of at least 15rem, 24px apart; below 72rem the two stack, screen first. The screen editor fills the viewport: its head, then the YAML (at least 24rem) beside a preview column as wide as the display plus room for its scrollbar, each scrolling on its own; below 64rem they stack, the YAML at 60% of the viewport height and the preview centred beneath.
 
-The screen editor fills the viewport: the YAML on the left, the proof on the right at the device's real pixels, and the data sources' answers below the proof in a column that scrolls on its own. Below 64rem the proof moves under the editor, centred and as wide as the display where it fits.
+Below 52rem the rail becomes a sunken bar along the top with a hairline under it: the mark, then the places, which scroll sideways before they would widen the page; signing out moves to Settings, and the page padding drops to 24px 16px 48px. Below 30rem the places keep only their icons. Below 40rem two-column forms become one and the settings tabs scroll sideways under a fade.
+
+Spacing runs on a 4px base: 4, 8, 12, 16, 24, 32, 48 and 64px.
 
 ## Elevation & Depth
 
-The proofroom is flat. Nothing casts a shadow. Depth comes from material: white sheets and plates lie on warm paper, and a plate carries a 1px outline of ink at 8% so a white screen still reads as an object. The sticky top bar is paper over paper, separated by its hairline rule.
+The system is flat and tonal. Depth is three levels of paper: Sunken Paper below the Cool Paper page below Card White, with 1px hairlines where a level meets the next. A card does not lift; it is white on a hairline. The one shadow belongs to what floats over the page: the editor's completion list and hover tooltips. `box-shadow` otherwise serves as a line, never as depth: the 1px ring that edges a display and the ink halo on the active cell of a claim code.
 
-**The Flat Table Rule.** Proofs lie on the table; nothing floats above it. Use a white sheet, a rule or a wash, never a shadow, to separate one thing from another.
+### Shadow Vocabulary
+- **Overlay** (`box-shadow: 0 10px 28px -10px light-dark(oklch(22% 0.03 218 / 0.22), oklch(0% 0 0 / 0.55))`): only for what floats over the page.
+- **Display edge** (`box-shadow: 0 0 0 1px var(--border-strong)`): the hairline around a display's screen, so a blank one still reads as an object.
+- **Cell focus** (`box-shadow: 0 0 0 3px color-mix(in oklch, var(--ink) 18%, transparent)`): the active cell of the claim code.
+
+### Named Rules
+**The Only What Floats Rule.** Nothing at rest casts a shadow. The overlay shadow is for what floats over the page and for nothing else.
 
 ## Shapes
 
-Controls have hairline corners (2px): buttons, inputs, selects, code cells. Sheets, plates and stamps are square. The signature forms are drawn geometry: crop marks (two 1px blue strokes at a plate's top-left and bottom-right corners, 0.875rem long and stopping 0.375rem short of the trim, and smaller in proportion on a phone), the stamp's double rule, the step wedge's row of patches, and the crossed box of a plate that has no image yet.
+Corners follow one ladder: a control and the field beside it share 8px; a card takes 12px; what sits inside a control (a segment, a day toggle, an inline code well, a day-strip track) and a display's screen take 5px; the sign-in sheet takes 16px. Badges, tags and the spans of a day strip are full pills; the account initial and step counters are circles. Edges are 1px hairlines throughout; the only heavier line is the 3px top rule of each firmware leg.
+
+The mark is two 9 by 9 squares with 1.5px corners: a filled one in the ink, and behind it, 4px down and to the right, its outline in the ink at 45% with a 1.25px stroke.
 
 ## Components
 
 ### Buttons
+Quiet and solid: a hairline box that tints toward the ink under the hand.
+- **Shape:** gently rounded (8px), 34px tall, 14px side padding, 13px label at 540, a 16px Lucide icon leading when it helps (a plus to create).
+- **Default:** Card White on a Strong Hairline border, Deep Slate text. Hover fills Teal Wash and moves the border 35% toward the ink; pressed fills the ink at 16%.
+- **Primary:** an ink fill with On Ink text; hover to Deep Teal. One per page head, card or form, for the action it exists for (Claim a display, New screen, Save playlist).
+- **Quiet:** no fill or border, Slate text; hover fills Teal Wash. For Cancel and secondary tools.
+- **Danger:** Removal Red text on Card White with a border 45% red; hover fills the red wash. It opens a confirmation, never acts on its own.
+- **Danger solid:** a red fill with On Ink text, hover darker; only the final button of a confirmation that has said what it does to the device.
+- **Disabled:** Sunken Paper fill, Hairline border, Muted Slate text.
+- **Icon button:** a 34px square, transparent, Slate icon; hover fills Teal Wash.
+- **Focus:** a 2px ink outline at 2px offset. Colour transitions take 150ms on the ease-out curve.
 
-Quiet and exact: a hairline frame that names its action.
+### Chips
+- **State badge:** a 24px pill in an amber wash with amber-on-slate text at 12px 580 and a 6px amber dot leading. It names a device state that wants attention, beside the device's name. A state that ends while the page is open stays, struck through, at 55% opacity with a grey dot (a 320ms fade), rather than vanishing under the reader's eye.
+- **Tag:** a 22px pill on Sunken Paper with Slate text at 12px 560, for a token's scope or an account's role.
+- **Segmented control:** a Strong Hairline outline with 8px corners and 3px padding around 5px-cornered options; the checked one fills Teal Wash with Deep Teal text at 620. The week's day toggles in a playlist entry use the same frame; a pressed day fills the ink at 24% into the surface, at 680.
 
-- **Shape:** hairline corners (2px), 2.25rem tall, 1rem side padding, a 16px lucide icon before the label when it helps.
-- **Default:** white with Pencil Blue text and a Pencil Blue border.
-- **Primary:** Pencil Blue fill with white text; one per form, for the action that saves.
-- **Danger:** white with Red Pencil text and border; the solid red variant confirms a removal after its consequences are spelled out.
-- **Hover / Focus:** hover fills with Blue Wash (Red Wash for danger; Deep Pencil Blue for primary) over 150ms; focus draws a 2px Non-repro Blue ring 2px outside.
-- **Disabled:** paper fill, Hairline Blue border, light blue text.
-- **Icon buttons:** 2rem square, transparent until hovered.
+### Cards / Containers
+- **Corner Style:** 12px.
+- **Background:** Card White on the Cool Paper page.
+- **Shadow Strategy:** none; see Elevation & Depth.
+- **Border:** a 1px Hairline.
+- **Internal Padding:** the gutter, 16px (24px from 48rem). A card's title (Section title) and a hint in Slate head it; its body follows with 16px gaps. Rows run edge to edge under a hairline, a label at 560 and a hint at the left, the control or value at the right.
+- **Notice:** a Teal Wash fill with 8px corners for a message the page wants read (a display just claimed, a token's secret shown once). A confirmation for a non-destructive step sits on Sunken Paper; a destructive one sits on the red wash with a 40% red border.
+- **Table:** the screens list is a table on a card: headings at 13px 540 in Muted Slate over a hairline, names at 580 in Deep Slate, other cells in Slate; a row's hover fills Teal Wash at 60%.
 
 ### Inputs / Fields
-
-- **Style:** white, 1px Hairline Blue border, hairline corners, 2.25rem tall; the label above in the annotation style.
-- **Hover:** the border turns Edge Blue.
-- **Focus:** a 2px Non-repro Blue ring inset over the border.
-- **Error:** the border turns Proofer's Red and a Red Pencil message follows the field.
+- **Style:** 34px tall, 8px corners, a 1px Strong Hairline border on Card White, 14px text, 12px side padding. The label sits 6px above in 13px 540 Slate; a hint follows below in 13px Slate. A select draws a Lucide chevron at its right.
+- **Focus:** the border turns to the ink inside a 2px outline of the ink at 45%. Hover moves the border 30% toward the ink.
+- **Error / Disabled:** an invalid field takes a red border and red 13px error text beneath.
+- **Claim code:** six cells at a 5:6 ratio drawn over one real input that takes every keystroke and paste; 20px figures at 620, tabular. A filled cell's border moves 40% toward the ink; the active cell takes the ink border and the cell-focus halo; an invalid code turns every cell red.
+- **YAML editor:** CodeMirror on a 12px card, 13px JetBrains Mono at 1.65. Keys in Deep Slate at 600, values in Slate, comments italic in Muted Slate; a 2px ink caret, the active line in Teal Wash at 55%, problems underlined in a red wave. The card's border moves 55% toward the ink while it has focus.
 
 ### Navigation
+- **Rail places:** 36px rows with 8px corners, a 16px Lucide icon (1.75 stroke) and the name at 520 in Slate. Hover fills Teal Wash with Deep Slate text; the current place fills Teal Wash with Deep Teal text at 600.
+- **Account:** a 28px circle with the initial in Deep Teal on Teal Wash (12px, 650), the name, and a sign-out icon button, above a hairline at the rail's foot.
+- **Settings tabs:** the rail's treatment laid along the top of the page, 32px tall, over a hairline.
+- **Back link:** 13px Slate with a 14px arrow, above the page title; hover to Deep Teal.
+- **Mobile:** below 52rem the rail is a sunken top bar and the places scroll sideways; below 30rem they are icons with their names kept for assistive technology.
 
-The top bar is paper with a hairline rule beneath it: the wordmark, then Devices and Screens as text tabs in Pencil Blue, with Server after them for the administrator, and at the right the account (a person icon and the account's name, in Pencil Blue, leading to the account page with its API tokens) and "Sign out". The current tab is heavier (640) and underlined by a 2px Non-repro Blue bar on the rule; on the account page the account's name is heavier. On a phone the account's name hides behind its icon, the wordmark sets at 1.0625rem and the gaps narrow; the tabs and "Sign out" stay, and where the tabs still do not fit they scroll sideways rather than widen the page. Back links on inner pages lead with a lucide arrow.
+### Display Panel (signature)
+A display's image as the display holds it, and the afterimage it leaves.
+- **Screen:** Display White in both themes, 5px corners, edged by the display-edge ring. It is as wide as the image's natural width where the column allows (1:1 at up to 800px) and narrower otherwise, holding the display's aspect ratio before the image loads; at 1:1 it renders pixelated so every device pixel stays crisp.
+- **Caption:** 12px in Muted Slate beneath: the palette's levels as 10px swatches with a faint inset ring (up to 16; a rainbow band for full colour), the palette's name, the size in pixels, and the scale, "1:1" or "at 41%".
+- **Empty:** Sunken Paper with the mark at 40px and 55% opacity above "No image yet" in 13px Muted Slate.
+- **Busy:** while the image is replaced, the screen dims to 60% over 240ms.
+- **Afterimage:** when the image changes, the one before is laid over the new one with `mix-blend-mode: multiply`, so it darkens the new image only where it was dark, and fades from 40% opacity to none while blurring to 1.5px over 2000ms on `cubic-bezier(0.45, 0, 0.55, 1)`; it is removed when the animation ends. Under reduced motion it lasts 1ms.
+- **Guides:** in the editor's preview, a layout grid can be drawn over the image: lines every 40 device pixels in the ink at 22%, every 200 at 50%, and dashed centre lines at 75%.
 
-### Proof plate (signature)
+### Day Strip
+- **Track:** a day from midnight to midnight on Sunken Paper with 5px corners, one 20px lane per playlist entry, a line every three hours in Hairline at 60% and every six hours in Strong Hairline.
+- **Entries:** grey pills (Muted Slate at 70% into the surface), inset 5px in their lane, as long as the entry is current. The strip reports; it never takes the ink.
+- **Now:** a 2px line in Deep Slate reaching 4px past the track.
+- **Scale:** 00, 06, 12, 18 and 24 beneath in 12px tabular Muted Slate; entry names in a 6.5rem column at the left when the strip shows several.
 
-A display's image framed as a press proof. The image sits on white at its true pixels, rendered pixelated when scaled up; crop marks stand at two corners. Under it the caption carries the palette's step wedge (one patch per level, up to 16, or a continuous band for full colour), the palette's name, the size, and the scale: "1:1" or an honest "at 42%". A plate with no image keeps its display's footprint, crossed corner to corner with "No image yet", and drops the scale.
+### Firmware Progress
+An install shows its three legs (requested, sent, installed) as columns under 3px top rules: a finished leg in the ink, the current one dashed in the ink at 45%, a waiting one in Hairline with Muted Slate text, a failed one in red with its label at 640.
 
-### Stamp (signature)
-
-A device state in proofer's red: narrow capitals between a 1.5px rule and a 1px outline 1.5px outside it. States are named plainly: "Not checked in", "Not seen lately", "Nothing scheduled". A state that ends while the page is open is cancelled rather than removed: its rules fade, a Red Pencil stroke draws through it over 320ms, and its lettering stays legible.
-
-### Day strip (signature)
-
-One day from midnight to midnight, each playlist entry a lane whose ink bars are as long as the time the entry is current. Lane names stand in a 6.5rem column of narrow blue text before the track, hour ticks fall every 3 hours (stronger every 6), and a Non-repro Blue marker shows now.
-
-### Routing slip
-
-An install request's three legs (Requested, Sent, Installed) side by side, each a 2px rule over its narrow label and its time. A leg that happened is Pencil Blue, the leg under way is dashed Non-repro Blue, a leg still to come is Hairline Blue with its label in Blue Gray, and a leg that failed is Proofer's Red with "Not installed" in Red Pencil at 720.
-
-### Sheets
-
-The claim panel, the sign-in form, the first-display guide and a new token's shown-once secret are white sheets with crop marks on paper, padded 1.5 to 2rem. The claim sheet holds the six-cell code field: white cells in the narrow cut, the active one ringed in Non-repro Blue with a blinking caret.
-
-### Editor
-
-CodeMirror on white: keys in Pencil Blue at 560, strings in ink, numbers and booleans in Soft Ink, comments and punctuation in Blue Gray, line numbers in Blue Gray on paper. Long lines wrap under their own indentation. Problems carry a wavy Proofer's Red underline. The layout grid over the proof draws Non-repro Blue lines every 40 device pixels, stronger every 200, with dashed centre lines.
+### Wordmark
+The lowercase name at 16px 620 after the 16px mark. The mark alone stands for the product where the name does not fit: the folded rail, and an empty display.
 
 ## Do's and Don'ts
 
 ### Do:
-
-- **Do** show a display's image at 1:1 wherever the viewport holds it, and label the scale honestly where it does not.
-- **Do** write labels, sizes, times and other annotations in the narrow blue style (0.6875rem, 560, width 72%, uppercase).
-- **Do** separate sections with a 1px Hairline Blue (#c7d8f5) rule and whitespace.
-- **Do** keep text at 4.5:1 or better: Blue Gray (#5f6f8f) is the lightest text colour on paper.
-- **Do** spell out what a destructive action does to the device before it happens, and put that action in red.
-- **Do** use lucide icons at one stroke weight; never a Unicode glyph standing in for one.
+- **Do** show every display image at its true pixels where the column allows (1:1 up to 800px), on Display White with the display-edge ring, with palette, size and scale beneath it.
+- **Do** keep the ink (oklch(48% 0.1 218) light, oklch(78% 0.085 218) dark) for links, the current place, focus, the primary action and what a hand has set.
+- **Do** declare every colour as one `light-dark()` pair at hue 218 and check both themes.
+- **Do** put each concern on its own white card: 12px corners, a 1px hairline, a 16px gutter that widens to 24px from 48rem.
+- **Do** rank text by weight and by Deep Slate, Slate and Muted Slate before size; keep body text at 14px on 1.55 and forms at a 44rem measure.
+- **Do** show a device state that wants attention as an amber badge beside its name, and keep a state that ends while the page is open, struck through at 55% opacity.
+- **Do** open a destructive action with an outlined danger button, say in the confirmation what it does to the device, and finish it with a solid danger button beside a quiet Cancel.
+- **Do** reserve the afterimage for display images: the image before, multiplied over the new one, fading from 40% to none and blurring to 1.5px over 2000ms, and 1ms under reduced motion.
 
 ### Don't:
-
-- **Don't** add shadows, rounded cards or a card grid of equal tiles.
-- **Don't** use red for anything but stamps and destructive actions (The Red Is Earned Rule).
-- **Don't** set Afterimage's own labels in ink or a display's content in blue (The Two Voices Rule).
-- **Don't** introduce a second paper or a gray surface; a thing is either paper or a white sheet.
-- **Don't** add mascots, illustrations or playful copy.
+- **Don't** build dashboards of status tiles, stat cards or rows of status pills; a device's facts are a two-column list of Muted Slate labels and plain values.
+- **Don't** use the ink as decoration: no ink headings, bands, gradients or tinted icons; an icon takes the colour of its text.
+- **Don't** introduce pure or warm greys; every neutral is hue 218 at chroma 0.02 or less.
+- **Don't** give anything at rest a shadow for depth; the overlay shadow is only for what floats.
+- **Don't** use amber or red for anything but a state that wants attention, removal and errors.
+- **Don't** set prose, labels or headings in JetBrains Mono, and don't uppercase or track out a label.
+- **Don't** draw on, tint or crop a display's image, or scale it above its true pixels; the editor's optional guides are the only marks laid over it.
+- **Don't** add mascots, cute illustration or playful copy; Afterimage is a calm tool.

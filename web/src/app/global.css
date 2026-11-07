@@ -37,7 +37,6 @@
     color-mix(in oklch, var(--ink) 20%, var(--surface))
   );
 
-  --positive: light-dark(oklch(52% 0.105 155), oklch(75% 0.1 155));
   --warn: light-dark(oklch(55% 0.115 72), oklch(79% 0.105 80));
   --danger: light-dark(oklch(51.5% 0.155 27), oklch(71% 0.13 25));
   --danger-strong: light-dark(oklch(45% 0.155 27), oklch(78% 0.11 25));
@@ -46,7 +45,6 @@
     color-mix(in oklab, var(--danger) 18%, var(--surface))
   );
 
-  --scrim: light-dark(oklch(24% 0.02 var(--hue) / 0.3), oklch(6% 0.01 var(--hue) / 0.6));
   /* The only shadow: what floats over the page. */
   --shadow-overlay: 0 10px 28px -10px light-dark(oklch(22% 0.03 var(--hue) / 0.22), oklch(0% 0 0 / 0.55));
 
@@ -203,6 +201,11 @@ code {
 .muted {
   color: var(--text-muted);
   font-size: var(--text-sm);
+}
+
+/* Every drawn icon at one stroke. */
+.lucide {
+  stroke-width: 1.75;
 }
 
 .visually-hidden {

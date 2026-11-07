@@ -3,10 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#f7f6f1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f3f6f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0f12" media="(prefers-color-scheme: dark)" />
     <title>Afterimage</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- The theme a person chose (src/app/theme.ts owns the key), set before the
+         stylesheet paints so a chosen theme never flashes the system's. -->
+    <script>
+      try {
+        const theme = localStorage.getItem("afterimage.theme");
+        if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

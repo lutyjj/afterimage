@@ -6,9 +6,6 @@ import { RouterProvider } from "react-router/dom";
 import "./app/global.css";
 import { queryClient } from "./app/client";
 import { router } from "./app/router";
-import { applyTheme } from "./app/theme";
-
-applyTheme();
 
 const root = document.getElementById("root");
 if (!root) {

@@ -40,7 +40,7 @@ use aws.protocols#restJson1
 use smithy.framework#ValidationException
 
 /// The API the web UI uses: sign-in, devices, their firmware, screens and their
-/// playlists, and the personal API tokens scripts and agents use instead.
+/// playlists, and the personal access tokens scripts and agents use instead.
 ///
 /// A screen is a document of components that templates fill from data sources.
 /// `PreviewScreen` draws a document on a display and answers the image, what each
@@ -53,7 +53,7 @@ use smithy.framework#ValidationException
 /// Every operation needs a credential except those that exist to start a
 /// session (`GetSignInOptions`, `CreateFirstAccount`, `SignIn`,
 /// `StartOidcSignIn`, `CompleteOidcSignIn`): the session cookie a browser holds,
-/// or a personal API token as `Authorization: Bearer <secret>`, which wins when
+/// or a personal access token as `Authorization: Bearer <secret>`, which wins when
 /// a request carries both; an `Authorization` of another scheme leaves the
 /// session to decide. Every resource belongs to the signed-in account;
 /// another account's resource answers `NotFound`, as a missing one does. A

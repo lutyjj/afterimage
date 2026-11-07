@@ -10,6 +10,9 @@ export function ServerInfo() {
   const server = useQuery(serverQuery);
   const signIn = useQuery(signInOptionsQuery).data;
 
+  if (server.isPending) {
+    return <p className="muted">Loading the server's settings</p>;
+  }
   if (server.isError) {
     return <p className="error-text">{messageOf(server.error)}</p>;
   }
@@ -17,9 +20,9 @@ export function ServerInfo() {
   return (
     <Section title="Server" intro="Set by the deployment, for every account on this server.">
       <Rows>
-        <Row label="Release">{data?.version}</Row>
+        <Row label="Release">{data.version}</Row>
         <Row label="Time zone" description="Playlists keep its time, and screens show dates in it.">
-          {data?.timeZone}
+          {data.timeZone}
         </Row>
         <Row
           label="Secrets"
@@ -30,11 +33,11 @@ export function ServerInfo() {
             </>
           }
         >
-          {data?.secretNames.length === 0 ? (
+          {data.secretNames.length === 0 ? (
             <span className="muted">None</span>
           ) : (
             <span className={styles.names}>
-              {data?.secretNames.map((name) => (
+              {data.secretNames.map((name) => (
                 <code key={name}>{name}</code>
               ))}
             </span>

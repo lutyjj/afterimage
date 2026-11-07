@@ -37,35 +37,49 @@
   gap: var(--space-4);
 }
 
+/* Radios drawn as one segmented control: the input stays for the keyboard
+   and assistive technology, the label is what shows. */
 .segmented {
   display: inline-flex;
   gap: 0.125rem;
+  margin: 0;
   padding: 0.1875rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
 }
 
-.segmented button {
+.segmented label {
+  display: inline-flex;
+  align-items: center;
   min-height: calc(var(--height-control) - 0.5rem);
   padding: 0 0.75rem;
-  border: 0;
   border-radius: var(--radius-inner);
-  background: transparent;
   color: var(--text-secondary);
   font-size: var(--text-sm);
   font-weight: 540;
   cursor: pointer;
 }
 
-.segmented button:hover {
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented label:hover {
   background: var(--ink-weak);
   color: var(--text);
 }
 
-.segmented button[aria-checked="true"] {
+.segmented label:has(input:checked) {
   background: var(--ink-weak);
   color: var(--ink-strong);
   font-weight: 620;
+}
+
+.segmented label:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
 }
 
 .tag {
@@ -119,6 +133,12 @@
   gap: var(--space-1);
   min-width: 0;
   max-width: 100%;
+}
+
+.copy {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
 /* A value wraps at its spaces, and breaks inside a word only when the word is

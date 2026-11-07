@@ -11,7 +11,7 @@ import styles from "./Settings.module.css";
 
 type Created = { token: AccessToken; secret: string };
 
-/** The personal API tokens scripts and agents act with, and how an agent
+/** The personal access tokens scripts and agents act with, and how an agent
  * connects over MCP with one. */
 export function AccessTokens() {
   const timeZone = useQuery(serverQuery).data?.timeZone;
@@ -87,24 +87,34 @@ function Agents({ secret }: { secret: string | undefined }) {
   );
 }
 
+/** A value to copy whole. Where the browser refuses the clipboard, as a page
+ * served without TLS on a network address is refused, it says so: the value
+ * may be a secret shown once. */
 function CopyText({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<boolean | "failed">(false);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
     } catch {
-      setCopied(false);
+      setCopied("failed");
     }
   };
   return (
-    <span className={styles.copyText}>
-      <code tabIndex={0} onFocus={(event) => window.getSelection()?.selectAllChildren(event.currentTarget)}>
-        {text}
-      </code>
-      <button type="button" className="icon-button" onClick={() => void copy()} aria-label="Copy" title="Copy">
-        {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
-      </button>
+    <span className={styles.copy}>
+      <span className={styles.copyText}>
+        <code tabIndex={0} onFocus={(event) => window.getSelection()?.selectAllChildren(event.currentTarget)}>
+          {text}
+        </code>
+        <button type="button" className="icon-button" onClick={() => void copy()} aria-label="Copy" title="Copy">
+          {copied === true ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+        </button>
+      </span>
+      {copied === "failed" && (
+        <span className="error-text" role="alert">
+          The browser did not allow copying. Select the text and copy it yourself.
+        </span>
+      )}
     </span>
   );
 }

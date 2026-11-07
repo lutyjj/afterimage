@@ -1,5 +1,5 @@
 //! The MCP endpoint at `/mcp`: the operations the model tags `mcp` as tools,
-//! called with a personal API token and answered by the management API.
+//! called with a personal access token and answered by the management API.
 
 mod common;
 

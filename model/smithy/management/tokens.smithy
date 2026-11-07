@@ -17,7 +17,7 @@ enum TokenScope {
     READ_ONLY = "read_only"
 }
 
-/// A personal API token, for scripts and agents acting for an account. It acts
+/// A personal access token, for scripts and agents acting for an account. It acts
 /// as its owner wherever a session does, narrowed by its scope, and lasts until
 /// it is revoked. The server keeps only a hash of its secret.
 structure AccessToken {

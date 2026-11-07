@@ -1,4 +1,4 @@
-//! The account's personal API tokens.
+//! The account's personal access tokens.
 
 use afterimage_management_api::model::{self, TokenScope};
 use afterimage_management_api::server::Extension;

@@ -19,19 +19,21 @@ export function Preferences() {
       <Section title="Appearance">
         <Rows>
           <Row label="Theme" description="Auto follows this device's setting. Kept in this browser.">
-            <div className={styles.segmented} role="radiogroup" aria-label="Theme">
+            <fieldset className={styles.segmented}>
+              <legend className="visually-hidden">Theme</legend>
               {THEMES.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  role="radio"
-                  aria-checked={theme === option}
-                  onClick={() => setTheme(option)}
-                >
+                <label key={option}>
+                  <input
+                    type="radio"
+                    name="theme"
+                    value={option}
+                    checked={theme === option}
+                    onChange={() => setTheme(option)}
+                  />
                   {THEME_LABELS[option]}
-                </button>
+                </label>
               ))}
-            </div>
+            </fieldset>
           </Row>
         </Rows>
       </Section>

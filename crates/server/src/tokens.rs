@@ -1,4 +1,4 @@
-//! Personal API tokens: what scripts and agents sign in with, as
+//! Personal access tokens: what scripts and agents sign in with, as
 //! `Authorization: Bearer <secret>`. A token acts as its owner wherever a session
 //! does, narrowed to reading when it is read-only, and lasts until it is
 //! revoked. The secret is a random token like a session's, and the database

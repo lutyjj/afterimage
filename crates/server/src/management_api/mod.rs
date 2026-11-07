@@ -1,7 +1,7 @@
 //! The generated management API, served over the stores.
 //!
 //! Every operation in [`NeedsSession`] passes through [`RequireSession`]: all of
-//! them but the five that start a session. It takes a personal API token from
+//! them but the five that start a session. It takes a personal access token from
 //! `Authorization: Bearer`, or else the session cookie, and refuses a read-only
 //! token any request but a read. Handlers read the account from [`Caller`], which
 //! only that plugin provides.
@@ -160,7 +160,7 @@ pub struct Caller {
 pub enum Credential {
     /// A browser's session, by its token, so that signing out can end it.
     Session(String),
-    /// A personal API token, whose read-only limit [`RequireSession`] applies.
+    /// A personal access token, whose read-only limit [`RequireSession`] applies.
     Token,
 }
 

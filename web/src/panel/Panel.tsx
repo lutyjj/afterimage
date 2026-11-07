@@ -23,7 +23,10 @@ export interface PanelProps {
 
 /** A display's image at its true pixels where there is room, with the palette,
  * size and scale beneath it. When the image changes, the one before lingers and
- * fades, as an e-paper screen keeps a trace of what it showed. */
+ * fades, as an e-paper screen keeps a trace of what it showed. The trace is the
+ * previous `src` drawn again: a data URL is itself the image, and a URL is
+ * served from the document's own list of images it has already decoded, which
+ * a browser keeps for the page's life whatever the response's cache headers. */
 export function Panel({
   src,
   alt,

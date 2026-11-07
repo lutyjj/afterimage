@@ -1,4 +1,4 @@
-//! Personal API tokens: created by a signed-in person, then sent by scripts and
+//! Personal access tokens: created by a signed-in person, then sent by scripts and
 //! agents as `Authorization: Bearer <secret>` instead of a session.
 
 mod common;

@@ -78,7 +78,8 @@ pub struct Config {
     /// The MQTT broker to publish device state to, with Home Assistant's
     /// discovery, such as `mqtt://broker.example:1883` or `mqtts://` with TLS.
     /// Set, it is the broker and the web UI only shows it; unset, the server
-    /// publishes to the broker the administrator saves on the Server page, if any.
+    /// publishes to the broker the administrator saves in the web UI's Home
+    /// Assistant settings, if any.
     #[arg(long, env = "AFTERIMAGE_MQTT_URL", value_parser = parse_mqtt_url)]
     pub mqtt_url: Option<url::Url>,
 
