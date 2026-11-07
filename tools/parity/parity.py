@@ -104,8 +104,9 @@ class Catalog:
         """The model, the palette, and the classes and variables TRMNL gives the
         screen element of a device with them and the default font."""
         model_name, _, palette_id = profile.partition("/")
-        if model_name not in self.models or palette_id not in self.palettes:
-            raise ValueError(f"{profile} is not a model and palette of TRMNL's catalogue")
+        model = self.models.get(model_name)
+        if model is None or palette_id not in model["palette_ids"]:
+            raise ValueError(f"{profile} is not a model and one of its palettes in TRMNL's catalogue")
         model, palette = self.models[model_name], self.palettes[palette_id]
         css = model["css"]
         classes = " ".join(
@@ -230,22 +231,36 @@ def compare(trmnl: Image.Image, afterimage: Image.Image, path: Path) -> float:
     return float((a != b).mean())
 
 
+def load(name: str, catalog: Catalog) -> dict:
+    """A case, refused before anything is drawn when it names no profile, a
+    profile outside the catalogue, or a limit that is not a share."""
+    case = yaml.safe_load((CASES / f"{name}.yaml").read_text())
+    limits = case.get("limits") or {}
+    if not limits:
+        raise ValueError(f"{name} names no profile in its limits")
+    for profile, limit in limits.items():
+        catalog.screen(profile)
+        if not isinstance(limit, (int, float)) or isinstance(limit, bool) or not 0 <= limit <= 100:
+            raise ValueError(f"{name} {profile}: a limit is a percentage from 0 to 100")
+    return case
+
+
 def main(server_binary, release_dir, pins, catalog_dir, out, names):
     release = Release(Path(release_dir), Path(pins))
     catalog = Catalog(Path(catalog_dir))
     out = Path(out)
     names = names or sorted(path.stem for path in CASES.glob("*.yaml"))
+    try:
+        cases = {name: load(name, catalog) for name in names}
+    except ValueError as error:
+        sys.exit(str(error))
     server = Server(server_binary)
     over = []
     try:
         with sync_playwright() as playwright:
             browser = playwright.firefox.launch()
-            for name in names:
-                case = yaml.safe_load((CASES / f"{name}.yaml").read_text())
-                limits = case.get("limits") or {}
-                if not limits:
-                    over.append(f"{name}, which names no profile")
-                for profile, limit in limits.items():
+            for name, case in cases.items():
+                for profile, limit in case["limits"].items():
                     trmnl = capture(browser, release, catalog, case["trmnl"], profile)
                     afterimage = server.draw(case["afterimage"], profile)
                     share = compare(trmnl, afterimage, out / name / f"{profile.replace('/', '_')}.png")
