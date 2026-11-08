@@ -3,6 +3,8 @@ import { createBrowserRouter, Navigate, redirect } from "react-router";
 
 import { DeviceDetail } from "../devices/DeviceDetail";
 import { DeviceList } from "../devices/DeviceList";
+import { PlaylistEditor } from "../playlists/PlaylistEditor";
+import { PlaylistList } from "../playlists/PlaylistList";
 import { ScreenList } from "../screens/ScreenList";
 import { AccessTokens } from "../settings/AccessTokens";
 import { HomeAssistant } from "../settings/HomeAssistant";
@@ -69,6 +71,9 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="devices" replace /> },
       { path: "devices", Component: DeviceList },
       { path: "devices/:deviceId", Component: DeviceDetail },
+      { path: "playlists", Component: PlaylistList },
+      { path: "playlists/new", Component: PlaylistEditor },
+      { path: "playlists/:playlistId", Component: PlaylistEditor },
       { path: "screens", Component: ScreenList },
       { path: "screens/new", lazy: screenEditor },
       { path: "screens/:screenId", lazy: screenEditor },

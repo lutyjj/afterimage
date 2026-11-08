@@ -1,4 +1,4 @@
-import type { Display, Screen, ScreenDocument } from "@afterimage/management-client";
+import type { Device, Display, Playlist, Screen, ScreenDocument } from "@afterimage/management-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Button,
@@ -15,37 +15,25 @@ import {
   WIDE_COLUMN_CLASS,
 } from "linen";
 import { Grid3x3, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Link, useBlocker, useLocation, useNavigate, useParams } from "react-router";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { client, displayModelsQuery, messageOf, queryClient, serverQuery } from "../../app/client";
+import { LeaveGuard } from "../../app/editing/LeaveGuard";
+import { SaveButton } from "../../app/editing/SaveButton";
+import { saveState } from "../../app/editing/saveState";
+import { useSaveShortcut } from "../../app/editing/useSaveShortcut";
 import { devicesQuery } from "../../devices/queries";
 import { Panel } from "../../panel/Panel";
+import { playlistsQuery } from "../../playlists/queries";
 import { screenQuery, screensQuery } from "../queries";
 import { Editor, type EditorHandle, type Located } from "./Editor";
 import { SourcesPanel } from "./SourcesPanel";
-import { SAVE_STATES, saveState } from "./saveState";
 import { STARTERS } from "./starters";
 import { usePreview } from "./usePreview";
 import { openingText, parseYaml, rangeOf } from "./yamlDocument";
 
 const TRAIL = [{ to: "/screens", label: "Screens" }];
-
-/** Every word the save button says, laid in the same cell so the button
- * keeps the width of the longest and its neighbour never shifts. */
-const SAVE_LABELS = [...new Set(Object.values(SAVE_STATES).map((state) => state.label))];
-
-function SaveLabel({ shown }: { shown: string }) {
-  return (
-    <span className="grid">
-      {SAVE_LABELS.map((label) => (
-        <span key={label} className={classes("col-start-1 row-start-1", label !== shown && "invisible")}>
-          {label}
-        </span>
-      ))}
-    </span>
-  );
-}
 
 /** Writing a screen: its YAML beside a preview the server draws at the display's
  * own pixels, with what each source answered and every problem in place. */
@@ -145,46 +133,20 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
     onSuccess: async () => {
       setBaseline({ text, name: name.trim() });
       await queryClient.invalidateQueries({ queryKey: screensQuery.queryKey });
+      await queryClient.invalidateQueries({ queryKey: playlistsQuery.queryKey });
       await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
       toast.show({ text: `${screen?.name ?? "The screen"} deleted` });
       void navigate("/screens");
     },
     onError: (error) => toast.show({ text: `The screen was not deleted. ${messageOf(error)}`, sticky: true }),
   });
-  const shownOn = devices?.filter((device) => device.playlist.some((entry) => entry.screenId === screen?.id)) ?? [];
+  const playlists = useQuery(playlistsQuery).data;
+  const holding = playlists?.filter((playlist) => screen !== undefined && playlist.screens.includes(screen.id)) ?? [];
+  const pinnedOn = devices?.filter((device) => screen !== undefined && device.shows.screenId === screen.id) ?? [];
 
-  // Leaving with unsaved changes asks first, inside the app and when the tab closes.
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      dirty && !save.isPending && !remove.isPending && currentLocation.pathname !== nextLocation.pathname,
-  );
-  // Set as the person chooses to leave, so the dialog closing does not stay.
-  const leaving = useRef(false);
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
-
-  // Ctrl+S or Cmd+S saves.
-  const saveRef = useRef(() => {});
-  saveRef.current = () => {
+  useSaveShortcut(() => {
     if (canSave) save.mutate();
-  };
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
-        event.preventDefault();
-        saveRef.current();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const shown =
-    SAVE_STATES[saveState({ saving: save.isPending, stored: screen !== undefined || save.isSuccess, dirty })];
+  });
 
   return (
     <div
@@ -204,13 +166,6 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
             onChange={(event) => setName(event.target.value)}
           />
         }
-        meta={
-          // The eye reads the state from the save button: quiet once saved,
-          // in ink while there is something to save.
-          <span role="status" className="sr-only">
-            {shown.status}
-          </span>
-        }
       >
         {screen && (
           <IconButton
@@ -223,14 +178,11 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
             <Trash2 aria-hidden="true" className="size-4" />
           </IconButton>
         )}
-        <Button
-          variant={shown.quiet ? "default" : "primary"}
+        <SaveButton
+          state={saveState({ saving: save.isPending, stored: screen !== undefined || save.isSuccess, dirty })}
           disabled={!canSave}
-          onClick={() => save.mutate()}
-          title="Ctrl+S"
-        >
-          <SaveLabel shown={shown.label} />
-        </Button>
+          onSave={() => save.mutate()}
+        />
       </TopBar>
 
       <div className={classes(WIDE_COLUMN_CLASS, "flex min-h-0 flex-1 flex-col gap-3 py-3")}>
@@ -411,33 +363,31 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
           open={confirmDelete}
           onOpenChange={setConfirmDelete}
           title={`Delete ${screen.name}?`}
-          detail={
-            shownOn.length > 0
-              ? `It leaves the playlists of ${shownOn.map((device) => device.name).join(", ")}, and those displays move on to their other screens.`
-              : "No display shows it."
-          }
+          detail={deleteDetail(holding, pinnedOn)}
           confirmLabel="Delete screen"
           destructive
           onConfirm={() => remove.mutate()}
         />
       )}
-      <ConfirmDialog
-        open={blocker.state === "blocked"}
-        onOpenChange={(open) => {
-          if (open || leaving.current) return;
-          blocker.reset?.();
-        }}
-        title="Leave without saving?"
+      <LeaveGuard
+        unsaved={dirty && !save.isPending && !remove.isPending}
         detail="The changes to this screen since it was last saved are lost."
-        confirmLabel="Leave"
-        destructive
-        onConfirm={() => {
-          leaving.current = true;
-          blocker.proceed?.();
-        }}
       />
     </div>
   );
+}
+
+/** What deleting the screen does to the playlists that hold it and the
+ * displays pinned on it. */
+function deleteDetail(holding: readonly Playlist[], pinnedOn: readonly Device[]): string {
+  const names = (things: ReadonlyArray<{ name: string }>) => things.map((thing) => thing.name).join(", ");
+  const parts = [
+    holding.length > 0 &&
+      `It leaves ${holding.length === 1 ? "the playlist" : "the playlists"} ${names(holding)}, whose displays move on to their other screens.`,
+    pinnedOn.length > 0 &&
+      `${names(pinnedOn)} ${pinnedOn.length === 1 ? "goes" : "go"} back to ${pinnedOn.length === 1 ? "its" : "their"} schedule.`,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" ") : "No playlist holds it.";
 }
 
 /** Where in the document a problem arose. */

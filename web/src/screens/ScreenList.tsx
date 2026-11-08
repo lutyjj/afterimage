@@ -5,16 +5,15 @@ import { Link } from "react-router";
 
 import { messageOf } from "../app/client";
 import { ago } from "../app/format";
-import { devicesQuery } from "../devices/queries";
+import { playlistsQuery } from "../playlists/queries";
 import { screensQuery } from "./queries";
 
-/** Every screen, with the displays that show it. */
+/** Every screen, with the playlists that hold it. */
 export function ScreenList() {
   const screens = useQuery(screensQuery);
-  const devices = useQuery(devicesQuery).data;
+  const playlists = useQuery(playlistsQuery).data;
   const shownOn = (id: number) =>
-    devices?.filter((device) => device.playlist.some((entry) => entry.screenId === id)).map((device) => device.name) ??
-    [];
+    playlists?.filter((playlist) => playlist.screens.includes(id)).map((playlist) => playlist.name) ?? [];
 
   return (
     <>
@@ -49,7 +48,7 @@ export function ScreenList() {
                     Screen
                   </th>
                   <th scope="col" className="px-gutter py-2.5 font-medium">
-                    Shown on
+                    In playlists
                   </th>
                   <th scope="col" className="px-gutter py-2.5 font-medium">
                     Changed
@@ -76,7 +75,7 @@ export function ScreenList() {
                           </Link>
                         </th>
                         <td className={on.length > 0 ? "px-gutter text-text-secondary" : "px-gutter text-text-muted"}>
-                          {on.length > 0 ? on.join(", ") : "No display"}
+                          {on.length > 0 ? on.join(", ") : "None"}
                         </td>
                         <td className="px-gutter whitespace-nowrap text-text-secondary tabular-nums">
                           {ago(screen.updatedAt)}

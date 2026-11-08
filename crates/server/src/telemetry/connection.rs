@@ -16,13 +16,14 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 
 use super::payloads::{
-    PLAYLIST, device_key, discovery, firmware_state, key, mac_of, overdue, screen_options, state,
+    device_key, discovery, firmware_state, key, mac_of, overdue, showing_options, state,
 };
 use super::{Change, Connection, Parts, Settings, Telemetry};
 use crate::clock::Clock;
 use crate::devices::{Changes, Device, Devices, Shows};
 use crate::firmware::{Board, Firmware};
 use crate::images::Images;
+use crate::playlists::Playlists;
 use crate::screens::Screens;
 
 /// How long the connection waits after it failed before it tries again.
@@ -156,6 +157,7 @@ impl Open {
             status,
             devices: Arc::clone(&parts.devices),
             screens: Arc::clone(&parts.screens),
+            playlists: Arc::clone(&parts.playlists),
             firmware: Arc::clone(&parts.firmware),
             images: Arc::clone(&parts.images),
             clock: Arc::clone(&parts.clock),
@@ -255,13 +257,12 @@ enum Incoming {
 
 /// What the publisher last published on a device's topics, which belong to a
 /// MAC: the device that held them, its image, whether it counted as not seen
-/// lately, and the "Showing" options Home Assistant was given, which a command
-/// names.
+/// lately, and the "Showing" options it was offered, which a command names.
 struct Published {
     device: i64,
     image: Option<String>,
     overdue: bool,
-    options: Vec<(String, i64)>,
+    options: Vec<(String, Shows)>,
 }
 
 /// A setting a command changes.
@@ -279,6 +280,7 @@ struct Publisher {
     status: String,
     devices: Arc<Devices>,
     screens: Arc<Screens>,
+    playlists: Arc<Playlists>,
     firmware: Arc<Firmware>,
     images: Arc<Images>,
     clock: Arc<dyn Clock>,
@@ -485,13 +487,17 @@ impl Publisher {
         };
         let now = self.clock.now();
         let screen = self.screen_name(device).await;
-        // Without its screens the select would offer and report the wrong
-        // thing, so the device waits for its next change instead, and the
-        // topics hold no other device's facts meanwhile, as after a removal.
-        let options = match self.screens.list(device.account_id).await {
-            Ok(screens) => screen_options(&screens),
+        // Without its playlists and screens the control would offer and report
+        // the wrong thing, so the device waits for its next change instead, and
+        // the topics hold no other device's facts meanwhile, as after a removal.
+        let offered = tokio::try_join!(
+            self.playlists.list(device.account_id),
+            self.screens.list(device.account_id)
+        );
+        let options = match offered {
+            Ok((playlists, screens)) => showing_options(&playlists, &screens),
             Err(error) => {
-                tracing::error!(%error, device = device.id, "the screens to offer could not be read");
+                tracing::error!(%error, device = device.id, "what to offer could not be read");
                 if self
                     .published
                     .get(&key)
@@ -589,8 +595,8 @@ impl Publisher {
 
     /// Applies a command to the device with this key, as the web UI would, in a
     /// task of its own, and publishes the device again. A "Showing" option is
-    /// read against the options Home Assistant was given, so it names the screen
-    /// it named there.
+    /// read against the options the device was offered, so it names what it
+    /// named there.
     fn set(&self, key: &str, setting: Setting) {
         let Some(mac) = mac_of(key) else {
             return;
@@ -606,19 +612,15 @@ impl Publisher {
                 ..Changes::default()
             },
             Setting::Showing(option) => {
-                let shows = if option == PLAYLIST {
-                    Some(Shows::Playlist)
-                } else {
-                    published.and_then(|published| {
-                        published
-                            .options
-                            .iter()
-                            .find(|(name, _)| *name == option)
-                            .map(|(_, id)| Shows::Screen(*id))
-                    })
-                };
+                let shows = published.and_then(|published| {
+                    published
+                        .options
+                        .iter()
+                        .find(|(name, _)| *name == option)
+                        .map(|(_, shows)| *shows)
+                });
                 let Some(shows) = shows else {
-                    tracing::warn!(key, option, "no screen has that option");
+                    tracing::warn!(key, option, "nothing has that option");
                     // Home Assistant shows the option it sent until told.
                     if let Some(published) = published {
                         self.telemetry.device(published.device);
@@ -642,8 +644,8 @@ impl Publisher {
                     return;
                 }
             };
-            // A screen of another account, as when the MAC changed hands since
-            // the options went out, is refused.
+            // A playlist or screen of another account, as when the MAC changed
+            // hands since the options went out, is refused.
             if let Err(error) = devices.update(device.account_id, device.id, changes).await {
                 tracing::warn!(%error, device = device.id, "a setting over MQTT was refused");
             }

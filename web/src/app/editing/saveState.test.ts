@@ -4,7 +4,7 @@ import { SAVE_STATES, saveState } from "./saveState";
 
 const shown = (inputs: Parameters<typeof saveState>[0]) => SAVE_STATES[saveState(inputs)];
 
-describe("the editor's save state", () => {
+describe("an editor's save state", () => {
   it("is a quiet Saved for a screen opened and left as it was", () => {
     expect(shown({ saving: false, stored: true, dirty: false })).toEqual({
       status: "Saved",

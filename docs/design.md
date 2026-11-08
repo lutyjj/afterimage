@@ -53,7 +53,7 @@ Every setup creates a new registration, and a user claims it in the web UI. Setu
 4. A user claims the device by entering the friendly ID in the web UI.
 
 - Anyone on the network can present a MAC, so a spoofed setup only creates a registration of its own, whose code never appears on the real device's screen.
-- A device that runs setup again shows its new code. Claiming that code for a device of the account with the same MAC moves that device to the new registration with its name, settings and playlist, and drops the old registration. Other unclaimed registrations of that MAC end on their own.
+- A device that runs setup again shows its new code. Claiming that code for a device of the account with the same MAC moves that device to the new registration with its name, settings and schedule, and drops the old registration. Other unclaimed registrations of that MAC end on their own.
 - Removing a device without a reset returns its registration to unclaimed, so the device shows its code again.
 
 | Unclaimed registrations | Limit |
@@ -90,11 +90,11 @@ Only TRMNL X sends `Percent-Charged`. For every other board the server estimates
 
 Status 0 carries the device's next screen:
 
-- The image is the next current entry of the device's playlist, drawn at the check-in. With nothing current, the device shows a screen saying so. While the device [sleeps](#sleep), it is its sleep screen instead.
-- `refresh_rate` wakes the device at its refresh interval, when the set of current entries changes, or when it falls asleep, whichever comes first; a sleeping device wakes when its sleep ends. The server keeps that wake time, and a device quiet long past it may be off or out of range.
+- The image is the next screen of the playlist the device's [schedule](#schedules) calls for, drawn at the check-in. With no playlist then, or an empty one, the device shows a screen saying so. While the device [sleeps](#sleep), it is its sleep screen instead.
+- `refresh_rate` wakes the device at its refresh interval, when its schedule calls for another playlist, or when it falls asleep, whichever comes first; a sleeping device wakes when its sleep ends. The server keeps that wake time, and a device quiet long past it may be off or out of range.
 - The image URL (`/api/images/<name>`) uses the host the device checked in at. The firmware downloads it with its `Access-Token`, and only that device may.
 - An image is named by a hash of its content, and the firmware caches by `filename`, so an unchanged screen costs no download.
-- A screen that cannot be drawn as written leaves the device on its last image, or shows what went wrong when it has none. The next check-in moves on to the entry after it.
+- A screen that cannot be drawn as written leaves the device on its last image, or shows what went wrong when it has none. The next check-in moves on to the screen after it.
 
 ### Firmware update
 
@@ -149,7 +149,7 @@ With a broker configured, the server publishes each claimed device to Home Assis
 | Not seen lately | Binary sensor, problem | On once the device is quiet past its wake by its refresh interval and ten minutes, the moment the web UI uses too |
 | Firmware | Update | Its install command starts a [firmware update](#firmware-update) to the board's newest release |
 | Sleep | Switch | Holds the device [asleep](#sleep) outside its windows until turned off |
-| Showing | Select | The playlist, or one of the account's screens pinned in its place; a name two screens share is numbered |
+| Showing | Select | "Schedule", or one of the account's playlists ("Weekend playlist") or screens pinned in its place; a name taken already is numbered |
 | Wakes every | Number | The refresh interval, 1 to 1440 minutes |
 | Button | Event | `press` when a press on the device's button woke it (firmware 1.8.18 reports `Update-Source`) |
 | Image | Image | The image the device shows, as PNG |
@@ -166,7 +166,7 @@ With a broker configured, the server publishes each claimed device to Home Assis
 | Home Assistant announces itself on its status topic | Publishes every device |
 | A device checks in or changes | Publishes that device, its image only when it changed |
 | A press on its button woke it | Publishes the button event |
-| A screen is created, renamed or deleted | Publishes every device, whose "Showing" options changed |
+| A playlist or screen is created, renamed or deleted | Publishes every device, whose "Showing" options changed |
 | A device turns not seen lately, checked every minute | Publishes that device |
 | A device is removed | Clears its topics |
 
@@ -212,9 +212,9 @@ The tools are the management operations the model tags `mcp`, read from the Open
 - The endpoint is stateless and answers JSON, since every tool is one request and one answer.
 - An answer is text, except that an image the API answers, alone or as a base64 member of its JSON such as a preview's, goes to the client as an image the agent can look at.
 
-## Screens and playlists
+## Screens, playlists and schedules
 
-A screen document holds its data sources and a tree of generic components. A device's playlist decides which screen it shows at each check-in.
+A screen document holds its data sources and a tree of generic components. A playlist holds screens in order. A device's schedule decides which playlist it shows when, and the playlist which screen it shows at each check-in.
 
 ### Screen documents
 
@@ -250,17 +250,34 @@ The components are those TRMNL's 30 published plugins use most. The design syste
 
 ### Playlists
 
-A device's playlist lists the screens it shows, each on some weekdays and between two times of day in the server's time zone. At each check-in the device shows the next current entry. One of the account's screens can be pinned in its place: the device shows it at every check-in until set back, the playlist waits where it was, and deleting the screen sets the device back.
+A playlist is one of the account's screens in order; a screen may stand in it more than once. A device on a playlist shows its next screen at each check-in and starts again at the first after the last.
+
+- Any number of devices show one playlist, and each goes through it on its own.
+- A device that comes to another playlist starts at its first screen. One that comes back to the playlist it last went through, after sleep, a pin or a gap, goes on from where it stood.
+- Changing a playlist's screens, or deleting one of them, starts every device on it again at its first screen.
+- Deleting a playlist takes it out of every schedule.
+
+### Schedules
+
+A device's schedule names the playlist it usually shows, and slots of weekdays and times of day in the server's time zone in which another playlist takes its place.
+
+| Part | Rule |
+|---|---|
+| Usual playlist | Shown while no slot is current; without one, the device shows that nothing is scheduled |
+| Slot | A playlist on some weekdays, between two times of day. One whose end comes before its start runs past midnight and belongs to the day it starts; equal times make it current all day |
+| Overlap | A device shows one playlist at a time, so the server refuses a schedule in which two slots are current in the same minute of the week, and names the first such minute |
+
+One of the account's playlists or screens can be pinned in place of the schedule: the device shows it until set back, the schedule waits, and deleting what is pinned sets the device back.
 
 ### Sleep
 
-A device sleeps in its sleep windows, which take the same weekdays and times of day as playlist entries.
+A device sleeps in its sleep windows, which take the same weekdays and times of day as schedule slots, and stand over the schedule.
 
 | While a window is current | The device |
 |---|---|
 | Shows | Its sleep screen: one of the account's screens, or the server's own, which says when it wakes. A sleep screen that cannot be drawn gives way to the server's own, so a daytime image does not stand all night |
 | Wakes | When no window is current, a day at most, so a device asleep around the clock still takes changes daily |
-| Playlist | Waits where it was, and goes on from the same entry |
+| Playlist | Waits where it was, and goes on from the same screen |
 
 A device can also be held asleep outside its windows until let go, as Home Assistant's sleep switch does. Held, it shows its sleep screen without a wake time and checks in hourly to learn of the release.
 
@@ -354,9 +371,9 @@ SQLite holds the server's records, and the data and cache directories hold its i
 |---|---|
 | Accounts, sessions, personal access tokens | Their secrets only as hashes (see [Sessions and tokens](#sessions-and-tokens)) |
 | Registrations | MAC, model, access key hash, friendly ID, end time, panel size, latest readings |
-| Devices | Owner, name, display, refresh interval, current registration, playlist position, the pinned screen, sleep screen and whether it is held asleep, the image it shows and whether it is the sleep screen, when it was asked to wake, the firmware board a user chose |
+| Devices | Owner, name, display, refresh interval, current registration, usual playlist, where it stands in the playlist it last went through, the pinned playlist or screen, sleep screen and whether it is held asleep, the image it shows with the screen and playlist it came from and whether it is the sleep screen, when it was asked to wake, the firmware board a user chose |
 | Firmware install requests | Each device's latest |
-| Screens, playlists and sleep | Screen documents, playlist entries and sleep windows |
+| Screens, playlists, schedules and sleep | Screen documents, each playlist's screens in order, schedule slots and sleep windows |
 | MQTT broker | The one the administrator saved (see [Broker settings](#broker-settings)) |
 
 | Files | Location | Lifecycle |

@@ -654,8 +654,8 @@ operation GetScreen {
     ]
 }
 
-/// Replaces the screen's name and document. Every device whose playlist holds it
-/// shows the new document from its next check-in.
+/// Replaces the screen's name and document. Every device that shows it shows the
+/// new document from its next check-in.
 @idempotent
 @http(method: "PUT", uri: "/manage/screens/{screenId}")
 @optionalAuth
@@ -685,7 +685,7 @@ operation UpdateScreen {
 
 /// Deletes the screen and takes it out of every playlist; a device that slept on
 /// it shows the server's own sleep screen instead, and one it was pinned on goes
-/// back to its playlist.
+/// back to its schedule.
 @idempotent
 @http(method: "DELETE", uri: "/manage/screens/{screenId}", code: 204)
 @optionalAuth

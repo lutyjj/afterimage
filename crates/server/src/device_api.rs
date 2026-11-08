@@ -17,6 +17,7 @@ use crate::devices::{Device, Devices};
 use crate::drawing::Drawing;
 use crate::firmware::Firmware;
 use crate::images::Images;
+use crate::playlists::Playlists;
 use crate::registrations::{CheckIn, Refusal, Registrations, Setup};
 use crate::screens::Screens;
 use crate::showing;
@@ -27,6 +28,7 @@ pub struct State {
     pub registrations: Registrations,
     pub devices: Devices,
     pub screens: Screens,
+    pub playlists: Playlists,
     pub drawing: Arc<Drawing>,
     pub images: Arc<Images>,
     pub firmware: Arc<Firmware>,
@@ -206,6 +208,7 @@ async fn get_display(
                 &device,
                 &state.devices,
                 &state.screens,
+                &state.playlists,
                 &state.drawing,
                 &state.images,
                 state.clock.now(),

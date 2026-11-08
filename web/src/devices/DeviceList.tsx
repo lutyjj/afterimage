@@ -1,4 +1,4 @@
-import type { Device, DisplayModel, ScreenSummary } from "@afterimage/management-client";
+import type { Device, DisplayModel, Playlist, ScreenSummary } from "@afterimage/management-client";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Card, CardBody, CardHead, Content, TopBar } from "linen";
 import { Plus } from "lucide-react";
@@ -7,12 +7,13 @@ import { Link } from "react-router";
 
 import { displayModelsQuery, messageOf, serverQuery } from "../app/client";
 import { Panel } from "../panel/Panel";
+import { playlistsQuery } from "../playlists/queries";
 import { screensQuery } from "../screens/queries";
 import { ClaimDialog } from "./ClaimDialog";
-import { DayStrip, dayLanes } from "./DayStrip";
+import { DayTrack, HourAxis, marksOf, namesOf } from "./DayTrack";
 import { DeviceFacts, Fact } from "./DeviceFacts";
 import { devicesQuery, findDisplay, imageUrl } from "./queries";
-import { nowIn } from "./schedule";
+import { dayOf, nowIn } from "./schedule";
 import { deviceStates, useShownStates } from "./states";
 import { StateBadge } from "./StateBadge";
 
@@ -21,6 +22,7 @@ export function DeviceList() {
   const devices = useQuery(devicesQuery);
   const models = useQuery(displayModelsQuery).data;
   const screens = useQuery(screensQuery).data;
+  const playlists = useQuery(playlistsQuery).data;
   const timeZone = useQuery(serverQuery).data?.timeZone;
   const [claiming, setClaiming] = useState(false);
   const none = devices.data?.length === 0;
@@ -46,7 +48,14 @@ export function DeviceList() {
         {devices.data && devices.data.length > 0 && (
           <ol className="grid gap-4" aria-label="Displays">
             {devices.data.map((device) => (
-              <DeviceCard key={device.id} device={device} models={models} screens={screens} timeZone={timeZone} />
+              <DeviceCard
+                key={device.id}
+                device={device}
+                models={models}
+                playlists={playlists}
+                screens={screens}
+                timeZone={timeZone}
+              />
             ))}
           </ol>
         )}
@@ -59,17 +68,18 @@ export function DeviceList() {
 function DeviceCard({
   device,
   models,
+  playlists,
   screens,
   timeZone,
 }: {
   device: Device;
   models: DisplayModel[] | undefined;
+  playlists: Playlist[] | undefined;
   screens: ScreenSummary[] | undefined;
   timeZone: string | undefined;
 }) {
   const { model, palette } = findDisplay(models, device);
-  const states = useShownStates(timeZone ? deviceStates(device, timeZone) : []);
-  const screenName = (id: number) => screens?.find((screen) => screen.id === id)?.name ?? "A screen";
+  const states = useShownStates(timeZone ? deviceStates(device, timeZone, playlists) : []);
   const now = timeZone ? nowIn(timeZone) : undefined;
 
   return (
@@ -98,7 +108,7 @@ function DeviceCard({
               </StateBadge>
             ))}
           </div>
-          <DeviceFacts device={device} screens={screens} timeZone={timeZone}>
+          <DeviceFacts device={device} playlists={playlists} screens={screens} timeZone={timeZone}>
             <Fact label="Display">{model?.label ?? device.display.model}</Fact>
           </DeviceFacts>
           {now && timeZone && (
@@ -106,15 +116,25 @@ function DeviceCard({
               <h3 className="text-sm font-medium text-text-secondary">
                 Today <span className="font-normal text-text-muted">in {timeZone}</span>
               </h3>
-              <DayStrip
-                day={now.day}
-                now={now.minute}
-                lanes={dayLanes(
-                  device.playlist.map((entry) => ({ hours: entry, name: screenName(entry.screenId) })),
-                  device.sleep.windows,
-                )}
-                label={`${device.name}'s playlist and sleep today`}
-              />
+              <div className="grid gap-1">
+                <DayTrack
+                  marks={marksOf(
+                    dayOf(
+                      {
+                        schedule: device.schedule,
+                        windows: device.sleep.windows,
+                        shows: device.shows,
+                        held: device.sleepHeld,
+                      },
+                      now.day,
+                    ),
+                    namesOf(playlists, screens),
+                  )}
+                  now={now.minute}
+                  label={`What ${device.name} shows today`}
+                />
+                <HourAxis />
+              </div>
             </div>
           )}
         </div>

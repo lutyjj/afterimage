@@ -65,14 +65,15 @@ testers.runNixOSTest {
         "name": "Alex Example", "username": "alex", "password": "correct-horse-battery",
     })
 
-    # Claimed and given a screen, the device gets a drawn image at its next
-    # check-in: Typst, the PNG encoder and the image store run under the
-    # unit's hardening.
+    # Claimed and given a playlist of one screen, the device gets a drawn
+    # image at its next check-in: Typst, the PNG encoder and the image store
+    # run under the unit's hardening.
     device = manage("POST", "/devices", {"code": first["friendly_id"]})["device"]
     screen = manage("POST", "/screens", {
         "name": "Hello", "document": {"content": {"title": {"text": "Hello"}}},
     })["screen"]
-    manage("PUT", f"/devices/{device['id']}/playlist", {"playlist": [{"screenId": screen["id"]}]})
+    playlist = manage("POST", "/playlists", {"name": "Hello", "screens": [screen["id"]]})["playlist"]
+    manage("PUT", f"/devices/{device['id']}/schedule", {"schedule": {"playlistId": playlist["id"], "slots": []}})
     drawn = json.loads(machine.succeed(
         "curl -sf http://127.0.0.1:8080/api/display"
         f" -H 'ID: 41:B4:10:39:A1:01' -H 'Access-Token: {first['api_key']}'"

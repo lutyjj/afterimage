@@ -4,13 +4,14 @@ import { Link, useParams } from "react-router";
 
 import { displayModelsQuery, messageOf, serverQuery } from "../app/client";
 import { Panel } from "../panel/Panel";
+import { playlistsQuery } from "../playlists/queries";
 import { screensQuery } from "../screens/queries";
 import { Aside, DeviceFacts, Fact } from "./DeviceFacts";
 import { DeviceFirmware } from "./DeviceFirmware";
 import { DeviceSettings } from "./DeviceSettings";
-import { PlaylistEditor } from "./PlaylistEditor";
 import { deviceQuery, findDisplay, imageUrl } from "./queries";
 import { RemoveDevice } from "./RemoveDevice";
+import { ScheduleEditor } from "./ScheduleEditor";
 import { SleepEditor } from "./SleepEditor";
 import { deviceStates, useShownStates } from "./states";
 import { StateBadge } from "./StateBadge";
@@ -22,8 +23,9 @@ export function DeviceDetail() {
   const device = useQuery(deviceQuery(deviceId));
   const models = useQuery(displayModelsQuery).data;
   const screens = useQuery(screensQuery).data;
+  const playlists = useQuery(playlistsQuery).data;
   const timeZone = useQuery(serverQuery).data?.timeZone;
-  const states = useShownStates(device.data && timeZone ? deviceStates(device.data, timeZone) : []);
+  const states = useShownStates(device.data && timeZone ? deviceStates(device.data, timeZone, playlists) : []);
 
   if (device.isPending) {
     return <TopBar trail={TRAIL} title="Display" />;
@@ -67,14 +69,14 @@ export function DeviceDetail() {
               colors={palette?.colors}
               paletteName={palette?.name}
             />
-            <DeviceFacts device={data} screens={screens} timeZone={timeZone}>
+            <DeviceFacts device={data} playlists={playlists} screens={screens} timeZone={timeZone}>
               <Fact label="Hardware">
                 {data.firmwareModel}
                 <Aside> {data.mac}</Aside>
               </Fact>
             </DeviceFacts>
           </Card>
-          <PlaylistEditor device={data} screens={screens} timeZone={timeZone} />
+          <ScheduleEditor device={data} playlists={playlists} screens={screens} timeZone={timeZone} />
           <SleepEditor device={data} screens={screens} timeZone={timeZone} />
           <DeviceSettings device={data} models={models} />
           <DeviceFirmware device={data} timeZone={timeZone} />

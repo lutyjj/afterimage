@@ -4,9 +4,9 @@
 //! whether it counts as not seen lately are binary sensors; its firmware is an
 //! update entity whose install asks the device to install its board's newest
 //! release (step 4 of the design's Devices); a switch holds it asleep, a select
-//! pins one of its account's screens in place of its playlist, a number sets
-//! how often it wakes, a press on its button is an event, and the image it
-//! shows is an image entity.
+//! pins one of its account's playlists or screens in place of its schedule, a
+//! number sets how often it wakes, a press on its button is an event, and the
+//! image it shows is an image entity.
 //!
 //! Topics, under the base topic (`afterimage` unless configured), where `<device>`
 //! is the device's MAC in lowercase hexadecimal:
@@ -27,8 +27,8 @@
 //! Everything but the commands and the button is retained, so a subscriber that
 //! joins later reads the last state. The server publishes every device again
 //! when it connects, when Home Assistant announces itself on
-//! `<prefix>/status`, and when an account's screens change, since they are the
-//! select's options; one device whenever it checks in or changes; and a device
+//! `<prefix>/status`, and when an account's playlists or screens change, since
+//! they are the select's options; one device whenever it checks in or changes; and a device
 //! whose not-seen-lately state turns, checked every minute. On connecting it
 //! also reads the retained state topics back and clears those of devices that
 //! are gone, so a device removed while the broker was out of reach does not
@@ -60,6 +60,7 @@ use crate::clock::Clock;
 use crate::devices::Devices;
 use crate::firmware::Firmware;
 use crate::images::Images;
+use crate::playlists::Playlists;
 use crate::screens::Screens;
 
 /// Where and how to publish.
@@ -147,7 +148,8 @@ enum Change {
     Removed(String),
     /// A press on the device's button woke it.
     Pressed(i64),
-    /// Every device, such as when screens, the select's options, change.
+    /// Every device, such as when playlists or screens, the select's options,
+    /// change.
     All,
 }
 
@@ -161,6 +163,7 @@ enum Command {
 struct Parts {
     devices: Arc<Devices>,
     screens: Arc<Screens>,
+    playlists: Arc<Playlists>,
     firmware: Arc<Firmware>,
     images: Arc<Images>,
     clock: Arc<dyn Clock>,
@@ -186,6 +189,7 @@ impl Telemetry {
         settings: Option<Settings>,
         devices: Devices,
         screens: Screens,
+        playlists: Playlists,
         firmware: Arc<Firmware>,
         images: Arc<Images>,
         clock: Arc<dyn Clock>,
@@ -193,6 +197,7 @@ impl Telemetry {
         let parts = Parts {
             devices: Arc::new(devices),
             screens: Arc::new(screens),
+            playlists: Arc::new(playlists),
             firmware,
             images,
             clock,
@@ -267,9 +272,9 @@ impl Telemetry {
         self.send(Command::Change(Change::Pressed(id)));
     }
 
-    /// Publishes every device again, such as after an account's screens, which
-    /// the select offers, changed.
-    pub fn screens_changed(&self) {
+    /// Publishes every device again, after an account's playlists or screens,
+    /// which the select offers, changed.
+    pub fn options_changed(&self) {
         self.send(Command::Change(Change::All));
     }
 

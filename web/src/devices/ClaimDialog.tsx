@@ -23,7 +23,7 @@ export function ClaimDialog({ open, onOpenChange }: { open: boolean; onOpenChang
       change(false);
       toast.show({
         text: replaced
-          ? `${device.name} set up again. It keeps its name, settings and playlist.`
+          ? `${device.name} set up again. It keeps its name, settings and schedule.`
           : `${device.name} claimed. It shows its first screen at its next check-in.`,
       });
       void navigate(`/devices/${device.id}`);

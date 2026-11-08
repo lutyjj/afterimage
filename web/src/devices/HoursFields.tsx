@@ -5,7 +5,7 @@ import { daysLabel, type Hours, isAllDay, shortDay, WEEK } from "./schedule";
 
 type Change = Partial<Hours & { allDay: boolean }>;
 
-/** When a playlist entry or a sleep window is current: its days, then all day or
+/** When a schedule slot or a sleep window is current: its days, then all day or
  * the times between. A fragment, so the row that holds it lays the two out;
  * `timed` is the window an item takes when it stops being all day. */
 export function HoursFields({

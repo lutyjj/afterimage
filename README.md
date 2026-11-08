@@ -26,7 +26,7 @@ Each setting is an environment variable or the flag `afterimage --help` lists be
 | `AFTERIMAGE_CACHE_DIR` | `cache` in the data directory | Files the server can fetch again, such as firmware images |
 | `AFTERIMAGE_URL` | | The address browsers use, such as `https://afterimage.example`. OIDC needs it; an `https` address makes cookies `Secure` |
 | `AFTERIMAGE_WEB_DIR` | | The built web UI |
-| `AFTERIMAGE_TIME_ZONE` | The host's | The time zone of playlists and of dates on screens, such as `Europe/Berlin` |
+| `AFTERIMAGE_TIME_ZONE` | The host's | The time zone of schedules and of dates on screens, such as `Europe/Berlin` |
 | `AFTERIMAGE_TRMNL_URL` | `https://trmnl.com` | TRMNL's site, which publishes the firmware displays install |
 | `AFTERIMAGE_PASSWORD_SIGN_IN` | `true` | Whether people may sign in with a password; `false` needs OIDC |
 | `AFTERIMAGE_OIDC_ISSUER` | | The OIDC provider. Its client allows the redirect `<AFTERIMAGE_URL>/manage/auth/oidc/callback` |

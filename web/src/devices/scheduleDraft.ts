@@ -1,6 +1,6 @@
 import { type Hours, isAllDay } from "./schedule";
 
-/** A playlist entry or sleep window while it is edited. */
+/** A schedule slot or sleep window while it is edited. */
 export type Draft<T extends Hours> = T & {
   key: number;
   /** Chosen with the row's checkbox, so times typed equal on the way to another

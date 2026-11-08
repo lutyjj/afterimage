@@ -13,7 +13,7 @@ export interface Step {
 }
 
 /** When the device checks in next: when the server asked it to wake, which
- * counts its playlist and its sleep. */
+ * counts its schedule and its sleep. */
 export function nextCheckIn(device: Device): Date | undefined {
   return device.wakesAt;
 }

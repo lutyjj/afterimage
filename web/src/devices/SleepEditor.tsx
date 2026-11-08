@@ -17,9 +17,9 @@ import { Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
-import { DayStrip } from "./DayStrip";
+import { DayTrack, HourAxis } from "./DayTrack";
 import { HoursFields } from "./HoursFields";
-import { daysLabel, windowLabel } from "./schedule";
+import { hoursLabel, spansOn } from "./schedule";
 import { type Draft, draftOf, entryOf, newKey, sameAs } from "./scheduleDraft";
 import { deviceQuery, devicesQuery } from "./queries";
 
@@ -129,7 +129,8 @@ export function SleepEditor({
           {dirty && (
             <Button
               onClick={() => {
-                setWindows(draftOf(saved.windows));
+                // The rows it keeps stay the same rows, not new arrivals.
+                setWindows((current) => draftOf(saved.windows, current));
                 setScreenId(saved.screenId);
               }}
             >
@@ -179,16 +180,18 @@ function WindowRow({
         <X aria-hidden="true" className="size-4" />
       </IconButton>
       <div className="col-span-2 grid gap-1">
-        <DayStrip
-          day="monday"
-          lanes={[{ hours: [{ ...saved, days: undefined }], name: "" }]}
-          hours={last}
-          names={false}
-          label={`${daysLabel(saved.days)}, ${windowLabel(saved)}`}
+        {/* The window alone, on any one of its days. */}
+        <DayTrack
+          marks={spansOn({ ...saved, days: undefined }, "monday").map(([start, end]) => ({
+            start,
+            end,
+            label: "Asleep",
+            tone: "asleep",
+          }))}
+          label={hoursLabel(saved)}
         />
-        <span className="text-xs text-text-muted">
-          {daysLabel(saved.days)}, {windowLabel(saved)}
-        </span>
+        {last && <HourAxis />}
+        <span className="text-xs text-text-muted">{hoursLabel(saved)}</span>
       </div>
     </SettlingItem>
   );

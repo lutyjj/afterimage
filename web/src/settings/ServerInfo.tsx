@@ -25,7 +25,7 @@ export function ServerInfo() {
           <SettingRow title="Release">
             <span className="text-sm tabular-nums">{server.data.version}</span>
           </SettingRow>
-          <SettingRow title="Time zone" description="Playlists keep its time, and screens show dates in it.">
+          <SettingRow title="Time zone" description="Schedules keep its time, and screens show dates in it.">
             <span className="text-sm">{server.data.timeZone}</span>
           </SettingRow>
           <SettingRow

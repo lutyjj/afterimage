@@ -35,7 +35,7 @@ export function RemoveDevice({ device }: { device: Device }) {
     <Card>
       <SettingRow
         title={`Remove ${device.name}`}
-        description="Take it off this server, keeping or erasing its Wi-Fi setup. Its playlist and settings go either way; screens stay."
+        description="Take it off this server, keeping or erasing its Wi-Fi setup. Its schedule and settings go either way; playlists and screens stay."
       >
         <Button
           variant="destructive"
@@ -52,7 +52,7 @@ export function RemoveDevice({ device }: { device: Device }) {
         open={open}
         onOpenChange={setOpen}
         title={`Remove ${device.name}?`}
-        detail="Its playlist and settings go either way. Screens stay."
+        detail="Its schedule and settings go either way. Playlists and screens stay."
         confirmLabel={choice === "reset" ? "Remove and reset" : "Remove"}
         destructive
         width="34rem"

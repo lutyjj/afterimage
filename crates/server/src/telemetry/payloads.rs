@@ -1,6 +1,6 @@
 //! What the server publishes about a device: the key that names it in topics,
-//! its state and firmware as Home Assistant's entities read them, the names its
-//! screens take as options, and its discovery payload.
+//! its state and firmware as Home Assistant's entities read them, the names of
+//! what it can show while awake, and its discovery payload.
 
 use std::str::FromStr;
 
@@ -11,31 +11,48 @@ use serde_json::{Value, json};
 use super::Settings;
 use crate::devices::{Device, Shows};
 use crate::firmware::{self, Board, Firmware};
+use crate::playlists::Playlist;
 use crate::screens::Summary;
 
-/// The option of the "Showing" select that follows the playlist.
-pub(super) const PLAYLIST: &str = "Playlist";
+/// The "Showing" option that follows the device's schedule.
+pub(super) const SCHEDULE: &str = "Schedule";
 
 /// The "Wakes every" number's bounds, which the model's `RefreshMinutes` sets
 /// (a test holds them to it).
 const FEWEST_MINUTES: i32 = 1;
 const MOST_MINUTES: i32 = 1440;
 
-/// The account's screens as the "Showing" select names them, after its
-/// playlist: each by its name, a name two screens share numbered by age, so an
-/// option names one screen.
-pub(super) fn screen_options(screens: &[Summary]) -> Vec<(String, i64)> {
-    let mut sorted: Vec<&Summary> = screens.iter().collect();
-    sorted.sort_by_key(|screen| screen.id);
-    let mut options: Vec<(String, i64)> = Vec::new();
-    for screen in sorted {
-        let mut name = screen.name.clone();
+/// What a device of the account can show while awake, as the "Showing"
+/// command and state name it: its schedule, then each playlist as "<name>
+/// playlist", then each screen by its name. A name taken already is numbered,
+/// each kind by age, so an option names one thing.
+pub(super) fn showing_options(playlists: &[Playlist], screens: &[Summary]) -> Vec<(String, Shows)> {
+    let mut playlists: Vec<&Playlist> = playlists.iter().collect();
+    playlists.sort_by_key(|playlist| playlist.id);
+    let mut screens: Vec<&Summary> = screens.iter().collect();
+    screens.sort_by_key(|screen| screen.id);
+    let named = playlists
+        .into_iter()
+        .map(|playlist| {
+            (
+                format!("{} playlist", playlist.name),
+                Shows::Playlist(playlist.id),
+            )
+        })
+        .chain(
+            screens
+                .into_iter()
+                .map(|screen| (screen.name.clone(), Shows::Screen(screen.id))),
+        );
+    let mut options = vec![(SCHEDULE.to_owned(), Shows::Schedule)];
+    for (name, shows) in named {
+        let mut option = name.clone();
         let mut count = 1;
-        while name == PLAYLIST || options.iter().any(|(taken, _)| *taken == name) {
+        while options.iter().any(|(taken, _)| *taken == option) {
             count += 1;
-            name = format!("{} ({count})", screen.name);
+            option = format!("{name} ({count})");
         }
-        options.push((name, screen.id));
+        options.push((option, shows));
     }
     options
 }
@@ -79,15 +96,12 @@ fn timestamp(seconds: Option<i64>) -> Option<String> {
 /// What the device's entities read: its readings, the screen it shows, whether
 /// it sleeps and is held asleep, when it wakes, whether it counts as not seen
 /// lately at `now`, how often it wakes, and what it shows while awake as the
-/// "Showing" option (`options` from [`screen_options`]).
-pub(super) fn state(device: &Device, screen: &str, options: &[(String, i64)], now: i64) -> Value {
-    let showing = match device.shows {
-        Shows::Playlist => PLAYLIST.to_owned(),
-        Shows::Screen(id) => options
-            .iter()
-            .find(|(_, option)| *option == id)
-            .map_or_else(|| PLAYLIST.to_owned(), |(name, _)| name.clone()),
-    };
+/// "Showing" option (`options` from [`showing_options`]).
+pub(super) fn state(device: &Device, screen: &str, options: &[(String, Shows)], now: i64) -> Value {
+    let showing = options
+        .iter()
+        .find(|(_, shows)| *shows == device.shows)
+        .map_or(SCHEDULE, |(name, _)| name.as_str());
     json!({
         "battery": device.readings.battery_percent.map(f64::round),
         "voltage": device.readings.battery_voltage,
@@ -161,7 +175,7 @@ pub(super) fn discovery(
     settings: &Settings,
     key: &str,
     device: &Device,
-    options: &[(String, i64)],
+    options: &[(String, Shows)],
 ) -> Value {
     let base = &settings.topic;
     let id = |entity: &str| format!("{base}_{key}_{entity}");
@@ -259,7 +273,7 @@ pub(super) fn discovery(
 /// The device's controls in Home Assistant: a switch that holds it asleep, a
 /// select of what it shows while awake, how often it wakes, its button's
 /// presses, and the image it shows.
-fn controls(base: &str, key: &str, options: &[(String, i64)]) -> serde_json::Map<String, Value> {
+fn controls(base: &str, key: &str, options: &[(String, Shows)]) -> serde_json::Map<String, Value> {
     let id = |entity: &str| format!("{base}_{key}_{entity}");
     let state_topic = format!("{base}/{key}/state");
     json!({
@@ -280,9 +294,7 @@ fn controls(base: &str, key: &str, options: &[(String, i64)]) -> serde_json::Map
             "state_topic": state_topic,
             "value_template": "{{ value_json.showing }}",
             "command_topic": format!("{base}/{key}/showing/set"),
-            "options": std::iter::once(PLAYLIST.to_owned())
-                .chain(options.iter().map(|(name, _)| name.clone()))
-                .collect::<Vec<_>>(),
+            "options": options.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>(),
         },
         "refresh": {
             "platform": "number",
@@ -333,25 +345,39 @@ mod tests {
     }
 
     #[test]
-    fn every_screen_option_names_one_screen() {
+    fn every_option_names_one_thing() {
         let screen = |id: i64, name: &str| Summary {
             id,
             name: name.to_owned(),
             updated_at: 0,
         };
-        let options = screen_options(&[
-            screen(3, "Weather"),
-            screen(1, "Weather"),
-            screen(2, "Playlist"),
-            screen(4, "Weather (2)"),
-        ]);
+        let playlist = |id: i64, name: &str| Playlist {
+            id,
+            name: name.to_owned(),
+            screens: Vec::new(),
+        };
+        let options = showing_options(
+            &[playlist(2, "Mornings"), playlist(1, "Mornings")],
+            &[
+                screen(3, "Weather"),
+                screen(1, "Weather"),
+                screen(2, "Schedule"),
+                screen(4, "Weather (2)"),
+                screen(5, "Mornings playlist"),
+            ],
+        );
+        let named = |name: &str, shows| (name.to_owned(), shows);
         assert_eq!(
             options,
             [
-                ("Weather".to_owned(), 1),
-                ("Playlist (2)".to_owned(), 2),
-                ("Weather (2)".to_owned(), 3),
-                ("Weather (2) (2)".to_owned(), 4),
+                named("Schedule", Shows::Schedule),
+                named("Mornings playlist", Shows::Playlist(1)),
+                named("Mornings playlist (2)", Shows::Playlist(2)),
+                named("Weather", Shows::Screen(1)),
+                named("Schedule (2)", Shows::Screen(2)),
+                named("Weather (2)", Shows::Screen(3)),
+                named("Weather (2) (2)", Shows::Screen(4)),
+                named("Mornings playlist (3)", Shows::Screen(5)),
             ]
         );
     }

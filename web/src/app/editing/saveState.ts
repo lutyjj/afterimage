@@ -1,4 +1,4 @@
-/** Where the editor's work stands against the screen the server holds. */
+/** Where an editor's work stands against what the server holds. */
 export type SaveState = "new" | "unsaved" | "saving" | "saved";
 
 export function saveState({
@@ -7,7 +7,7 @@ export function saveState({
   dirty,
 }: {
   saving: boolean;
-  /** The server holds the screen: it was opened, or saved once already. */
+  /** The server holds it: it was opened, or saved once already. */
   stored: boolean;
   dirty: boolean;
 }): SaveState {

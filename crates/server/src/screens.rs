@@ -119,19 +119,22 @@ impl Screens {
         .await
     }
 
-    /// Deletes the screen, and with it every playlist entry that shows it; a
-    /// device that slept on it shows the server's own sleep screen instead.
-    /// `false` when the account has no such screen.
+    /// Deletes the screen, and with it its place in every playlist; a device
+    /// that slept on it shows the server's own sleep screen instead, and one
+    /// pinned on it goes back to its schedule. `false` when the account has no
+    /// such screen.
     ///
     /// # Errors
     ///
     /// When storage fails.
     pub async fn delete(&self, account_id: i64, id: i64) -> Result<bool, sqlx::Error> {
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
-        // A playlist that loses an entry starts again at its first.
+        // A device going through a playlist that loses a screen starts it again
+        // at its first.
         sqlx::query!(
             "UPDATE devices SET playlist_position = NULL
-             WHERE account_id = ? AND id IN (SELECT device_id FROM playlist_entries WHERE screen_id = ?)",
+             WHERE account_id = ?
+               AND position_playlist_id IN (SELECT playlist_id FROM playlist_screens WHERE screen_id = ?)",
             account_id,
             id
         )

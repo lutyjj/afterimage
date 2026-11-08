@@ -1,22 +1,24 @@
 //! What a claimed device shows at a check-in: its sleep screen while it sleeps
-//! or is held asleep, else its pinned screen or the next current entry of its
-//! playlist, drawn now, or one of the server's own screens.
+//! or is held asleep, else its pinned screen or the next screen of the playlist
+//! its pin or its schedule calls for, drawn now, or one of the server's own
+//! screens.
 //!
-//! A playlist screen that cannot be drawn as written (a data source down, a
-//! template error) leaves the device on the image it shows, so a passing outage
-//! does not blank the display; a device with no image yet, or one just woken
-//! from its sleep screen, shows what went wrong.
-//! With no current entry, the device shows a screen saying so. A sleep screen
-//! that cannot be drawn gives way to the server's own, which says when the
-//! device wakes, so a daytime image does not stand all night.
+//! A screen that cannot be drawn as written (a data source down, a template
+//! error) leaves the device on the image it shows, so a passing outage does not
+//! blank the display; a device with no image yet, or one just woken from its
+//! sleep screen, shows what went wrong. With no playlist, or an empty one, the
+//! device shows a screen saying so. A sleep screen that cannot be drawn gives
+//! way to the server's own, which says when the device wakes, so a daytime
+//! image does not stand all night.
 
 use afterimage_render_typst::Renderer;
 use afterimage_trmnl::catalog::{Catalog, Model, Palette};
 use serde_json::{Value, json};
 
-use crate::devices::{Device, Devices, Entry, Showing, Shows};
+use crate::devices::{Device, Devices, Position, Showing, Shows};
 use crate::drawing::{self, Drawing, Problem};
 use crate::images::Images;
+use crate::playlists::{Playlist, Playlists};
 use crate::schedule;
 use crate::screens::Screens;
 
@@ -36,8 +38,8 @@ pub struct Shown {
 pub enum Error {
     #[error(transparent)]
     Devices(#[from] crate::devices::Error),
-    #[error("screen storage: {0}")]
-    Screens(#[from] sqlx::Error),
+    #[error("screen or playlist storage: {0}")]
+    Storage(#[from] sqlx::Error),
     #[error("image storage: {0}")]
     Images(#[from] std::io::Error),
     #[error("the server's own screen could not be drawn: {0}")]
@@ -72,6 +74,7 @@ pub async fn next(
     device: &Device,
     devices: &Devices,
     screens: &Screens,
+    playlists: &Playlists,
     drawing: &Drawing,
     images: &Images,
     now: i64,
@@ -79,13 +82,11 @@ pub async fn next(
     let at = jiff::Timestamp::from_second(now)
         .unwrap_or(jiff::Timestamp::UNIX_EPOCH)
         .to_zoned(drawing.time_zone().zone().clone());
-    let playlist: &[Entry] = match device.shows {
-        Shows::Playlist => &device.playlist,
-        Shows::Screen(_) => &[],
-    };
+    // A pinned playlist or screen follows no schedule.
+    let followed = matches!(device.shows, Shows::Schedule).then_some(&device.schedule);
     let in_window = schedule::asleep(&device.sleep.windows, &at);
     let wait = schedule::wait(
-        playlist,
+        followed,
         &device.sleep.windows,
         device.sleep_held,
         device.refresh_minutes,
@@ -104,24 +105,36 @@ pub async fn next(
     // The server's own screens share the check-in's time with the screen drawn first.
     let places_by = Drawing::places_deadline();
     let (model, palette) = display(device);
-    // A pinned screen stands in for the playlist, which waits where it was.
-    let (position, screen) = match device.shows {
-        Shows::Screen(screen_id) => (device.playlist_position, Some(screen_id)),
-        Shows::Playlist => {
-            let position = schedule::next(&device.playlist, device.playlist_position, &at);
-            (
-                position,
-                position.map(|position| device.playlist[position].screen_id),
-            )
-        }
+    let playlist_id = match device.shows {
+        Shows::Screen(_) => None,
+        Shows::Playlist(id) => Some(id),
+        Shows::Schedule => device.schedule.playlist_at(&at),
     };
+    let on = match playlist_id {
+        Some(id) => playlists.get(device.account_id, id).await?,
+        None => None,
+    };
+    let (screen, position) = match device.shows {
+        Shows::Screen(screen_id) => (Some(screen_id), device.position),
+        Shows::Playlist(_) | Shows::Schedule => on
+            .as_ref()
+            .and_then(|playlist| step(playlist, device.position))
+            .map_or((None, device.position), |(screen, position)| {
+                (Some(screen), Some(position))
+            }),
+    };
+    let playlist_id = on.as_ref().map(|playlist| playlist.id);
     let drawn = if let Some(screen_id) = screen {
         drawn_screen(device, screens, drawing, screen_id, now)
             .await?
             .map(|bytes| (bytes, Some(screen_id)))
     } else {
+        let nothing = nothing_to_show(
+            &device.name,
+            on.as_ref().map(|playlist| playlist.name.as_str()),
+        );
         let image = drawing
-            .draw_resolved(nothing_to_show(&device.name), model, palette, places_by)
+            .draw_resolved(nothing, model, palette, places_by)
             .await
             .map_err(Error::Fallback)?;
         Ok((image.bytes, None))
@@ -137,8 +150,8 @@ pub async fn next(
                 .as_ref()
                 .filter(|showing| !showing.asleep && images.has(device.id, &showing.image))
             {
-                // The device keeps its image, and the playlist moves past the entry
-                // that failed, so the next check-in shows the entry after it.
+                // The device keeps its image, and the playlist moves past the screen
+                // that failed, so the next check-in shows the one after it.
                 devices
                     .show(device.id, position, showing, now + wait)
                     .await?;
@@ -154,7 +167,34 @@ pub async fn next(
             (image.bytes, None)
         }
     };
-    shown.record(&bytes, screen_id, position, false).await
+    shown
+        .record(
+            &bytes,
+            Drawn {
+                screen_id,
+                playlist_id,
+                asleep: false,
+            },
+            position,
+        )
+        .await
+}
+
+/// The screen to show next in `playlist`, and where the device then stands in
+/// it: the one after the device's position there, or the first when the device
+/// last went through another playlist; `None` for an empty playlist.
+fn step(playlist: &Playlist, position: Option<Position>) -> Option<(i64, Position)> {
+    let last = position
+        .filter(|position| position.playlist_id == playlist.id)
+        .map(|position| position.index);
+    let index = schedule::next(playlist.screens.len(), last)?;
+    Some((
+        playlist.screens[index],
+        Position {
+            playlist_id: playlist.id,
+            index,
+        },
+    ))
 }
 
 /// The device's sleep screen, or the server's own when it has none or it
@@ -173,9 +213,12 @@ async fn asleep(
     if let Some(screen_id) = device.sleep.screen_id {
         match drawn_screen(device, screens, drawing, screen_id, shown.now).await? {
             Ok(bytes) => {
-                return shown
-                    .record(&bytes, Some(screen_id), device.playlist_position, true)
-                    .await;
+                let drawn = Drawn {
+                    screen_id: Some(screen_id),
+                    playlist_id: None,
+                    asleep: true,
+                };
+                return shown.record(&bytes, drawn, device.position).await;
             }
             Err(Failed { name, problems }) => log_problems(device.id, &name, &problems),
         }
@@ -195,9 +238,12 @@ async fn asleep(
         )
         .await
         .map_err(Error::Fallback)?;
-    shown
-        .record(&image.bytes, None, device.playlist_position, true)
-        .await
+    let drawn = Drawn {
+        screen_id: None,
+        playlist_id: None,
+        asleep: true,
+    };
+    shown.record(&image.bytes, drawn, device.position).await
 }
 
 /// A screen that could not be drawn as written, and why.
@@ -246,6 +292,16 @@ fn log_problems(device: i64, screen: &str, problems: &[Problem]) {
     }
 }
 
+/// What an image was drawn from.
+struct Drawn {
+    /// `None` for one of the server's own screens.
+    screen_id: Option<i64>,
+    /// The playlist the device was on.
+    playlist_id: Option<i64>,
+    /// Whether it is the device's sleep screen.
+    asleep: bool,
+}
+
 /// The check-in being answered, which records what the device shows.
 struct Record<'a> {
     device: &'a Device,
@@ -257,13 +313,13 @@ struct Record<'a> {
 }
 
 impl Record<'_> {
-    /// Saves the image and records it as what the device shows until it wakes.
+    /// Saves the image and records it as what the device shows until it wakes,
+    /// and where the device now stands in its playlist.
     async fn record(
         &self,
         bytes: &[u8],
-        screen_id: Option<i64>,
-        position: Option<usize>,
-        asleep: bool,
+        drawn: Drawn,
+        position: Option<Position>,
     ) -> Result<Shown, Error> {
         let device = self.device;
         let image = self.images.save(device.id, bytes)?;
@@ -274,9 +330,10 @@ impl Record<'_> {
             .map_or(self.now, |showing| showing.rendered_at);
         let showing = Showing {
             image: image.clone(),
-            screen_id,
+            screen_id: drawn.screen_id,
+            playlist_id: drawn.playlist_id,
             rendered_at,
-            asleep,
+            asleep: drawn.asleep,
         };
         self.devices
             .show(device.id, position, &showing, self.now + self.wait)
@@ -307,13 +364,20 @@ fn sleeping(device: &str, at: &jiff::Zoned, wakes: Option<&jiff::Zoned>) -> Valu
     })
 }
 
-/// The server's screen for a device whose playlist has nothing current.
-fn nothing_to_show(device: &str) -> Value {
+/// The server's screen for a device with no playlist now, or with the named
+/// one, which has no screens.
+fn nothing_to_show(device: &str, playlist: Option<&str>) -> Value {
+    let why = match playlist {
+        Some(playlist) => format!("The playlist {playlist} has no screens. Add one in Afterimage."),
+        None => {
+            "Nothing is scheduled now. Choose a playlist for this display in Afterimage.".to_owned()
+        }
+    };
     json!({
         "titleBar": { "title": "Afterimage", "instance": device },
         "content": { "column": { "align": "center", "justify": "center", "gap": "medium", "grow": false, "children": [
             { "title": { "text": "Nothing to show", "size": "large" } },
-            { "description": { "text": "Add a screen to this device's playlist in Afterimage." } }
+            { "description": { "text": why } }
         ] } }
     })
 }

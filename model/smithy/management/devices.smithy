@@ -115,8 +115,9 @@ structure Device {
     @required
     refreshMinutes: RefreshMinutes
 
+    /// Which playlist the device shows when, while awake.
     @required
-    playlist: Playlist
+    schedule: Schedule
 
     @required
     readings: Readings
@@ -164,6 +165,10 @@ structure Showing {
     /// for an empty playlist or the one that says when it wakes.
     screenId: Id
 
+    /// The playlist the device was on at the check-in, by its schedule or pinned;
+    /// absent while it shows a pinned screen, sleeps, or has no playlist then.
+    playlistId: Id
+
     @required
     renderedAt: Instant
 
@@ -176,21 +181,34 @@ structure Showing {
 @range(min: 1, max: 1440)
 integer RefreshMinutes
 
-/// The screens a device shows, in order. At each check-in the device shows the
-/// next entry whose days and hours include now, and wakes again after its refresh
-/// interval, when the set of current entries changes, or when it falls asleep,
-/// whichever comes first.
-@length(max: 32)
-list Playlist {
-    member: PlaylistEntry
-}
+/// Which playlist an awake device shows when. While a slot is current the
+/// device shows the slot's playlist, and otherwise its usual one. At each
+/// check-in it shows the playlist's next screen, and wakes again after its
+/// refresh interval, when another slot or the usual playlist takes over, or when
+/// it falls asleep, whichever comes first. A playlist that takes over starts at
+/// its first screen.
+structure Schedule {
+    /// The playlist shown while no slot is current; absent shows that nothing is
+    /// scheduled.
+    playlistId: Id
 
-structure PlaylistEntry with [Hours] {
+    /// No two slots are current at once.
     @required
-    screenId: Id
+    slots: ScheduleSlots
 }
 
-/// When a playlist entry or a sleep window is current, in the server's time
+@length(max: 32)
+list ScheduleSlots {
+    member: ScheduleSlot
+}
+
+/// Days and times another playlist takes the usual one's place.
+structure ScheduleSlot with [Hours] {
+    @required
+    playlistId: Id
+}
+
+/// When a schedule slot or a sleep window is current, in the server's time
 /// zone.
 @mixin
 structure Hours {
@@ -206,20 +224,23 @@ structure Hours {
     until: TimeOfDay
 }
 
-/// What an awake device shows. A pinned screen stays until set back to the
-/// playlist, which waits where it was; deleting the screen sets it back.
+/// What an awake device shows. A pinned playlist or screen stays until set back
+/// to the schedule; deleting it sets the device back.
 union Shows {
-    /// Its playlist.
-    playlist: Unit
+    /// Its schedule.
+    schedule: Unit
 
-    /// One screen, at every check-in.
+    /// One playlist, whatever the schedule says.
+    playlistId: Id
+
+    /// One screen, at every check-in; the playlist waits where it was.
     screenId: Id
 }
 
 /// When a device sleeps. While a window is current the device shows its sleep
 /// screen and does not wake until no window is, or for a day at most; its
 /// playlist waits where it was. Awake, it wakes again at the next window's
-/// start at the latest.
+/// start at the latest. Sleep windows stand over the schedule.
 structure Sleep {
     /// Empty for a device that never sleeps.
     @required
@@ -269,7 +290,7 @@ operation ListDisplayModels {
     }
 }
 
-/// The account's devices, with their playlists, readings and the screen each
+/// The account's devices, with their schedules, readings and the screen each
 /// shows now.
 @readonly
 @http(method: "GET", uri: "/manage/devices")
@@ -284,7 +305,7 @@ operation ListDevices {
 
 /// Claims the device showing `code`. When the account already has a device with
 /// the same MAC, that device takes the new registration and keeps its name,
-/// settings and playlist; its old registration ends.
+/// settings and schedule; its old registration ends.
 @http(method: "POST", uri: "/manage/devices", code: 201)
 @optionalAuth
 @tags(["mcp"])
@@ -312,7 +333,7 @@ operation ClaimDevice {
     ]
 }
 
-/// One device, with its playlist, readings and the screen it shows now.
+/// One device, with its schedule, readings and the screen it shows now.
 @readonly
 @http(method: "GET", uri: "/manage/devices/{deviceId}")
 @optionalAuth
@@ -374,19 +395,20 @@ operation UpdateDevice {
     ]
 }
 
-/// Replaces the device's playlist.
+/// Replaces which playlist the device shows when, from its next check-in. A
+/// schedule whose slots are current at once is refused.
 @idempotent
-@http(method: "PUT", uri: "/manage/devices/{deviceId}/playlist")
+@http(method: "PUT", uri: "/manage/devices/{deviceId}/schedule")
 @optionalAuth
 @tags(["mcp"])
-operation SetPlaylist {
+operation SetSchedule {
     input := {
         @required
         @httpLabel
         deviceId: Id
 
         @required
-        playlist: Playlist
+        schedule: Schedule
     }
 
     output := {

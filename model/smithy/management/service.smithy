@@ -39,17 +39,18 @@ namespace afterimage.management
 use aws.protocols#restJson1
 use smithy.framework#ValidationException
 
-/// The API the web UI uses: sign-in, devices, their firmware, screens and their
+/// The API the web UI uses: sign-in, devices and their firmware, screens,
 /// playlists, and the personal access tokens scripts and agents use instead.
 ///
 /// A screen is a document of components that templates fill from data sources.
 /// `PreviewScreen` draws a document on a display and answers the image, what each
 /// source returned and every problem, so a document is checked before
-/// `CreateScreen` or `UpdateScreen` saves it. A device shows the screens of its
-/// playlist (`SetPlaylist`) in turn, each on its days and between its times in the
-/// server's time zone (`GetServer`, which also names the secrets source requests
-/// may read), and sleeps in its sleep windows (`SetSleep`), which take the same
-/// days and times.
+/// `CreateScreen` or `UpdateScreen` saves it. A playlist (`CreatePlaylist`) is
+/// screens shown in turn, and any number of devices show it. A device's schedule
+/// (`SetSchedule`) names the playlist it usually shows and the slots of days and
+/// times, in the server's time zone (`GetServer`, which also names the secrets
+/// source requests may read), when another one takes its place. It sleeps in its
+/// sleep windows (`SetSleep`), which take the same days and times.
 ///
 /// Every operation needs a credential except those that exist to start a
 /// session (`GetSignInOptions`, `CreateFirstAccount`, `SignIn`,
@@ -78,7 +79,7 @@ service Management {
         ClaimDevice
         GetDevice
         UpdateDevice
-        SetPlaylist
+        SetSchedule
         SetSleep
         DeleteDevice
         GetDeviceImage
@@ -91,6 +92,11 @@ service Management {
         UpdateScreen
         DeleteScreen
         PreviewScreen
+        ListPlaylists
+        CreatePlaylist
+        GetPlaylist
+        UpdatePlaylist
+        DeletePlaylist
         GetServer
         GetMqttSettings
         UpdateMqttSettings

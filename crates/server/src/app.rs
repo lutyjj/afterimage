@@ -28,6 +28,7 @@ use crate::firmware::Firmware;
 use crate::images::Images;
 use crate::keys::Entropy;
 use crate::oidc::Oidc;
+use crate::playlists::Playlists;
 use crate::registrations::Registrations;
 use crate::screens::Screens;
 use crate::secrets::Secrets;
@@ -80,6 +81,18 @@ async fn broker(config: &Config, saved: &Saved) -> Result<Option<telemetry::Sett
         .ok())
 }
 
+/// The zone the settings name, or else the host's. Schedule times and dates on
+/// screens are in it, and the web UI shows times in it, so it needs a name.
+fn time_zone(config: &Config) -> Result<TimeZone, Error> {
+    match config.time_zone.as_deref() {
+        Some(name) => TimeZone::named(name)
+            .map_err(|error| Error::Settings(format!("the time zone {name}: {error}"))),
+        None => TimeZone::system().ok_or_else(|| {
+            Error::Settings("the host's time zone has no name; set the time zone".to_owned())
+        }),
+    }
+}
+
 /// Opens the database under the data directory and builds the router.
 ///
 /// # Errors
@@ -103,15 +116,7 @@ pub async fn build(
             "turning password sign-in off needs an OIDC provider".to_owned(),
         ));
     }
-    // Playlist times and dates on screens are in this zone, and the web UI shows
-    // times in it, so it needs a name.
-    let time_zone = match config.time_zone.as_deref() {
-        Some(name) => TimeZone::named(name)
-            .map_err(|error| Error::Settings(format!("the time zone {name}: {error}")))?,
-        None => TimeZone::system().ok_or_else(|| {
-            Error::Settings("the host's time zone has no name; set the time zone".to_owned())
-        })?,
-    };
+    let time_zone = time_zone(config)?;
     std::fs::create_dir_all(&config.data_dir).map_err(Error::DataDir)?;
     let pool = database::open(&config.data_dir.join("afterimage.db")).await?;
     let oidc = match (oidc_settings, config.public_url.as_deref()) {
@@ -142,6 +147,7 @@ pub async fn build(
         broker(config, &saved_broker).await?,
         Devices::new(pool.clone(), Arc::clone(&clock)),
         Screens::new(pool.clone(), Arc::clone(&clock)),
+        Playlists::new(pool.clone()),
         Arc::clone(&firmware),
         Arc::clone(&images),
         Arc::clone(&clock),
@@ -151,6 +157,7 @@ pub async fn build(
         registrations: Registrations::new(pool.clone(), Arc::clone(&clock), Arc::clone(&entropy)),
         devices: Devices::new(pool.clone(), Arc::clone(&clock)),
         screens: Screens::new(pool.clone(), Arc::clone(&clock)),
+        playlists: Playlists::new(pool.clone()),
         drawing: Arc::clone(&drawing),
         images: Arc::clone(&images),
         firmware: Arc::clone(&firmware),
@@ -170,7 +177,8 @@ pub async fn build(
             Arc::clone(&entropy),
         )),
         devices: Devices::new(pool.clone(), Arc::clone(&clock)),
-        screens: Screens::new(pool, Arc::clone(&clock)),
+        screens: Screens::new(pool.clone(), Arc::clone(&clock)),
+        playlists: Playlists::new(pool),
         oidc,
         landing: config.landing(),
         cookies: CookiePolicy::new(config.public_url_is_https()),

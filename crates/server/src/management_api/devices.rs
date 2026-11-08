@@ -1,4 +1,4 @@
-//! Display models, claiming devices, their settings and playlists.
+//! Display models, claiming devices, their settings, schedules and sleep.
 
 use afterimage_management_api::model::{self, DeviceName, FirmwareBoardName};
 use afterimage_management_api::server::Extension;
@@ -133,7 +133,9 @@ pub async fn update_device(
     {
         Ok(device) => device.ok_or_else(not_found)?,
         Err(
-            error @ (devices::Error::UnsupportedDisplay { .. } | devices::Error::UnknownScreen(_)),
+            error @ (devices::Error::UnsupportedDisplay { .. }
+            | devices::Error::UnknownScreen(_)
+            | devices::Error::UnknownPlaylist(_)),
         ) => {
             return Err(invalid(error.to_string()).into());
         }
@@ -148,29 +150,24 @@ pub async fn update_device(
     })
 }
 
-pub async fn set_playlist(
-    input: input::SetPlaylistInput,
+pub async fn set_schedule(
+    input: input::SetScheduleInput,
     Extension(state): Shared,
     caller: Caller,
-) -> Result<output::SetPlaylistOutput, error::SetPlaylistError> {
-    let playlist: Vec<_> = input
-        .playlist
-        .inner()
-        .iter()
-        .map(wire::stored_entry)
-        .collect();
+) -> Result<output::SetScheduleOutput, error::SetScheduleError> {
+    let schedule = wire::stored_schedule(&input.schedule);
     let device = match state
         .devices
-        .set_playlist(caller.account.id, *input.device_id.inner(), &playlist)
+        .set_schedule(caller.account.id, *input.device_id.inner(), &schedule)
         .await
     {
         Ok(device) => device.ok_or_else(not_found)?,
-        Err(error @ devices::Error::UnknownScreen(_)) => {
+        Err(error @ (devices::Error::UnknownPlaylist(_) | devices::Error::Overlap(_))) => {
             return Err(invalid(error.to_string()).into());
         }
         Err(error) => return Err(internal(&error).into()),
     };
-    Ok(output::SetPlaylistOutput {
+    Ok(output::SetScheduleOutput {
         device: shown(&state, device)?,
     })
 }

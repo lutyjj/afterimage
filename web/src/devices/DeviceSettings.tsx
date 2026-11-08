@@ -18,7 +18,7 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
   const toast = useToast();
 
   // Settings saved elsewhere replace the fields this form has not touched, as the
-  // playlist does.
+  // schedule does.
   const stored = {
     name: device.name,
     model: device.display.model,
@@ -103,7 +103,7 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
           <Select label="Colors" choices={paletteChoices} value={palette} onValueChange={setPalette} />
           <Select
             label="Wakes at least every"
-            hint="Sooner when its playlist changes. Waking more often drains the battery faster."
+            hint="Sooner when its schedule calls for another playlist. Waking more often drains the battery faster."
             choices={refreshChoices.map((minutes) => ({ value: String(minutes), label: minutesLabel(minutes) }))}
             value={String(refresh)}
             onValueChange={(value) => setRefresh(Number(value))}

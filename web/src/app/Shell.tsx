@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { AccountMenu, Button, MenuChoice, type Place, SegmentedControl, Shell as Frame } from "linen";
-import { LogOut, PanelsTopLeft, Settings, Tablet } from "lucide-react";
+import { ListVideo, LogOut, PanelsTopLeft, Settings, Tablet } from "lucide-react";
 import { Form, Outlet, useLocation, useNavigation } from "react-router";
 
 import { accountQuery } from "./client";
@@ -11,6 +11,7 @@ const HOME = { to: "/", label: "Afterimage" };
 
 const PLACES: readonly Place[] = [
   { to: "/devices", label: "Devices", icon: Tablet },
+  { to: "/playlists", label: "Playlists", icon: ListVideo },
   { to: "/screens", label: "Screens", icon: PanelsTopLeft },
   { to: "/settings", label: "Settings", icon: Settings },
 ];

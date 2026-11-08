@@ -1,4 +1,4 @@
-//! Claimed devices: an account's name, display settings, playlist and sleep for
+//! Claimed devices: an account's name, display settings, schedule and sleep for
 //! the registration a device holds.
 //!
 //! Claiming moves a registration out of the unclaimed state ([`crate::registrations`])
@@ -20,6 +20,7 @@ use sqlx::{Sqlite, SqlitePool, Transaction};
 use crate::clock::Clock;
 use crate::firmware;
 use crate::registrations::IDLE_SECONDS;
+use crate::schedule::{Hours, Overlap, Schedule, Slot};
 
 /// A new device's minutes between check-ins, TRMNL's default refresh rate.
 pub const DEFAULT_REFRESH_MINUTES: i64 = 15;
@@ -32,29 +33,22 @@ pub struct Display {
     pub palette: String,
 }
 
-/// When a playlist entry or a sleep window is current. Days are bits, Monday as
-/// 1 through Sunday as 64; times are minutes after midnight.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Hours {
-    pub days: Option<u8>,
-    pub from_minute: Option<u16>,
-    pub until_minute: Option<u16>,
-}
-
-/// One playlist entry: a screen and when it is current.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Entry {
-    pub screen_id: i64,
-    pub hours: Hours,
-}
-
-/// What an awake device shows: its playlist, or one screen pinned until set
-/// back.
+/// What an awake device shows: its schedule, or one playlist or screen pinned
+/// until set back.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Shows {
     #[default]
-    Playlist,
+    Schedule,
+    Playlist(i64),
     Screen(i64),
+}
+
+/// Where a device stands in a playlist: the position it showed last. Another
+/// playlist starts at its first screen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Position {
+    pub playlist_id: i64,
+    pub index: usize,
 }
 
 /// When a device sleeps, and the screen it shows meanwhile; `None` for the
@@ -72,6 +66,9 @@ pub struct Showing {
     pub image: String,
     /// The screen it was drawn from; `None` for one of the server's own.
     pub screen_id: Option<i64>,
+    /// The playlist the device was on; `None` for a pinned screen, a sleep
+    /// screen, or a check-in without a playlist.
+    pub playlist_id: Option<i64>,
     pub rendered_at: i64,
     /// Whether it is the device's sleep screen.
     pub asleep: bool,
@@ -88,7 +85,7 @@ pub struct Device {
     pub panel: Option<(u32, u32)>,
     pub display: Display,
     pub refresh_minutes: i64,
-    pub playlist: Vec<Entry>,
+    pub schedule: Schedule,
     pub shows: Shows,
     pub sleep: Sleep,
     /// Held asleep outside its sleep windows until let go.
@@ -97,8 +94,8 @@ pub struct Device {
     pub seen_at: Option<i64>,
     /// When the server asked the device to check in next.
     pub wakes_at: Option<i64>,
-    /// The playlist position shown last.
-    pub playlist_position: Option<usize>,
+    /// Where it stands in the playlist it showed last.
+    pub position: Option<Position>,
     pub showing: Option<Showing>,
     /// The firmware board a user chose, a name from TRMNL's firmware list.
     pub firmware_board: Option<String>,
@@ -156,6 +153,10 @@ pub enum Error {
     UnsupportedDisplay { model: String, palette: String },
     #[error("screen {0} does not exist")]
     UnknownScreen(i64),
+    #[error("playlist {0} does not exist")]
+    UnknownPlaylist(i64),
+    #[error("{0}")]
+    Overlap(Overlap),
 }
 
 pub struct Devices {
@@ -313,7 +314,7 @@ impl Devices {
         self.holding(registration).await
     }
 
-    /// Records the image a device now shows, the playlist position it came from,
+    /// Records the image a device now shows, where it stands in its playlist,
     /// and when the device was asked to check in next.
     ///
     /// # Errors
@@ -322,18 +323,22 @@ impl Devices {
     pub async fn show(
         &self,
         id: i64,
-        position: Option<usize>,
+        position: Option<Position>,
         showing: &Showing,
         wakes_at: i64,
     ) -> Result<(), Error> {
-        let position = position.and_then(|position| i64::try_from(position).ok());
+        let playlist = position.map(|position| position.playlist_id);
+        let index = position.and_then(|position| i64::try_from(position.index).ok());
         sqlx::query!(
-            "UPDATE devices SET playlist_position = ?, image_name = ?, image_screen_id = ?, rendered_at = ?,
+            "UPDATE devices SET position_playlist_id = ?, playlist_position = ?, image_name = ?,
+                                image_screen_id = ?, image_playlist_id = ?, rendered_at = ?,
                                 image_asleep = ?, wakes_at = ?
              WHERE id = ?",
-            position,
+            playlist,
+            index,
             showing.image,
             showing.screen_id,
+            showing.playlist_id,
             showing.rendered_at,
             showing.asleep,
             wakes_at,
@@ -461,25 +466,21 @@ impl Devices {
             firmware::updates::withdraw_unsent(&mut tx, id).await?;
         }
         if let Some(shows) = changes.shows {
-            let pinned = match shows {
-                Shows::Playlist => None,
+            let (screen, playlist) = match shows {
+                Shows::Schedule => (None, None),
+                Shows::Playlist(playlist_id) => {
+                    owned_playlist(&mut tx, account_id, playlist_id).await?;
+                    (None, Some(playlist_id))
+                }
                 Shows::Screen(screen_id) => {
-                    let screen = sqlx::query_scalar!(
-                        "SELECT id FROM screens WHERE id = ? AND account_id = ?",
-                        screen_id,
-                        account_id
-                    )
-                    .fetch_optional(&mut *tx)
-                    .await?;
-                    if screen.is_none() {
-                        return Err(Error::UnknownScreen(screen_id));
-                    }
-                    Some(screen_id)
+                    owned_screen(&mut tx, account_id, screen_id).await?;
+                    (Some(screen_id), None)
                 }
             };
             sqlx::query!(
-                "UPDATE devices SET pinned_screen_id = ? WHERE id = ?",
-                pinned,
+                "UPDATE devices SET pinned_screen_id = ?, pinned_playlist_id = ? WHERE id = ?",
+                screen,
+                playlist,
                 id
             )
             .execute(&mut *tx)
@@ -509,18 +510,21 @@ impl Devices {
         Ok(device)
     }
 
-    /// Replaces the device's playlist.
+    /// Replaces the device's schedule.
     ///
     /// # Errors
     ///
-    /// `UnknownScreen` for a screen the account does not have; otherwise when
-    /// storage fails.
-    pub async fn set_playlist(
+    /// `UnknownPlaylist` for a playlist the account does not have, `Overlap`
+    /// for slots current at once; otherwise when storage fails.
+    pub async fn set_schedule(
         &self,
         account_id: i64,
         id: i64,
-        playlist: &[Entry],
+        schedule: &Schedule,
     ) -> Result<Option<Device>, Error> {
+        if let Some(overlap) = schedule.overlap() {
+            return Err(Error::Overlap(overlap));
+        }
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let owned = sqlx::query_scalar!(
             "SELECT id FROM devices WHERE id = ? AND account_id = ?",
@@ -532,36 +536,33 @@ impl Devices {
         if owned.is_none() {
             return Ok(None);
         }
-        sqlx::query!("DELETE FROM playlist_entries WHERE device_id = ?", id)
-            .execute(&mut *tx)
-            .await?;
-        // A new playlist starts at its first entry.
+        let named = schedule
+            .playlist_id
+            .into_iter()
+            .chain(schedule.slots.iter().map(|slot| slot.playlist_id));
+        for playlist_id in named {
+            owned_playlist(&mut tx, account_id, playlist_id).await?;
+        }
         sqlx::query!(
-            "UPDATE devices SET playlist_position = NULL WHERE id = ?",
+            "UPDATE devices SET playlist_id = ? WHERE id = ?",
+            schedule.playlist_id,
             id
         )
         .execute(&mut *tx)
         .await?;
-        for (position, entry) in (0_i64..).zip(playlist) {
-            let screen = sqlx::query_scalar!(
-                "SELECT id FROM screens WHERE id = ? AND account_id = ?",
-                entry.screen_id,
-                account_id
-            )
-            .fetch_optional(&mut *tx)
+        sqlx::query!("DELETE FROM schedule_slots WHERE device_id = ?", id)
+            .execute(&mut *tx)
             .await?;
-            if screen.is_none() {
-                return Err(Error::UnknownScreen(entry.screen_id));
-            }
+        for (position, slot) in (0_i64..).zip(&schedule.slots) {
             sqlx::query!(
-                "INSERT INTO playlist_entries (device_id, position, screen_id, days, from_minute, until_minute)
+                "INSERT INTO schedule_slots (device_id, position, playlist_id, days, from_minute, until_minute)
                  VALUES (?, ?, ?, ?, ?, ?)",
                 id,
                 position,
-                entry.screen_id,
-                entry.hours.days,
-                entry.hours.from_minute,
-                entry.hours.until_minute
+                slot.playlist_id,
+                slot.hours.days,
+                slot.hours.from_minute,
+                slot.hours.until_minute
             )
             .execute(&mut *tx)
             .await?;
@@ -595,16 +596,7 @@ impl Devices {
             return Ok(None);
         }
         if let Some(screen_id) = sleep.screen_id {
-            let screen = sqlx::query_scalar!(
-                "SELECT id FROM screens WHERE id = ? AND account_id = ?",
-                screen_id,
-                account_id
-            )
-            .fetch_optional(&mut *tx)
-            .await?;
-            if screen.is_none() {
-                return Err(Error::UnknownScreen(screen_id));
-            }
+            owned_screen(&mut tx, account_id, screen_id).await?;
         }
         sqlx::query!(
             "UPDATE devices SET sleep_screen_id = ? WHERE id = ?",
@@ -673,6 +665,40 @@ impl Devices {
     }
 }
 
+/// Refuses a screen the account does not have.
+async fn owned_screen(
+    tx: &mut Transaction<'_, Sqlite>,
+    account_id: i64,
+    id: i64,
+) -> Result<(), Error> {
+    sqlx::query_scalar!(
+        "SELECT id FROM screens WHERE id = ? AND account_id = ?",
+        id,
+        account_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .map(drop)
+    .ok_or(Error::UnknownScreen(id))
+}
+
+/// Refuses a playlist the account does not have.
+async fn owned_playlist(
+    tx: &mut Transaction<'_, Sqlite>,
+    account_id: i64,
+    id: i64,
+) -> Result<(), Error> {
+    sqlx::query_scalar!(
+        "SELECT id FROM playlists WHERE id = ? AND account_id = ?",
+        id,
+        account_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .map(drop)
+    .ok_or(Error::UnknownPlaylist(id))
+}
+
 /// Days and times as the store keeps them.
 fn hours(days: Option<i64>, from_minute: Option<i64>, until_minute: Option<i64>) -> Hours {
     Hours {
@@ -680,6 +706,24 @@ fn hours(days: Option<i64>, from_minute: Option<i64>, until_minute: Option<i64>)
         from_minute: from_minute.and_then(|minute| u16::try_from(minute).ok()),
         until_minute: until_minute.and_then(|minute| u16::try_from(minute).ok()),
     }
+}
+
+/// What an awake device shows, as the store keeps its pins: a write pins a
+/// screen or a playlist, never both.
+fn shows(screen: Option<i64>, playlist: Option<i64>) -> Shows {
+    match (screen, playlist) {
+        (Some(screen), _) => Shows::Screen(screen),
+        (None, Some(playlist)) => Shows::Playlist(playlist),
+        (None, None) => Shows::Schedule,
+    }
+}
+
+/// Where a device stands in a playlist, as the store keeps it.
+fn position(playlist_id: Option<i64>, index: Option<i64>) -> Option<Position> {
+    Some(Position {
+        playlist_id: playlist_id?,
+        index: usize::try_from(index?).ok()?,
+    })
 }
 
 /// A panel size as registrations store it.
@@ -694,10 +738,11 @@ async fn load(
 ) -> Result<Option<Device>, sqlx::Error> {
     let Some(row) = sqlx::query!(
         "SELECT devices.id, devices.account_id, devices.name, devices.display_model, devices.palette,
-                devices.refresh_minutes, devices.playlist_position, devices.image_name,
-                devices.image_screen_id, devices.rendered_at, devices.image_asleep,
+                devices.refresh_minutes, devices.playlist_id, devices.position_playlist_id,
+                devices.playlist_position, devices.image_name, devices.image_screen_id,
+                devices.image_playlist_id, devices.rendered_at, devices.image_asleep,
                 devices.firmware_board, devices.sleep_screen_id, devices.wakes_at,
-                devices.pinned_screen_id, devices.sleep_held,
+                devices.pinned_screen_id, devices.pinned_playlist_id, devices.sleep_held,
                 registrations.mac, registrations.model, registrations.width, registrations.height,
                 registrations.seen_at, registrations.battery_voltage,
                 registrations.battery_percent, registrations.signal_dbm,
@@ -712,17 +757,17 @@ async fn load(
     else {
         return Ok(None);
     };
-    let playlist = sqlx::query!(
-        "SELECT screen_id, days, from_minute, until_minute FROM playlist_entries
+    let slots = sqlx::query!(
+        "SELECT playlist_id, days, from_minute, until_minute FROM schedule_slots
          WHERE device_id = ? ORDER BY position",
         id
     )
     .fetch_all(&mut **tx)
     .await?
     .into_iter()
-    .map(|entry| Entry {
-        screen_id: entry.screen_id,
-        hours: hours(entry.days, entry.from_minute, entry.until_minute),
+    .map(|slot| Slot {
+        playlist_id: slot.playlist_id,
+        hours: hours(slot.days, slot.from_minute, slot.until_minute),
     })
     .collect();
     let windows = sqlx::query!(
@@ -741,6 +786,7 @@ async fn load(
         .map(|(image, rendered_at)| Showing {
             image,
             screen_id: row.image_screen_id,
+            playlist_id: row.image_playlist_id,
             rendered_at,
             asleep: row.image_asleep != 0,
         });
@@ -757,8 +803,11 @@ async fn load(
             palette: row.palette,
         },
         refresh_minutes: row.refresh_minutes,
-        playlist,
-        shows: row.pinned_screen_id.map_or(Shows::Playlist, Shows::Screen),
+        schedule: Schedule {
+            playlist_id: row.playlist_id,
+            slots,
+        },
+        shows: shows(row.pinned_screen_id, row.pinned_playlist_id),
         sleep: Sleep {
             windows,
             screen_id: row.sleep_screen_id,
@@ -772,9 +821,7 @@ async fn load(
         },
         seen_at: row.seen_at,
         wakes_at: row.wakes_at,
-        playlist_position: row
-            .playlist_position
-            .and_then(|position| usize::try_from(position).ok()),
+        position: position(row.position_playlist_id, row.playlist_position),
         showing,
         firmware_board: row.firmware_board,
         firmware_update,

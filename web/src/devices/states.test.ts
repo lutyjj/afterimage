@@ -1,4 +1,4 @@
-import type { Device } from "@afterimage/management-client";
+import type { Device, Playlist } from "@afterimage/management-client";
 import { describe, expect, it } from "vitest";
 
 import { deviceStates, endedStates, type DeviceState } from "./states";
@@ -6,6 +6,10 @@ import { deviceStates, endedStates, type DeviceState } from "./states";
 // Friday 6 November 2026, 12:00 in Berlin.
 const NOW = new Date("2026-11-06T11:00:00Z");
 const ZONE = "Europe/Berlin";
+const PLAYLISTS: Playlist[] = [
+  { id: 1, name: "Usual", screens: [1] },
+  { id: 2, name: "Mornings", screens: [] },
+];
 
 function device(change: Partial<Device>): Device {
   return {
@@ -15,8 +19,8 @@ function device(change: Partial<Device>): Device {
     firmwareModel: "og",
     display: { model: "og_png", palette: "bw" },
     refreshMinutes: 15,
-    playlist: [{ screenId: 1 }],
-    shows: { playlist: {} },
+    schedule: { playlistId: 1, slots: [] },
+    shows: { schedule: {} },
     sleep: { windows: [] },
     sleepHeld: false,
     readings: {},
@@ -32,25 +36,34 @@ const keys = (states: DeviceState[]) => states.map((state) => state.key);
 
 describe("deviceStates", () => {
   it("names nothing for a device that checked in and has a current screen", () => {
-    expect(keys(deviceStates(device({}), ZONE, NOW))).toEqual([]);
+    expect(keys(deviceStates(device({}), ZONE, PLAYLISTS, NOW))).toEqual([]);
   });
 
   it("waits for the first check-in of a device never seen", () => {
-    expect(keys(deviceStates(device({ seenAt: undefined }), ZONE, NOW))).toEqual(["never-seen"]);
+    expect(keys(deviceStates(device({ seenAt: undefined }), ZONE, PLAYLISTS, NOW))).toEqual(["never-seen"]);
   });
 
   it("calls a device quiet past the moment the server names not seen lately", () => {
     const at = (minutes: number) => device({ overdueAt: new Date(NOW.getTime() + minutes * 60_000) });
-    expect(keys(deviceStates(at(0), ZONE, NOW))).toEqual([]);
-    expect(keys(deviceStates(at(-1), ZONE, NOW))).toEqual(["not-seen"]);
+    expect(keys(deviceStates(at(0), ZONE, PLAYLISTS, NOW))).toEqual([]);
+    expect(keys(deviceStates(at(-1), ZONE, PLAYLISTS, NOW))).toEqual(["not-seen"]);
   });
 
-  it("says nothing is scheduled when no entry is current in the server's time zone", () => {
-    expect(keys(deviceStates(device({ playlist: [] }), ZONE, NOW))).toEqual(["nothing-scheduled"]);
+  it("says nothing is scheduled when no playlist is, in the server's time zone", () => {
+    const none = device({ schedule: { slots: [] } });
+    expect(keys(deviceStates(none, ZONE, PLAYLISTS, NOW))).toEqual(["nothing-scheduled"]);
     // 08:00 to 11:30 in Berlin has ended by 12:00 there, though not in UTC.
-    const morning = device({ playlist: [{ screenId: 1, from: "08:00", until: "11:30" }] });
-    expect(keys(deviceStates(morning, ZONE, NOW))).toEqual(["nothing-scheduled"]);
-    expect(keys(deviceStates(morning, "UTC", NOW))).toEqual([]);
+    const morning = device({ schedule: { slots: [{ playlistId: 1, from: "08:00", until: "11:30" }] } });
+    expect(keys(deviceStates(morning, ZONE, PLAYLISTS, NOW))).toEqual(["nothing-scheduled"]);
+    expect(keys(deviceStates(morning, "UTC", PLAYLISTS, NOW))).toEqual([]);
+  });
+
+  it("names an empty playlist, once the playlists are read, and minds no pin to a screen", () => {
+    const mornings = device({ schedule: { playlistId: 2, slots: [] } });
+    expect(keys(deviceStates(mornings, ZONE, PLAYLISTS, NOW))).toEqual(["empty-playlist"]);
+    expect(keys(deviceStates(mornings, ZONE, undefined, NOW))).toEqual([]);
+    expect(keys(deviceStates({ ...mornings, shows: { screenId: 4 } }, ZONE, PLAYLISTS, NOW))).toEqual([]);
+    expect(keys(deviceStates({ ...mornings, shows: { playlistId: 1 } }, ZONE, PLAYLISTS, NOW))).toEqual([]);
   });
 });
 
@@ -66,7 +79,7 @@ describe("endedStates", () => {
     expect(keys(endedStates(ended, [], [state("never-seen")]))).toEqual([]);
   });
 
-  it("lets a device sleep through the night unmissed, with nothing missing from its playlist", () => {
+  it("lets a device sleep through the night unmissed, with nothing missing from its schedule", () => {
     // 06:30 Friday in Berlin: asleep since its check-in at 23:00 Thursday, due at
     // 07:00, so the server counts it not seen lately only from 07:25.
     const dawn = new Date("2026-11-06T05:30:00Z");
@@ -74,13 +87,13 @@ describe("endedStates", () => {
       seenAt: new Date("2026-11-05T22:00:00Z"),
       wakesAt: new Date("2026-11-06T06:00:00Z"),
       overdueAt: new Date("2026-11-06T06:25:00Z"),
-      playlist: [{ screenId: 1, from: "08:00", until: "20:00" }],
+      schedule: { slots: [{ playlistId: 1, from: "08:00", until: "20:00" }] },
       sleep: { windows: [{ from: "23:00", until: "07:00" }] },
     });
-    expect(keys(deviceStates(sleeping, ZONE, dawn))).toEqual([]);
+    expect(keys(deviceStates(sleeping, ZONE, PLAYLISTS, dawn))).toEqual([]);
     expect(
-      keys(deviceStates({ ...sleeping, sleep: { windows: [] } }, ZONE, dawn)),
-      "awake at that hour, its playlist has nothing current",
+      keys(deviceStates({ ...sleeping, sleep: { windows: [] } }, ZONE, PLAYLISTS, dawn)),
+      "awake at that hour, its schedule has nothing current",
     ).toEqual(["nothing-scheduled"]);
   });
 });

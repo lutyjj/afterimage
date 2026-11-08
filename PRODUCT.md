@@ -16,7 +16,7 @@ The person who runs an Afterimage server for a household or a small group: they 
 
 ## Product Purpose
 
-Afterimage is a self-hosted server for TRMNL e-paper displays. It onboards devices, draws screens from the data the user points it at (Home Assistant, any JSON over HTTP), and serves each display the screen its playlist calls for. Success is a display that shows the right thing at the right time and needs no attention after setup.
+Afterimage is a self-hosted server for TRMNL e-paper displays. It onboards devices, draws screens from the data the user points it at (Home Assistant, any JSON over HTTP), and serves each display the screen its schedule calls for. Success is a display that shows the right thing at the right time and needs no attention after setup.
 
 ## Positioning
 
@@ -26,7 +26,8 @@ One small server and one contract: the Smithy model defines every API, and scree
 
 - Claiming: a new device shows a six-character code; the user types it into the web UI.
 - Screens: a YAML document (data sources, a title bar, components with Jinja templates), edited beside a preview drawn by the server at the device's real size, with what each source answered and every problem located in the document.
-- Playlists: each device shows its screens in order, on chosen weekdays and between times of day; it wakes when its refresh interval ends, the set of current screens changes, or it falls asleep.
+- Playlists: screens in order, which any number of displays show in turn, one at each check-in.
+- Schedules: each display usually shows one playlist, and others on chosen weekdays and between times of day, which never overlap; one playlist or screen can be pinned in place of the schedule. It wakes when its refresh interval ends, another playlist takes over, or it falls asleep.
 - Sleep: each device sleeps in windows of the same weekdays and times, showing a sleep screen and waking when they end, which saves its battery.
 - Devices report battery, signal and firmware at each check-in; displays sleep between check-ins and cannot be woken from the server.
 - Sign-in: a password for the first account, and an OIDC provider for everyone else when configured.

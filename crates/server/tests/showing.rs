@@ -76,12 +76,48 @@ async fn screen(server: &common::Server, name: &str, document: Value) -> i64 {
     body["screen"]["id"].as_i64().unwrap()
 }
 
-async fn play(server: &common::Server, device: i64, playlist: Value) {
+async fn playlist(server: &common::Server, name: &str, screens: &[i64]) -> i64 {
+    let (status, body) = server
+        .call(
+            "POST",
+            "/manage/playlists",
+            Some(json!({ "name": name, "screens": screens })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    body["playlist"]["id"].as_i64().unwrap()
+}
+
+async fn set_schedule(
+    server: &common::Server,
+    device: i64,
+    schedule: Value,
+) -> (StatusCode, Value) {
+    server
+        .call(
+            "PUT",
+            &format!("/manage/devices/{device}/schedule"),
+            Some(json!({ "schedule": schedule })),
+        )
+        .await
+}
+
+/// Gives the device a playlist of these screens to show usually.
+async fn play(server: &common::Server, device: i64, screens: &[i64]) -> i64 {
+    let id = playlist(server, "Usual", screens).await;
+    let (status, body) =
+        set_schedule(server, device, json!({ "playlistId": id, "slots": [] })).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    id
+}
+
+/// Replaces the playlist's screens, keeping its name.
+async fn refill(server: &common::Server, playlist: i64, screens: &[i64]) {
     let (status, body) = server
         .call(
             "PUT",
-            &format!("/manage/devices/{device}/playlist"),
-            Some(json!({ "playlist": playlist })),
+            &format!("/manage/playlists/{playlist}"),
+            Some(json!({ "name": "Usual", "screens": screens })),
         )
         .await;
     assert_eq!(status, StatusCode::OK, "{body}");
@@ -120,7 +156,7 @@ async fn a_claimed_device_shows_its_screen_drawn_from_its_data() {
     let (device, key) = server.claim(&mac(1)).await;
     let id = device["id"].as_i64().unwrap();
     let weather = screen(&server, "Weather", weather(&url)).await;
-    play(&server, id, json!([{ "screenId": weather }])).await;
+    play(&server, id, &[weather]).await;
 
     let answer = server.display(&key, &READINGS).await;
     assert_eq!(answer["status"], 0, "{answer}");
@@ -205,7 +241,7 @@ async fn an_unchanged_screen_keeps_its_name_and_an_outage_keeps_the_last_image()
     let (device, key) = server.claim(&mac(1)).await;
     let id = device["id"].as_i64().unwrap();
     let weather = screen(&server, "Weather", weather(&url)).await;
-    play(&server, id, json!([{ "screenId": weather }])).await;
+    play(&server, id, &[weather]).await;
 
     let first = server.display(&key, &READINGS).await["filename"].clone();
     assert_eq!(
@@ -271,73 +307,138 @@ async fn a_screen_never_shows_a_secret() {
 }
 
 #[tokio::test]
-async fn a_playlist_rotates_and_wakes_the_device_when_it_changes() {
+async fn a_slot_takes_over_from_the_usual_playlist_and_wakes_the_device_for_it() {
     let server = start().await;
     server.sign_up().await;
-    let (device, key) = server.claim(&mac(1)).await;
-    let id = device["id"].as_i64().unwrap();
+    let (claimed, key) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
     let text = |label: &str| json!({ "content": { "title": { "text": label } } });
-    let first = screen(&server, "First", text("First")).await;
+    let usual_screen = screen(&server, "Usual", text("Usual")).await;
     let second = screen(&server, "Second", text("Second")).await;
-    // The harness clock starts at 08:00 UTC; the second entry starts at 08:05.
-    play(
+    let third = screen(&server, "Third", text("Third")).await;
+    let usual = playlist(&server, "Usual", &[usual_screen]).await;
+    let mornings = playlist(&server, "Mornings", &[second, third]).await;
+    // The harness clock starts at 08:00 UTC; the slot starts at 08:05.
+    let (status, body) = set_schedule(
         &server,
         id,
-        json!([{ "screenId": first }, { "screenId": second, "from": "08:05", "until": "20:00" }]),
+        json!({ "playlistId": usual, "slots": [{ "playlistId": mornings, "from": "08:05", "until": "20:00" }] }),
     )
     .await;
-    let showing = |body: Value| body["device"]["showing"]["screenId"].clone();
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let showing = |device: Value| {
+        (
+            device["showing"]["screenId"].clone(),
+            device["showing"]["playlistId"].clone(),
+        )
+    };
 
     let answer = server.display(&key, &READINGS).await;
+    assert_eq!(answer["refresh_rate"], 5 * 60, "wakes when the slot starts");
     assert_eq!(
-        answer["refresh_rate"],
-        5 * 60,
-        "wakes when the second entry starts"
+        showing(device(&server, id).await),
+        (json!(usual_screen), json!(usual))
     );
-    assert_eq!(
-        showing(
-            server
-                .call("GET", &format!("/manage/devices/{id}"), None)
-                .await
-                .1
-        ),
-        first
-    );
-    assert_eq!(
-        server.display(&key, &READINGS).await["refresh_rate"],
-        5 * 60
-    );
-    assert_eq!(
-        showing(
-            server
-                .call("GET", &format!("/manage/devices/{id}"), None)
-                .await
-                .1
-        ),
-        first,
-        "nothing else is current"
-    );
+
     server.clock.advance(5 * 60);
     server.display(&key, &READINGS).await;
     assert_eq!(
-        showing(
-            server
-                .call("GET", &format!("/manage/devices/{id}"), None)
-                .await
-                .1
-        ),
-        second
+        showing(device(&server, id).await),
+        (json!(second), json!(mornings)),
+        "the slot's playlist starts at its first screen"
     );
     server.display(&key, &READINGS).await;
+    assert_eq!(showing(device(&server, id).await).0, third);
+    server.display(&key, &READINGS).await;
     assert_eq!(
-        showing(
-            server
-                .call("GET", &format!("/manage/devices/{id}"), None)
-                .await
-                .1
-        ),
-        first
+        showing(device(&server, id).await).0,
+        second,
+        "and starts over"
     );
+}
+
+#[tokio::test]
+async fn a_schedule_whose_slots_are_current_at_once_is_refused() {
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, _) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    let one = playlist(&server, "One", &[]).await;
+    let two = playlist(&server, "Two", &[]).await;
+    let (status, body) = set_schedule(
+        &server,
+        id,
+        json!({ "slots": [
+            { "playlistId": one, "days": ["monday"], "from": "07:00", "until": "09:00" },
+            { "playlistId": two, "from": "08:30", "until": "12:00" }
+        ] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(
+        body["message"]
+            .as_str()
+            .unwrap()
+            .contains("Slots 1 and 2 are both current on Monday at 08:30"),
+        "{body}"
+    );
+    assert_eq!(
+        device(&server, id).await["schedule"],
+        json!({ "slots": [] }),
+        "nothing changed"
+    );
+
+    let meeting = json!({ "playlistId": one, "slots": [
+        { "playlistId": one, "days": ["monday"], "from": "07:00", "until": "09:00" },
+        { "playlistId": two, "days": ["monday"], "from": "09:00", "until": "07:00" }
+    ] });
+    let (status, body) = set_schedule(&server, id, meeting.clone()).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "slots that meet do not overlap: {body}"
+    );
+    assert_eq!(body["device"]["schedule"], meeting);
+}
+
+#[tokio::test]
+async fn devices_share_a_playlist_and_each_goes_through_it_on_its_own() {
+    let server = start().await;
+    server.sign_up().await;
+    let (one, one_key) = server.claim(&mac(1)).await;
+    let (two, two_key) = server.claim(&mac(2)).await;
+    let (one, two) = (one["id"].as_i64().unwrap(), two["id"].as_i64().unwrap());
+    let text = |label: &str| json!({ "content": { "title": { "text": label } } });
+    let first = screen(&server, "First", text("First")).await;
+    let second = screen(&server, "Second", text("Second")).await;
+    let shared = play(&server, one, &[first, second]).await;
+    let (status, body) =
+        set_schedule(&server, two, json!({ "playlistId": shared, "slots": [] })).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    server.display(&one_key, &READINGS).await;
+    server.display(&one_key, &READINGS).await;
+    server.display(&two_key, &READINGS).await;
+    assert_eq!(device(&server, one).await["showing"]["screenId"], second);
+    assert_eq!(
+        device(&server, two).await["showing"]["screenId"],
+        first,
+        "the other device starts at the first screen"
+    );
+
+    // Deleting the playlist leaves both with nothing scheduled.
+    let (status, _) = server
+        .call("DELETE", &format!("/manage/playlists/{shared}"), None)
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(
+        device(&server, one).await["schedule"],
+        json!({ "slots": [] })
+    );
+    server.display(&two_key, &READINGS).await;
+    let shown = device(&server, two).await;
+    assert!(shown["showing"].get("screenId").is_none(), "{shown}");
+    assert!(shown["showing"].get("playlistId").is_none(), "{shown}");
 }
 
 #[tokio::test]
@@ -475,12 +576,7 @@ async fn a_screen_that_fails_does_not_hold_up_the_rest_of_the_playlist() {
     )
     .await;
     let third = screen(&server, "Third", text("Third")).await;
-    play(
-        &server,
-        id,
-        json!([{ "screenId": first }, { "screenId": broken }, { "screenId": third }]),
-    )
-    .await;
+    play(&server, id, &[first, broken, third]).await;
     let showing = |body: Value| body["device"]["showing"]["screenId"].clone();
     let device_path = format!("/manage/devices/{id}");
 
@@ -498,12 +594,12 @@ async fn a_screen_that_fails_does_not_hold_up_the_rest_of_the_playlist() {
     assert_eq!(
         showing(server.call("GET", &device_path, None).await.1),
         third,
-        "the entry after the broken one shows next"
+        "the screen after the broken one shows next"
     );
 }
 
 #[tokio::test]
-async fn a_new_playlist_starts_at_its_first_entry() {
+async fn a_changed_playlist_starts_again_at_its_first_screen() {
     let server = start().await;
     server.sign_up().await;
     let (device, key) = server.claim(&mac(1)).await;
@@ -512,12 +608,7 @@ async fn a_new_playlist_starts_at_its_first_entry() {
     let first = screen(&server, "First", text("First")).await;
     let second = screen(&server, "Second", text("Second")).await;
     let other = screen(&server, "Other", text("Other")).await;
-    play(
-        &server,
-        id,
-        json!([{ "screenId": first }, { "screenId": second }]),
-    )
-    .await;
+    let usual = play(&server, id, &[first, second]).await;
     let shown = server.display(&key, &READINGS).await;
     let device_path = format!("/manage/devices/{id}");
     let showing = |body: Value| body["device"]["showing"]["screenId"].clone();
@@ -526,12 +617,7 @@ async fn a_new_playlist_starts_at_its_first_entry() {
         first
     );
 
-    play(
-        &server,
-        id,
-        json!([{ "screenId": other }, { "screenId": first }]),
-    )
-    .await;
+    refill(&server, usual, &[other, first]).await;
     server.display(&key, &READINGS).await;
     assert_eq!(
         showing(server.call("GET", &device_path, None).await.1),
@@ -543,12 +629,7 @@ async fn a_new_playlist_starts_at_its_first_entry() {
     // second, last], and the next check-in starts at `first` rather than taking
     // the old position and skipping `second` for `last`.
     let last = screen(&server, "Last", text("Last")).await;
-    play(
-        &server,
-        id,
-        json!([{ "screenId": other }, { "screenId": first }, { "screenId": second }, { "screenId": last }]),
-    )
-    .await;
+    refill(&server, usual, &[other, first, second, last]).await;
     server.display(&key, &READINGS).await;
     server.display(&key, &READINGS).await;
     assert_eq!(
@@ -591,7 +672,7 @@ async fn a_device_whose_first_screen_fails_shows_why_and_a_lost_image_is_drawn_a
         json!({ "sources": { "down": { "url": url } }, "content": { "title": { "text": "{{ down.value }}" } } }),
     )
     .await;
-    play(&server, id, json!([{ "screenId": broken }])).await;
+    play(&server, id, &[broken]).await;
     // Its file goes missing.
     std::fs::remove_dir_all(server.data.path().join("images").join(id.to_string())).unwrap();
 
@@ -698,12 +779,7 @@ async fn a_device_sleeps_through_its_window_and_wakes_where_its_playlist_was() {
     let text = |label: &str| json!({ "content": { "title": { "text": label } } });
     let first = screen(&server, "First", text("First")).await;
     let second = screen(&server, "Second", text("Second")).await;
-    play(
-        &server,
-        id,
-        json!([{ "screenId": first }, { "screenId": second }]),
-    )
-    .await;
+    play(&server, id, &[first, second]).await;
     server.display(&key, &READINGS).await;
     assert_eq!(device(&server, id).await["showing"]["screenId"], first);
 
@@ -737,7 +813,7 @@ async fn a_device_sleeps_through_its_window_and_wakes_where_its_playlist_was() {
     assert_eq!(awake["showing"]["asleep"], false);
     assert_eq!(
         awake["showing"]["screenId"], second,
-        "the playlist goes on from the entry shown before it slept"
+        "the playlist goes on from the screen shown before it slept"
     );
 }
 
@@ -753,7 +829,7 @@ async fn an_awake_device_wakes_in_time_to_fall_asleep() {
         json!({ "content": { "title": { "text": "First" } } }),
     )
     .await;
-    play(&server, id, json!([{ "screenId": first }])).await;
+    play(&server, id, &[first]).await;
     set_sleep(
         &server,
         id,
@@ -873,7 +949,7 @@ async fn a_device_that_wakes_into_a_failing_screen_says_so_rather_than_that_it_s
     let id = claimed["id"].as_i64().unwrap();
     let weather = screen(&server, "Weather", weather(&url)).await;
     source.set(Some(json!({ "temperature": 4, "hourly": [1, 2, 3] })));
-    play(&server, id, json!([{ "screenId": weather }])).await;
+    play(&server, id, &[weather]).await;
     set_sleep(
         &server,
         id,
@@ -959,7 +1035,7 @@ async fn update(server: &common::Server, id: i64, changes: Value) -> (StatusCode
 }
 
 #[tokio::test]
-async fn a_pinned_screen_stands_in_for_the_playlist_until_set_back() {
+async fn a_pinned_screen_stands_in_for_the_schedule_until_set_back() {
     let server = start().await;
     server.sign_up().await;
     let (claimed, key) = server.claim(&mac(1)).await;
@@ -968,12 +1044,7 @@ async fn a_pinned_screen_stands_in_for_the_playlist_until_set_back() {
     let first = screen(&server, "First", text("First")).await;
     let second = screen(&server, "Second", text("Second")).await;
     let guests = screen(&server, "Guests", text("Wi-Fi")).await;
-    play(
-        &server,
-        id,
-        json!([{ "screenId": first }, { "screenId": second }]),
-    )
-    .await;
+    play(&server, id, &[first, second]).await;
     server.display(&key, &READINGS).await;
     assert_eq!(device(&server, id).await["showing"]["screenId"], first);
 
@@ -982,10 +1053,12 @@ async fn a_pinned_screen_stands_in_for_the_playlist_until_set_back() {
     assert_eq!(body["device"]["shows"], json!({ "screenId": guests }));
     for _ in 0..2 {
         server.display(&key, &READINGS).await;
-        assert_eq!(device(&server, id).await["showing"]["screenId"], guests);
+        let shown = device(&server, id).await;
+        assert_eq!(shown["showing"]["screenId"], guests);
+        assert!(shown["showing"].get("playlistId").is_none(), "{shown}");
     }
 
-    update(&server, id, json!({ "shows": { "playlist": {} } })).await;
+    update(&server, id, json!({ "shows": { "schedule": {} } })).await;
     server.display(&key, &READINGS).await;
     assert_eq!(
         device(&server, id).await["showing"]["screenId"],
@@ -999,14 +1072,74 @@ async fn a_pinned_screen_stands_in_for_the_playlist_until_set_back() {
         .await;
     assert_eq!(
         device(&server, id).await["shows"],
-        json!({ "playlist": {} }),
-        "deleting the pinned screen sets the device back to its playlist"
+        json!({ "schedule": {} }),
+        "deleting the pinned screen sets the device back to its schedule"
     );
 
     let eve = server.second_account().await;
     let theirs = screen(&eve, "Theirs", text("Theirs")).await;
     let (status, _) = update(&server, id, json!({ "shows": { "screenId": theirs } })).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn a_pinned_playlist_stands_in_for_the_schedule_until_set_back() {
+    let server = start().await;
+    server.sign_up().await;
+    let (claimed, key) = server.claim(&mac(1)).await;
+    let id = claimed["id"].as_i64().unwrap();
+    let text = |label: &str| json!({ "content": { "title": { "text": label } } });
+    let first = screen(&server, "First", text("First")).await;
+    let guest_wifi = screen(&server, "Wi-Fi", text("Wi-Fi")).await;
+    let guest_map = screen(&server, "Map", text("Map")).await;
+    play(&server, id, &[first]).await;
+    let guests = playlist(&server, "Guests", &[guest_wifi, guest_map]).await;
+    // A slot from 08:05 does not wake a pinned device: it follows no schedule.
+    let usual = device(&server, id).await["schedule"]["playlistId"].clone();
+    let (status, body) = set_schedule(
+        &server,
+        id,
+        json!({ "playlistId": usual, "slots": [{ "playlistId": usual, "from": "08:05", "until": "09:00" }] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    let (status, body) = update(&server, id, json!({ "shows": { "playlistId": guests } })).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["device"]["shows"], json!({ "playlistId": guests }));
+    let answer = server.display(&key, &READINGS).await;
+    assert_eq!(
+        answer["refresh_rate"],
+        15 * 60,
+        "its refresh, not the slot's start"
+    );
+    let shown = device(&server, id).await;
+    assert_eq!(shown["showing"]["screenId"], guest_wifi);
+    assert_eq!(shown["showing"]["playlistId"], guests);
+    server.display(&key, &READINGS).await;
+    assert_eq!(device(&server, id).await["showing"]["screenId"], guest_map);
+
+    server
+        .call("DELETE", &format!("/manage/playlists/{guests}"), None)
+        .await;
+    assert_eq!(
+        device(&server, id).await["shows"],
+        json!({ "schedule": {} }),
+        "deleting the pinned playlist sets the device back to its schedule"
+    );
+    server.display(&key, &READINGS).await;
+    assert_eq!(device(&server, id).await["showing"]["screenId"], first);
+
+    let eve = server.second_account().await;
+    let theirs = playlist(&eve, "Theirs", &[]).await;
+    let (status, _) = update(&server, id, json!({ "shows": { "playlistId": theirs } })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = set_schedule(&server, id, json!({ "playlistId": theirs, "slots": [] })).await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "nor schedule another account's playlist"
+    );
 }
 
 #[tokio::test]
@@ -1021,7 +1154,7 @@ async fn a_device_held_asleep_checks_in_hourly_until_let_go() {
         json!({ "content": { "title": { "text": "First" } } }),
     )
     .await;
-    play(&server, id, json!([{ "screenId": first }])).await;
+    play(&server, id, &[first]).await;
 
     let (status, body) = update(&server, id, json!({ "sleepHeld": true })).await;
     assert_eq!(status, StatusCode::OK, "{body}");

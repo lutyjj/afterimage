@@ -1,4 +1,4 @@
-//! The server's time zone: playlists follow it, templates format dates in it, and
+//! The server's time zone: schedules follow it, templates format dates in it, and
 //! the web UI shows times in it, so it always has an IANA name.
 
 #[derive(Debug, Clone)]

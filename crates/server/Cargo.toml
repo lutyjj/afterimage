@@ -36,7 +36,7 @@ data-url = "0.3.2"
 esp-idf-part = "0.6.0"
 getrandom = "0.4.3"
 http = "1.5.0"
-# Local time for playlists; the time zone database is bundled so that a host or
+# Local time for schedules; the time zone database is bundled so that a host or
 # container without one still schedules correctly.
 jiff = { version = "0.2.39", features = ["tzdb-bundle-always"] }
 # Screen templates, with Jinja's filters for dates (in the server's time zone) and

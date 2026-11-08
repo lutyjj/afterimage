@@ -451,7 +451,7 @@ async fn a_tls_broker_url_starts_the_server() {
 }
 
 #[tokio::test]
-async fn home_assistant_holds_sleep_pins_a_screen_and_sets_the_wake() {
+async fn home_assistant_holds_sleep_pins_a_playlist_or_screen_and_sets_the_wake() {
     let broker = Broker::start().await;
     let observer = Observer::start(&broker);
     let server = start(&broker).await;
@@ -467,9 +467,19 @@ async fn home_assistant_holds_sleep_pins_a_screen_and_sets_the_wake() {
         .await;
     assert_eq!(status, StatusCode::CREATED, "{body}");
     let night = body["screen"]["id"].clone();
+    let (status, body) = server
+        .call(
+            "POST",
+            "/manage/playlists",
+            Some(json!({ "name": "Night", "screens": [night] })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    let nights = body["playlist"]["id"].clone();
     let config = observer
         .wait(CONFIG, |config| {
-            config["components"]["showing"]["options"] == json!(["Playlist", "Night"])
+            config["components"]["showing"]["options"]
+                == json!(["Schedule", "Night playlist", "Night"])
         })
         .await;
     assert_eq!(
@@ -493,7 +503,7 @@ async fn home_assistant_holds_sleep_pins_a_screen_and_sets_the_wake() {
         device(&server, id).await["shows"],
         json!({ "screenId": night })
     );
-    // An option no screen has changes nothing, and the state goes out again so
+    // An option nothing has changes nothing, and the state goes out again so
     // Home Assistant's select shows what the device does.
     let sent = observer.seen(STATE).len();
     observer
@@ -510,14 +520,24 @@ async fn home_assistant_holds_sleep_pins_a_screen_and_sets_the_wake() {
         json!({ "screenId": night })
     );
     observer
-        .publish(&format!("{DEVICE}/showing/set"), "Playlist", false)
+        .publish(&format!("{DEVICE}/showing/set"), "Night playlist", false)
         .await;
     observer
-        .wait(STATE, |state| state["showing"] == "Playlist")
+        .wait(STATE, |state| state["showing"] == "Night playlist")
         .await;
     assert_eq!(
         device(&server, id).await["shows"],
-        json!({ "playlist": {} })
+        json!({ "playlistId": nights })
+    );
+    observer
+        .publish(&format!("{DEVICE}/showing/set"), "Schedule", false)
+        .await;
+    observer
+        .wait(STATE, |state| state["showing"] == "Schedule")
+        .await;
+    assert_eq!(
+        device(&server, id).await["shows"],
+        json!({ "schedule": {} })
     );
 
     observer

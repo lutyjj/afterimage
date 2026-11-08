@@ -11,6 +11,7 @@ mod deployment;
 mod devices;
 mod firmware;
 mod mqtt;
+mod playlists;
 mod screens;
 mod tokens;
 mod wire;
@@ -41,6 +42,7 @@ use crate::drawing::Drawing;
 use crate::firmware::Firmware;
 use crate::images::Images;
 use crate::oidc::Oidc;
+use crate::playlists::Playlists;
 use crate::screens::Screens;
 use crate::sessions::{CookieName, CookiePolicy, Sessions};
 use crate::telemetry::{self, Saved, Telemetry};
@@ -53,12 +55,13 @@ pub struct State {
     pub tokens: Arc<Tokens>,
     pub devices: Devices,
     pub screens: Screens,
+    pub playlists: Playlists,
     pub oidc: Option<Oidc>,
     /// Where the web UI lives, for redirects after OIDC sign-in.
     pub landing: String,
     pub cookies: CookiePolicy,
     pub password_sign_in: bool,
-    /// The IANA name of the time zone of playlists and dates on screens.
+    /// The IANA name of the time zone of schedules and dates on screens.
     pub time_zone: String,
     /// Names of the secrets data sources may read; the values stay with the renderer.
     pub secret_names: Vec<String>,
@@ -118,7 +121,7 @@ pub fn service(
         .claim_device(devices::claim_device)
         .get_device(devices::get_device)
         .update_device(devices::update_device)
-        .set_playlist(devices::set_playlist)
+        .set_schedule(devices::set_schedule)
         .set_sleep(devices::set_sleep)
         .delete_device(devices::delete_device)
         .get_device_image(devices::get_device_image)
@@ -131,6 +134,11 @@ pub fn service(
         .update_screen(screens::update_screen)
         .delete_screen(screens::delete_screen)
         .preview_screen(screens::preview_screen)
+        .list_playlists(playlists::list_playlists)
+        .create_playlist(playlists::create_playlist)
+        .get_playlist(playlists::get_playlist)
+        .update_playlist(playlists::update_playlist)
+        .delete_playlist(playlists::delete_playlist)
         .get_server(deployment::get_server)
         .get_mqtt_settings(mqtt::get_mqtt_settings)
         .update_mqtt_settings(mqtt::update_mqtt_settings)

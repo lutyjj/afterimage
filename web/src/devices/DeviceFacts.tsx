@@ -1,4 +1,4 @@
-import type { Device, ScreenSummary } from "@afterimage/management-client";
+import type { Device, Playlist, ScreenSummary } from "@afterimage/management-client";
 import type { ReactNode } from "react";
 
 import { classes } from "linen";
@@ -9,12 +9,14 @@ import { ago, moment, signalQuality } from "../app/format";
  * `children` adds facts of the page's own after them. */
 export function DeviceFacts({
   device,
+  playlists,
   screens,
   timeZone,
   className,
   children,
 }: {
   device: Device;
+  playlists: Playlist[] | undefined;
   screens: ScreenSummary[] | undefined;
   timeZone: string | undefined;
   className?: string | undefined;
@@ -23,15 +25,22 @@ export function DeviceFacts({
   const { showing, seenAt, wakesAt } = device;
   const { batteryVoltage, batteryPercent, signal, firmwareVersion } = device.readings;
   const screenName = (id: number) => screens?.find((screen) => screen.id === id)?.name ?? "A screen";
-  const showingName = !showing
+  const playlistName = (id: number) => playlists?.find((playlist) => playlist.id === id)?.name ?? "a playlist";
+  const pinned =
+    showing !== undefined &&
+    ((showing.screenId !== undefined && showing.screenId === device.shows.screenId) ||
+      (showing.playlistId !== undefined && showing.playlistId === device.shows.playlistId));
+  const what = !showing
     ? "Nothing yet"
     : showing.asleep
       ? showing.screenId !== undefined
         ? `Asleep, showing ${screenName(showing.screenId)}`
         : "Asleep"
       : showing.screenId !== undefined
-        ? `${screenName(showing.screenId)}${showing.screenId === device.shows.screenId ? ", pinned" : ""}`
+        ? screenName(showing.screenId)
         : "Afterimage's own screen";
+  const from = showing?.playlistId !== undefined ? `, from ${playlistName(showing.playlistId)}` : "";
+  const showingName = `${what}${from}${pinned ? ", pinned" : ""}`;
 
   return (
     <dl className={classes("grid grid-cols-[max-content_minmax(0,1fr)] gap-x-6 gap-y-2 text-sm", className)}>

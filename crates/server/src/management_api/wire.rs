@@ -10,9 +10,11 @@ use afterimage_trmnl::catalog::Catalog;
 use aws_smithy_types::DateTime;
 
 use crate::accounts::Account;
-use crate::devices::{self, Device, Entry, Hours, Shows, Sleep};
+use crate::devices::{self, Device, Shows, Sleep};
 use crate::drawing;
 use crate::firmware::{self, Board, Firmware};
+use crate::playlists::Playlist;
+use crate::schedule::{Hours, Schedule, Slot};
 use crate::screens::{Screen, Summary};
 
 /// A stored value into its constrained model shape.
@@ -68,11 +70,7 @@ pub fn device(device: Device, boards: Option<&[Board]>) -> Result<model::Device,
             palette: fit(device.display.palette)?,
         },
         refresh_minutes: fit(i32::try_from(device.refresh_minutes).unwrap_or(i32::MAX))?,
-        playlist: fit(device
-            .playlist
-            .into_iter()
-            .map(entry)
-            .collect::<Result<Vec<_>, _>>()?)?,
+        schedule: schedule(device.schedule)?,
         shows: shows(device.shows)?,
         sleep: sleep(device.sleep)?,
         sleep_held: device.sleep_held,
@@ -90,6 +88,7 @@ pub fn device(device: Device, boards: Option<&[Board]>) -> Result<model::Device,
             .map(|showing| -> Result<_, InternalFailure> {
                 Ok(model::Showing {
                     screen_id: showing.screen_id.map(fit).transpose()?,
+                    playlist_id: showing.playlist_id.map(fit).transpose()?,
                     rendered_at: DateTime::from_secs(showing.rendered_at),
                     asleep: showing.asleep,
                 })
@@ -187,31 +186,46 @@ fn stored_hours(
     }
 }
 
-fn entry(entry: Entry) -> Result<model::PlaylistEntry, InternalFailure> {
-    let WireHours { days, from, until } = wire_hours(entry.hours)?;
-    Ok(model::PlaylistEntry {
-        screen_id: fit(entry.screen_id)?,
-        days,
-        from,
-        until,
+fn schedule(schedule: Schedule) -> Result<model::Schedule, InternalFailure> {
+    let slots = schedule
+        .slots
+        .into_iter()
+        .map(|slot| {
+            let WireHours { days, from, until } = wire_hours(slot.hours)?;
+            Ok(model::ScheduleSlot {
+                playlist_id: fit(slot.playlist_id)?,
+                days,
+                from,
+                until,
+            })
+        })
+        .collect::<Result<Vec<_>, InternalFailure>>()?;
+    Ok(model::Schedule {
+        playlist_id: schedule.playlist_id.map(fit).transpose()?,
+        slots: fit(slots)?,
     })
 }
 
-/// A playlist entry as the store keeps it.
-pub fn stored_entry(entry: &model::PlaylistEntry) -> Entry {
-    Entry {
-        screen_id: *entry.screen_id.inner(),
-        hours: stored_hours(
-            entry.days.as_ref(),
-            entry.from.as_ref(),
-            entry.until.as_ref(),
-        ),
+/// A device's schedule as the store keeps it.
+pub fn stored_schedule(schedule: &model::Schedule) -> Schedule {
+    Schedule {
+        playlist_id: schedule.playlist_id.as_ref().map(|id| *id.inner()),
+        slots: schedule
+            .slots
+            .inner()
+            .iter()
+            .map(|slot| Slot {
+                playlist_id: *slot.playlist_id.inner(),
+                hours: stored_hours(slot.days.as_ref(), slot.from.as_ref(), slot.until.as_ref()),
+            })
+            .collect(),
     }
 }
 
 fn shows(shows: Shows) -> Result<model::Shows, InternalFailure> {
     Ok(match shows {
-        Shows::Playlist => model::Shows::Playlist,
+        Shows::Schedule => model::Shows::Schedule,
+        Shows::Playlist(id) => model::Shows::PlaylistId(fit(id)?),
         Shows::Screen(id) => model::Shows::ScreenId(fit(id)?),
     })
 }
@@ -219,7 +233,8 @@ fn shows(shows: Shows) -> Result<model::Shows, InternalFailure> {
 /// What an awake device shows, as the store keeps it.
 pub fn stored_shows(shows: &model::Shows) -> Shows {
     match shows {
-        model::Shows::Playlist => Shows::Playlist,
+        model::Shows::Schedule => Shows::Schedule,
+        model::Shows::PlaylistId(id) => Shows::Playlist(*id.inner()),
         model::Shows::ScreenId(id) => Shows::Screen(*id.inner()),
     }
 }
@@ -322,6 +337,18 @@ pub fn summary(screen: Summary) -> Result<model::ScreenSummary, InternalFailure>
         id: fit(screen.id)?,
         name: fit(screen.name)?,
         updated_at: DateTime::from_secs(screen.updated_at),
+    })
+}
+
+pub fn playlist(playlist: Playlist) -> Result<model::Playlist, InternalFailure> {
+    Ok(model::Playlist {
+        id: fit(playlist.id)?,
+        name: fit(playlist.name)?,
+        screens: fit(playlist
+            .screens
+            .into_iter()
+            .map(fit)
+            .collect::<Result<Vec<_>, _>>()?)?,
     })
 }
 

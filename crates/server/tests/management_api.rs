@@ -155,7 +155,8 @@ async fn claiming_a_code_makes_the_registration_a_device_with_a_default_display(
     assert_eq!(device["mac"], mac(1));
     assert_eq!(device["firmwareModel"], "og");
     assert_eq!(device["refreshMinutes"], 15);
-    assert_eq!(device["playlist"], json!([]));
+    assert_eq!(device["schedule"], json!({ "slots": [] }));
+    assert_eq!(device["shows"], json!({ "schedule": {} }));
     assert_eq!(device["readings"]["batteryVoltage"], 4.12);
     // The test device reports an 800x480 panel and a model name the catalogue lacks.
     let (_, models) = server.call("GET", "/manage/display-models", None).await;
@@ -227,12 +228,13 @@ async fn claiming_a_device_set_up_again_keeps_it_and_retires_its_old_key() {
     let (device, old_key) = server.claim(&mac(1)).await;
     let id = device["id"].as_i64().unwrap();
     let screen = create_screen(&server, "Clock").await;
-    let playlist = json!({ "playlist": [{ "screenId": screen }] });
+    let playlist = create_playlist(&server, "Clock", &[screen]).await;
+    let schedule = json!({ "schedule": { "playlistId": playlist, "slots": [] } });
     let (status, _) = server
         .call(
             "PUT",
-            &format!("/manage/devices/{id}/playlist"),
-            Some(playlist),
+            &format!("/manage/devices/{id}/schedule"),
+            Some(schedule.clone()),
         )
         .await;
     assert_eq!(status, StatusCode::OK);
@@ -255,7 +257,7 @@ async fn claiming_a_device_set_up_again_keeps_it_and_retires_its_old_key() {
     assert_eq!(body["replaced"], true);
     assert_eq!(body["device"]["id"], id);
     assert_eq!(body["device"]["name"], "Kitchen");
-    assert_eq!(body["device"]["playlist"], json!([{ "screenId": screen }]));
+    assert_eq!(body["device"]["schedule"], schedule["schedule"]);
     let (_, devices) = server.call("GET", "/manage/devices", None).await;
     assert_eq!(devices["devices"].as_array().unwrap().len(), 1);
     let rows = server
@@ -282,12 +284,13 @@ async fn claiming_a_device_set_up_again_keeps_it_and_retires_its_old_key() {
 }
 
 #[tokio::test]
-async fn another_account_cannot_reach_a_device_or_screen() {
+async fn another_account_cannot_reach_a_device_screen_or_playlist() {
     let server = start().await;
     server.sign_up().await;
     let (device, _) = server.claim(&mac(1)).await;
     let device = device["id"].as_i64().unwrap();
     let screen = create_screen(&server, "Private").await;
+    let playlist = create_playlist(&server, "Private", &[screen]).await;
 
     let eve = server.second_account().await;
 
@@ -300,8 +303,8 @@ async fn another_account_cannot_reach_a_device_or_screen() {
         ),
         (
             "PUT",
-            format!("/manage/devices/{device}/playlist"),
-            Some(json!({ "playlist": [] })),
+            format!("/manage/devices/{device}/schedule"),
+            Some(json!({ "schedule": { "slots": [] } })),
         ),
         ("DELETE", format!("/manage/devices/{device}"), None),
         ("GET", format!("/manage/screens/{screen}"), None),
@@ -311,6 +314,13 @@ async fn another_account_cannot_reach_a_device_or_screen() {
             Some(json!({ "name": "Mine", "document": document() })),
         ),
         ("DELETE", format!("/manage/screens/{screen}"), None),
+        ("GET", format!("/manage/playlists/{playlist}"), None),
+        (
+            "PUT",
+            format!("/manage/playlists/{playlist}"),
+            Some(json!({ "name": "Mine", "screens": [] })),
+        ),
+        ("DELETE", format!("/manage/playlists/{playlist}"), None),
     ] {
         assert_eq!(
             eve.call(method, &path, body).await.0,
@@ -326,8 +336,20 @@ async fn another_account_cannot_reach_a_device_or_screen() {
         eve.call("GET", "/manage/screens", None).await.1["screens"],
         json!([])
     );
+    assert_eq!(
+        eve.call("GET", "/manage/playlists", None).await.1["playlists"],
+        json!([])
+    );
 
-    // Eve's playlist cannot name Ada's screen either.
+    // Eve's playlist cannot name Ada's screen, nor her schedule Ada's playlist.
+    let (status, _) = eve
+        .call(
+            "POST",
+            "/manage/playlists",
+            Some(json!({ "name": "Borrowed", "screens": [screen] })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
     let (_, code) = eve.register(&mac(2)).await;
     let (_, claimed) = eve
         .call("POST", "/manage/devices", Some(json!({ "code": code })))
@@ -336,11 +358,19 @@ async fn another_account_cannot_reach_a_device_or_screen() {
     let (status, _) = eve
         .call(
             "PUT",
-            &format!("/manage/devices/{eves}/playlist"),
-            Some(json!({ "playlist": [{ "screenId": screen }] })),
+            &format!("/manage/devices/{eves}/schedule"),
+            Some(json!({ "schedule": { "slots": [{ "playlistId": playlist }] } })),
         )
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        server
+            .call("GET", &format!("/manage/playlists/{playlist}"), None)
+            .await
+            .1["playlist"]["screens"],
+        json!([screen]),
+        "Ada's playlist is as she left it"
+    );
     assert_eq!(
         server
             .call("GET", &format!("/manage/devices/{device}"), None)
@@ -376,6 +406,18 @@ async fn create_screen(server: &common::Server, name: &str) -> i64 {
         .await;
     assert_eq!(status, StatusCode::CREATED, "{body}");
     body["screen"]["id"].as_i64().unwrap()
+}
+
+async fn create_playlist(server: &common::Server, name: &str, screens: &[i64]) -> i64 {
+    let (status, body) = server
+        .call(
+            "POST",
+            "/manage/playlists",
+            Some(json!({ "name": name, "screens": screens })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    body["playlist"]["id"].as_i64().unwrap()
 }
 
 #[tokio::test]
@@ -428,26 +470,65 @@ async fn a_screen_document_comes_back_as_written_with_its_defaults() {
 }
 
 #[tokio::test]
-async fn deleting_a_screen_takes_it_out_of_every_playlist() {
+async fn a_playlist_keeps_its_screens_in_order_and_takes_one_twice() {
     let server = start().await;
     server.sign_up().await;
-    let (device, _) = server.claim(&mac(1)).await;
-    let id = device["id"].as_i64().unwrap();
-    let kept = create_screen(&server, "Kept").await;
-    let dropped = create_screen(&server, "Dropped").await;
-    let playlist = json!({ "playlist": [
-        { "screenId": dropped, "days": ["monday", "friday"], "from": "07:00", "until": "09:30" },
-        { "screenId": kept }
-    ] });
+    let clock = create_screen(&server, "Clock").await;
+    let weather = create_screen(&server, "Weather").await;
+    let id = create_playlist(&server, "Mornings", &[weather, clock, weather]).await;
+    let (status, body) = server
+        .call("GET", &format!("/manage/playlists/{id}"), None)
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["playlist"],
+        json!({ "id": id, "name": "Mornings", "screens": [weather, clock, weather] })
+    );
+
     let (status, body) = server
         .call(
             "PUT",
-            &format!("/manage/devices/{id}/playlist"),
-            Some(playlist.clone()),
+            &format!("/manage/playlists/{id}"),
+            Some(json!({ "name": "Evenings", "screens": [clock] })),
         )
         .await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["device"]["playlist"], playlist["playlist"]);
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (_, list) = server.call("GET", "/manage/playlists", None).await;
+    assert_eq!(
+        list["playlists"],
+        json!([{ "id": id, "name": "Evenings", "screens": [clock] }])
+    );
+
+    let (status, _) = server
+        .call(
+            "PUT",
+            &format!("/manage/playlists/{id}"),
+            Some(json!({ "name": "Evenings", "screens": [clock, 999] })),
+        )
+        .await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "a screen that does not exist"
+    );
+    assert_eq!(
+        server
+            .call("GET", &format!("/manage/playlists/{id}"), None)
+            .await
+            .1["playlist"]["screens"],
+        json!([clock]),
+        "a refused change changes nothing"
+    );
+}
+
+#[tokio::test]
+async fn deleting_a_screen_takes_it_out_of_every_playlist() {
+    let server = start().await;
+    server.sign_up().await;
+    let kept = create_screen(&server, "Kept").await;
+    let dropped = create_screen(&server, "Dropped").await;
+    let one = create_playlist(&server, "One", &[dropped, kept, dropped]).await;
+    let two = create_playlist(&server, "Two", &[dropped]).await;
     assert_eq!(
         server
             .call("DELETE", &format!("/manage/screens/{dropped}"), None)
@@ -455,10 +536,55 @@ async fn deleting_a_screen_takes_it_out_of_every_playlist() {
             .0,
         StatusCode::NO_CONTENT
     );
+    let screens = |id: i64| {
+        let server = &server;
+        async move {
+            server
+                .call("GET", &format!("/manage/playlists/{id}"), None)
+                .await
+                .1["playlist"]["screens"]
+                .clone()
+        }
+    };
+    assert_eq!(screens(one).await, json!([kept]));
+    assert_eq!(screens(two).await, json!([]));
+}
+
+#[tokio::test]
+async fn deleting_a_playlist_takes_it_out_of_every_schedule() {
+    let server = start().await;
+    server.sign_up().await;
+    let (device, _) = server.claim(&mac(1)).await;
+    let id = device["id"].as_i64().unwrap();
+    let kept = create_playlist(&server, "Kept", &[]).await;
+    let dropped = create_playlist(&server, "Dropped", &[]).await;
+    let schedule = json!({ "playlistId": dropped, "slots": [
+        { "playlistId": dropped, "days": ["monday", "friday"], "from": "07:00", "until": "09:30" },
+        { "playlistId": kept, "days": ["saturday"] }
+    ] });
+    let (status, body) = server
+        .call(
+            "PUT",
+            &format!("/manage/devices/{id}/schedule"),
+            Some(json!({ "schedule": schedule })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["device"]["schedule"], schedule);
+    assert_eq!(
+        server
+            .call("DELETE", &format!("/manage/playlists/{dropped}"), None)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
     let (_, body) = server
         .call("GET", &format!("/manage/devices/{id}"), None)
         .await;
-    assert_eq!(body["device"]["playlist"], json!([{ "screenId": kept }]));
+    assert_eq!(
+        body["device"]["schedule"],
+        json!({ "slots": [{ "playlistId": kept, "days": ["saturday"] }] })
+    );
 }
 
 #[tokio::test]
