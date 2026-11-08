@@ -402,6 +402,26 @@ fn a_missing_image_or_value_leaves_the_rest_of_the_screen() {
 }
 
 #[test]
+fn a_value_a_template_kept_shows_as_the_text_jinja_writes() {
+    // A template that is exactly one `{{ expression }}` keeps its value, so text
+    // can arrive as a boolean or a number.
+    let drawn = |text: Value| {
+        render(
+            &screen_of(&json!({ "label": { "text": text, "size": "base", "style": "plain" } })),
+            "og_plus",
+            "gray-4",
+        )
+    };
+    for (value, text) in [
+        (json!(true), "true"),
+        (json!(false), "false"),
+        (json!(7), "7"),
+    ] {
+        assert!(drawn(value.clone()) == drawn(json!(text)), "{value}");
+    }
+}
+
+#[test]
 fn supports_what_it_can_write_and_has_tokens_for() {
     let catalog = Catalog::get();
     let drawable = |model: &str, palette: &str| {

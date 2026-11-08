@@ -4,7 +4,8 @@
 // pt is one layout pixel of TRMNL's design system.
 
 // A resolved value as text: nothing for a value a template could not produce.
-#let shown(value) = if value == none { "" } else if type(value) in (str, int, float, bool) { str(value) } else { repr(value) }
+// `str` takes no boolean; `repr` writes one as Jinja does, `true` or `false`.
+#let shown(value) = if value == none { "" } else if type(value) in (str, int, float) { str(value) } else { repr(value) }
 
 // A token's value; lengths are pixels.
 #let tok(t, name, default: none) = t.at(name, default: default)
