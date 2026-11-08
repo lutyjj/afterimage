@@ -12,6 +12,7 @@ import {
   SettlingItem,
   SettlingRows,
   useToast,
+  useUnsavedChanges,
 } from "linen";
 import { Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -65,6 +66,8 @@ export function SleepEditor({
       toast.show({ text: "Sleep saved. The display takes it at its next check-in." });
     },
   });
+
+  useUnsavedChanges(dirty, { name: "sleep", pending: save.isPending });
 
   const update = (key: number, change: Partial<Draft<SleepWindow>>) =>
     setWindows((all) => all.map((window) => (window.key === key ? { ...window, ...change } : window)));

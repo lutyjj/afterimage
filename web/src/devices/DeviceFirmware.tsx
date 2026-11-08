@@ -1,6 +1,18 @@
 import type { Device, FirmwareBoard } from "@afterimage/management-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Actions, Button, Card, CardBody, CardHead, classes, ConfirmDialog, FieldRow, Select, useToast } from "linen";
+import {
+  Actions,
+  Button,
+  Card,
+  CardBody,
+  CardHead,
+  classes,
+  ConfirmDialog,
+  FieldRow,
+  Select,
+  useToast,
+  useUnsavedChanges,
+} from "linen";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
@@ -227,6 +239,7 @@ function BoardChoice({
   });
   const sorted = [...(boards ?? [])].sort((a, b) => a.label.localeCompare(b.label));
   const changed = board !== "" && board !== current;
+  useUnsavedChanges(changed, { name: "the firmware board", pending: save.isPending });
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

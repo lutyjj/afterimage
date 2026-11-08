@@ -1,5 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { AccountMenu, Button, MenuChoice, type Place, SegmentedControl, Shell as Frame } from "linen";
+import {
+  AccountMenu,
+  Button,
+  MenuChoice,
+  type Place,
+  SegmentedControl,
+  Shell as Frame,
+  UnsavedChangesGuard,
+} from "linen";
 import { ListVideo, LogOut, PanelsTopLeft, Settings, Tablet } from "lucide-react";
 import { Form, Outlet, useLocation, useNavigation } from "react-router";
 
@@ -43,7 +51,10 @@ export function Shell() {
       phoneNav="top"
       screen={screenOf(pathname)}
     >
-      <Outlet />
+      {/* Every page's unsaved drafts ask before the person leaves them. */}
+      <UnsavedChangesGuard>
+        <Outlet />
+      </UnsavedChangesGuard>
     </Frame>
   );
 }

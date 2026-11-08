@@ -16,6 +16,7 @@ import {
   SettlingRows,
   classes,
   useToast,
+  useUnsavedChanges,
 } from "linen";
 import { Plus, X } from "lucide-react";
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -87,6 +88,8 @@ export function ScheduleEditor({
       toast.show({ text: "Schedule saved. The display takes it at its next check-in." });
     },
   });
+
+  useUnsavedChanges(dirty, { name: "the schedule", pending: save.isPending });
 
   const update = (key: number, change: Partial<Draft<ScheduleSlot>>) =>
     setSlots((all) => all.map((slot) => (slot.key === key ? { ...slot, ...change } : slot)));

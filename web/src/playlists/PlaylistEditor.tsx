@@ -18,13 +18,13 @@ import {
   TitleField,
   TopBar,
   useToast,
+  useUnsavedChanges,
 } from "linen";
 import { ArrowDown, ArrowUp, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { client, messageOf, queryClient } from "../app/client";
-import { LeaveGuard } from "../app/editing/LeaveGuard";
 import { SaveButton } from "../app/editing/SaveButton";
 import { saveState } from "../app/editing/saveState";
 import { useSaveShortcut } from "../app/editing/useSaveShortcut";
@@ -118,6 +118,7 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
   useSaveShortcut(() => {
     if (canSave) save.mutate();
   });
+  useUnsavedChanges(dirty, { name: "this playlist", pending: save.isPending || remove.isPending });
 
   const move = (index: number, by: number) =>
     setRows((all) => {
@@ -242,11 +243,6 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
           onConfirm={() => remove.mutate()}
         />
       )}
-      <LeaveGuard
-        unsaved={dirty}
-        settling={save.isPending || remove.isPending}
-        detail="The changes to this playlist since it was last saved are lost."
-      />
     </>
   );
 }

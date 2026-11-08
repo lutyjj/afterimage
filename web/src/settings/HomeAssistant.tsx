@@ -20,6 +20,7 @@ import {
   TextField,
   useToast,
   WarnDot,
+  useUnsavedChanges,
 } from "linen";
 import { type FormEvent, useState } from "react";
 
@@ -160,6 +161,15 @@ function BrokerForm({ settings, save }: { settings: MqttSettings; save: Save }) 
       discoveryPrefix: prefix.trim(),
     });
   };
+  // A save remounts the form from what the server saved, which clears this.
+  const unsaved =
+    url.trim() !== (settings.url ?? "") ||
+    username.trim() !== (settings.username ?? "") ||
+    password !== "" ||
+    removePassword ||
+    topic.trim() !== settings.topic ||
+    prefix.trim() !== settings.discoveryPrefix;
+  useUnsavedChanges(unsaved, { name: "the broker", pending: save.isPending });
   const movesDevices = publishing && (topic.trim() !== settings.topic || prefix.trim() !== settings.discoveryPrefix);
   // The server sends a saved password only to the broker and username it was
   // given for, so naming another asks for it again.

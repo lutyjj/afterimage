@@ -1,6 +1,6 @@
 import type { Device, DisplayModel } from "@afterimage/management-client";
 import { useMutation } from "@tanstack/react-query";
-import { Actions, Button, Card, CardBody, CardHead, Select, TextField, useToast } from "linen";
+import { Actions, Button, Card, CardBody, CardHead, Select, TextField, useToast, useUnsavedChanges } from "linen";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
@@ -58,6 +58,7 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
       toast.show({ text: `${updated.name} saved. The display takes it at its next check-in.` });
     },
   });
+  useUnsavedChanges(changed, { name: "the name and display", pending: save.isPending });
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

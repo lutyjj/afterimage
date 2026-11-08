@@ -12,13 +12,13 @@ import {
   TopBar,
   useToast,
   WIDE_COLUMN_CLASS,
+  useUnsavedChanges,
 } from "linen";
 import { Grid3x3, Trash2 } from "lucide-react";
 import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { client, displayModelsQuery, messageOf, queryClient, serverQuery } from "../../app/client";
-import { LeaveGuard } from "../../app/editing/LeaveGuard";
 import { SaveButton } from "../../app/editing/SaveButton";
 import { saveState } from "../../app/editing/saveState";
 import { useSaveShortcut } from "../../app/editing/useSaveShortcut";
@@ -147,6 +147,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
   useSaveShortcut(() => {
     if (canSave) save.mutate();
   });
+  useUnsavedChanges(dirty, { name: "this screen", pending: save.isPending || remove.isPending });
 
   return (
     <div
@@ -369,11 +370,6 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
           onConfirm={() => remove.mutate()}
         />
       )}
-      <LeaveGuard
-        unsaved={dirty}
-        settling={save.isPending || remove.isPending}
-        detail="The changes to this screen since it was last saved are lost."
-      />
     </div>
   );
 }
