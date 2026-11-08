@@ -779,6 +779,25 @@ async fn a_data_source_cannot_take_a_name_templates_read() {
 }
 
 #[tokio::test]
+async fn a_data_source_names_each_header_once_whatever_its_case() {
+    let server = start().await;
+    server.sign_up().await;
+    let mut document = document();
+    document["sources"] = json!({ "state": {
+        "url": "https://ha.example.test/",
+        "headers": { "Content-Type": "application/json", "content-type": "text/plain" }
+    } });
+    let (status, body) = server
+        .call(
+            "POST",
+            "/manage/screens",
+            Some(json!({ "name": "Twice", "document": document })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+}
+
+#[tokio::test]
 async fn a_session_ends_after_thirty_days() {
     let server = start().await;
     server.sign_up().await;

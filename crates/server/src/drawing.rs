@@ -23,6 +23,7 @@ use afterimage_render_typst::{Image, Renderer};
 use afterimage_trmnl::catalog::{Catalog, Model, Palette};
 use minijinja::value::{Kwargs, Serde, Value as Template};
 use minijinja::{Environment, Error, ErrorKind, State, UndefinedBehavior, context};
+use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue};
 use serde_json::{Map, Value, json};
 use tokio::sync::Semaphore;
 use tokio::time::Instant;
@@ -323,36 +324,10 @@ impl Drawing {
         let mut requests = tokio::task::JoinSet::new();
         for (name, source) in sources {
             let path = format!("/sources/{}", pointer_escape(name));
-            let request = resolver
-                .request(source, &scope, &path)
-                .map(|request| self.http.client().request(request.0, request.1));
+            let request = resolver.request(self.http.client(), source, &scope, &path);
             let name = name.clone();
             match request {
                 Ok(builder) => {
-                    let builder = match source.get("headers").and_then(Value::as_object) {
-                        Some(headers) => {
-                            headers.iter().fold(builder, |builder, (header, value)| {
-                                let value = resolver.text(
-                                    value,
-                                    &scope,
-                                    &format!("{path}/headers/{}", pointer_escape(header)),
-                                );
-                                builder.header(header.as_str(), value)
-                            })
-                        }
-                        None => builder,
-                    };
-                    let builder =
-                        match source.get("body").and_then(Value::as_str) {
-                            Some(body) => builder.header("Content-Type", "application/json").body(
-                                resolver.text(
-                                    &Value::String(body.to_owned()),
-                                    &scope,
-                                    &format!("{path}/body"),
-                                ),
-                            ),
-                            None => builder,
-                        };
                     let http = self.http.clone();
                     requests.spawn(async move {
                         let answer = tokio::time::timeout_at(deadline, fetch_json(&http, builder))
@@ -451,9 +426,7 @@ async fn fetch_image(http: &Outbound, url: &str) -> Result<Vec<u8>, String> {
 }
 
 async fn fetch_json(http: &Outbound, request: reqwest::RequestBuilder) -> Result<Value, String> {
-    let bytes = http
-        .read(request.header("Accept", "application/json"), SOURCE_BYTES)
-        .await?;
+    let bytes = http.read(request, SOURCE_BYTES).await?;
     serde_json::from_slice(&bytes)
         .map_err(|error| format!("answered something other than JSON: {error}"))
 }
@@ -556,13 +529,16 @@ impl Resolver {
         }
     }
 
-    /// A data source's method and URL.
+    /// A data source's request. It asks for JSON with `Accept` and labels a body as
+    /// JSON with `Content-Type`, and a header the source names takes the place of
+    /// the one of the same name, as the model's `Source` states.
     fn request(
         &mut self,
+        client: &reqwest::Client,
         source: &Value,
         scope: &Template,
         path: &str,
-    ) -> Result<(reqwest::Method, String), String> {
+    ) -> Result<reqwest::RequestBuilder, String> {
         let url = self.text(&source["url"], scope, &format!("{path}/url"));
         if !(url.starts_with("https://") || url.starts_with("http://")) {
             // The URL itself stays out of the message: it may hold a secret.
@@ -573,7 +549,33 @@ impl Resolver {
         } else {
             reqwest::Method::GET
         };
-        Ok((method, url))
+        let body = source.get("body").filter(|body| body.is_string());
+        let json = HeaderValue::from_static("application/json");
+        let mut headers = HeaderMap::new();
+        headers.insert(ACCEPT, json.clone());
+        if body.is_some() {
+            headers.insert(CONTENT_TYPE, json);
+        }
+        let named = source.get("headers").and_then(Value::as_object);
+        for (name, template) in named.into_iter().flatten() {
+            let value = self.text(
+                template,
+                scope,
+                &format!("{path}/headers/{}", pointer_escape(name)),
+            );
+            let header = HeaderName::try_from(name.as_str())
+                .map_err(|_| format!("`{name}` is not a header name"))?;
+            // The value itself stays out of the message: it may hold a secret.
+            let value = HeaderValue::try_from(value).map_err(|_| {
+                format!("its `{name}` header holds a control character, such as a line break")
+            })?;
+            headers.insert(header, value);
+        }
+        let request = client.request(method, url).headers(headers);
+        Ok(match body {
+            Some(body) => request.body(self.text(body, scope, &format!("{path}/body"))),
+            None => request,
+        })
     }
 
     fn document(&mut self, document: &Value, scope: &Template) -> Value {

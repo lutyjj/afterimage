@@ -17,12 +17,12 @@ use common::{FIRMWARE, READINGS, mac, start, start_on_data, start_with_secrets};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-/// A JSON endpoint whose answer the test changes, which records the
-/// `Authorization` it was sent.
+/// A JSON endpoint whose answer the test changes, which records the headers of
+/// the last request it was sent.
 #[derive(Clone, Default)]
 struct Source {
     answer: Arc<Mutex<Option<Value>>>,
-    authorization: Arc<Mutex<Option<String>>>,
+    headers: Arc<Mutex<HeaderMap>>,
 }
 
 impl Source {
@@ -32,17 +32,14 @@ impl Source {
             headers: HeaderMap,
         ) -> axum::response::Response {
             use axum::response::IntoResponse;
-            *source.authorization.lock().unwrap() = headers
-                .get("authorization")
-                .and_then(|value| value.to_str().ok())
-                .map(str::to_owned);
+            *source.headers.lock().unwrap() = headers;
             match source.answer.lock().unwrap().clone() {
                 Some(value) => Json(value).into_response(),
                 None => StatusCode::SERVICE_UNAVAILABLE.into_response(),
             }
         }
         let app = axum::Router::new()
-            .route("/state", get(answer))
+            .route("/state", get(answer).post(answer))
             .with_state(self.clone());
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("http://{}/state", listener.local_addr().unwrap());
@@ -52,6 +49,17 @@ impl Source {
 
     fn set(&self, answer: Option<Value>) {
         *self.answer.lock().unwrap() = answer;
+    }
+
+    /// Every value of the header `name` in the last request, in the order sent.
+    fn sent(&self, name: &str) -> Vec<String> {
+        self.headers
+            .lock()
+            .unwrap()
+            .get_all(name)
+            .iter()
+            .map(|value| value.to_str().unwrap().to_owned())
+            .collect()
     }
 }
 
@@ -174,10 +182,7 @@ async fn a_claimed_device_shows_its_screen_drawn_from_its_data() {
         filename.len() <= 31,
         "the firmware keeps 31 characters: {filename}"
     );
-    assert_eq!(
-        source.authorization.lock().unwrap().as_deref(),
-        Some("Bearer s3cret")
-    );
+    assert_eq!(source.sent("authorization"), ["Bearer s3cret"]);
 
     let response = download(&server, &answer, &key).await;
     assert_eq!(response.status(), StatusCode::OK);
@@ -286,10 +291,7 @@ async fn a_screen_never_shows_a_secret() {
         )
         .await;
     assert_eq!(body["problems"], json!([]), "{body}");
-    assert_eq!(
-        source.authorization.lock().unwrap().as_deref(),
-        Some("Bearer s3cret")
-    );
+    assert_eq!(source.sent("authorization"), ["Bearer s3cret"]);
     // View templates do not have `secrets`: the label above showed nothing, and a
     // template that needs a secret's value fails because there is none.
     let document = json!({ "content": { "value": { "text": "{{ secrets.HA_TOKEN | length }}" } } });
@@ -556,10 +558,51 @@ async fn a_secret_stays_out_of_failures_and_echoed_answers() {
         "Bearer [secret HA_TOKEN]"
     );
     assert_eq!(
-        echo.authorization.lock().unwrap().as_deref(),
-        Some("Bearer s3cret-value"),
+        echo.sent("authorization"),
+        ["Bearer s3cret-value"],
         "the request itself carries the secret"
     );
+}
+
+#[tokio::test]
+async fn a_source_sends_each_header_once_and_its_own_replace_the_servers() {
+    let source = Source::default();
+    source.set(Some(json!({ "state": "done" })));
+    let url = source.serve().await;
+    let server = start().await;
+    server.sign_up().await;
+    let preview = |headers: Value| {
+        let document = json!({
+            "sources": { "script": { "method": "POST", "url": url, "headers": headers, "body": "{}" } },
+            "content": { "label": { "text": "{{ script.state }}" } }
+        });
+        server.call(
+            "POST",
+            "/manage/preview",
+            Some(
+                json!({ "document": document, "display": { "model": "og_png", "palette": "bw" } }),
+            ),
+        )
+    };
+
+    let (_, body) = preview(json!({})).await;
+    assert_eq!(body["problems"], json!([]), "{body}");
+    assert_eq!(source.sent("content-type"), ["application/json"]);
+    assert_eq!(source.sent("accept"), ["application/json"]);
+
+    // Header names ignore case, so a source's own header replaces the server's
+    // however it is spelled.
+    let (_, body) = preview(json!({
+        "content-type": "application/merge-patch+json",
+        "ACCEPT": "application/geo+json"
+    }))
+    .await;
+    assert_eq!(body["problems"], json!([]), "{body}");
+    assert_eq!(
+        source.sent("content-type"),
+        ["application/merge-patch+json"]
+    );
+    assert_eq!(source.sent("accept"), ["application/geo+json"]);
 }
 
 #[tokio::test]

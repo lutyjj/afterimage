@@ -48,13 +48,16 @@ map Sources {
 }
 
 /// An HTTP request that answers JSON. The server sends it each time it draws the
-/// screen and gives up after 10 seconds.
+/// screen and gives up after 10 seconds. It asks for JSON with `Accept:
+/// application/json` and labels a body with `Content-Type: application/json`; a
+/// header of the same name in `headers` takes the place of either.
 structure Source {
     @required
     url: Template
 
     method: HttpMethod = "GET"
 
+    /// Header names ignore case, as HTTP's do, so a source names each header once.
     headers: Headers
 
     /// A JSON request body, as a template.

@@ -1,5 +1,7 @@
 //! Screens, their previews, and the secrets their data sources may read.
 
+use std::collections::HashSet;
+
 use afterimage_management_api::server::Extension;
 use afterimage_management_api::{error, input, model, output};
 
@@ -7,20 +9,31 @@ use super::{Caller, Shared, internal, invalid, wire};
 use crate::screens::TEMPLATE_NAMES;
 use crate::{drawing, showing};
 
-/// Refuses a data source named like something templates already read.
+/// Refuses a data source named like something templates already read, and one
+/// that names a header twice, since header names ignore case.
 fn check(document: &model::ScreenDocument) -> Result<(), error::ValidationException> {
-    let taken = document
-        .sources
-        .iter()
-        .flat_map(|sources| sources.inner().keys())
-        .find(|name| TEMPLATE_NAMES.contains(&name.as_str()));
-    match taken {
-        Some(name) => Err(invalid(format!(
-            "A data source cannot be named `{}`: templates read that name already.",
-            name.as_str()
-        ))),
-        None => Ok(()),
+    for (name, source) in document.sources.iter().flat_map(model::Sources::inner) {
+        if TEMPLATE_NAMES.contains(&name.as_str()) {
+            return Err(invalid(format!(
+                "A data source cannot be named `{}`: templates read that name already.",
+                name.as_str()
+            )));
+        }
+        let mut named = HashSet::new();
+        let twice = source
+            .headers
+            .iter()
+            .flat_map(|headers| headers.inner().keys())
+            .find(|header| !named.insert(header.as_str().to_ascii_lowercase()));
+        if let Some(header) = twice {
+            return Err(invalid(format!(
+                "The data source `{}` names the header `{}` twice: header names ignore case.",
+                name.as_str(),
+                header.as_str()
+            )));
+        }
     }
+    Ok(())
 }
 
 fn not_found() -> error::NotFound {
