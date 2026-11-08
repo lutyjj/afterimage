@@ -9,6 +9,17 @@ export interface Use {
   when: string[];
 }
 
+/** What deleting a playlist does to the displays that show it, as the server's
+ * deletion does it; `undefined` until the displays have loaded, when it says
+ * what happens without naming anyone. */
+export function playlistDeletion(uses: readonly Use[] | undefined): string {
+  const effect =
+    "Where it was usually shown, nothing is scheduled until another playlist takes its place; a display pinned on it goes back to its schedule.";
+  if (uses === undefined) return `It leaves every schedule that shows it. ${effect}`;
+  if (uses.length === 0) return "No display shows it.";
+  return `It leaves the schedule of ${uses.map(({ device }) => device.name).join(", ")}. ${effect}`;
+}
+
 /** The displays that show the playlist, in their order, each with when. */
 export function usesOf(playlistId: number, devices: readonly Device[]): Use[] {
   return devices.flatMap((device) => {

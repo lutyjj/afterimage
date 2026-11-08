@@ -29,7 +29,7 @@ const NIGHT = { from: "23:00", until: "07:00" };
 /** At most as many windows as the server keeps. */
 const MOST_WINDOWS = 14;
 
-/** When a device sleeps, on the same days and times a playlist entry takes, and
+/** When a device sleeps, on the same days and times a schedule slot takes, and
  * what it shows meanwhile. */
 export function SleepEditor({
   device,
@@ -45,7 +45,7 @@ export function SleepEditor({
   const [screenId, setScreenId] = useState(saved.screenId);
   const dirty = !sameAs(windows, saved.windows) || screenId !== saved.screenId;
 
-  // Sleep saved elsewhere replaces an untouched draft, as the playlist's does.
+  // Sleep saved elsewhere replaces an untouched draft, as the schedule's does.
   const previous = useRef(saved);
   useEffect(() => {
     const before = previous.current;

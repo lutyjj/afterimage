@@ -165,8 +165,9 @@ structure Showing {
     /// for an empty playlist or the one that says when it wakes.
     screenId: Id
 
-    /// The playlist the device was on at the check-in, by its schedule or pinned;
-    /// absent while it shows a pinned screen, sleeps, or has no playlist then.
+    /// The playlist the image was drawn from, by the device's schedule or
+    /// pinned; absent for a pinned screen, a sleep screen, or an image drawn
+    /// with no playlist.
     playlistId: Id
 
     @required

@@ -254,7 +254,7 @@ A playlist is one of the account's screens in order; a screen may stand in it mo
 
 - Any number of devices show one playlist, and each goes through it on its own.
 - A device that comes to another playlist starts at its first screen. One that comes back to the playlist it last went through, after sleep, a pin or a gap, goes on from where it stood.
-- Changing a playlist's screens, or deleting one of them, starts every device on it again at its first screen.
+- Changing a playlist's screens, or deleting one of them, starts every device on it again at its first screen; renaming it does not.
 - Deleting a playlist takes it out of every schedule.
 
 ### Schedules

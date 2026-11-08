@@ -36,20 +36,30 @@ impl Playlists {
     ///
     /// When storage fails.
     pub async fn list(&self, account_id: i64) -> Result<Vec<Playlist>, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
+        // One query: each playlist with its screens in order, an empty one as a
+        // row without a screen.
         let rows = sqlx::query!(
-            "SELECT id, name FROM playlists WHERE account_id = ? ORDER BY name, id",
+            "SELECT playlists.id, playlists.name, playlist_screens.screen_id AS \"screen_id?\"
+             FROM playlists
+             LEFT JOIN playlist_screens ON playlist_screens.playlist_id = playlists.id
+             WHERE playlists.account_id = ?
+             ORDER BY playlists.name, playlists.id, playlist_screens.position",
             account_id
         )
-        .fetch_all(&mut *tx)
+        .fetch_all(&self.pool)
         .await?;
-        let mut playlists = Vec::with_capacity(rows.len());
+        let mut playlists: Vec<Playlist> = Vec::new();
         for row in rows {
-            playlists.push(Playlist {
-                id: row.id,
-                name: row.name,
-                screens: screens(&mut tx, row.id).await?,
-            });
+            if playlists.last().is_none_or(|last| last.id != row.id) {
+                playlists.push(Playlist {
+                    id: row.id,
+                    name: row.name,
+                    screens: Vec::new(),
+                });
+            }
+            if let (Some(playlist), Some(screen)) = (playlists.last_mut(), row.screen_id) {
+                playlist.screens.push(screen);
+            }
         }
         Ok(playlists)
     }
@@ -94,8 +104,9 @@ impl Playlists {
         Ok(playlist)
     }
 
-    /// Replaces the playlist's name and screens. Every device going through it
-    /// starts again at its first screen.
+    /// Replaces the playlist's name and screens. When its screens change, every
+    /// device going through it starts again at its first screen; a new name
+    /// alone leaves them where they are.
     ///
     /// # Errors
     ///
@@ -120,16 +131,19 @@ impl Playlists {
         if renamed.rows_affected() == 0 {
             return Ok(None);
         }
+        let before = self::screens(&mut tx, id).await?;
         sqlx::query!("DELETE FROM playlist_screens WHERE playlist_id = ?", id)
             .execute(&mut *tx)
             .await?;
         write_screens(&mut tx, account_id, id, screens).await?;
-        sqlx::query!(
-            "UPDATE devices SET playlist_position = NULL WHERE position_playlist_id = ?",
-            id
-        )
-        .execute(&mut *tx)
-        .await?;
+        if before != screens {
+            sqlx::query!(
+                "UPDATE devices SET playlist_position = NULL WHERE position_playlist_id = ?",
+                id
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
         let playlist = load(&mut tx, account_id, id).await?;
         tx.commit().await?;
         Ok(playlist)

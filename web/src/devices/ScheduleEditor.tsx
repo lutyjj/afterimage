@@ -25,6 +25,7 @@ import { client, messageOf, queryClient } from "../app/client";
 import { timeOfDay } from "../app/format";
 import { DayTrack, HourAxis, marksOf, type Names, namesOf } from "./DayTrack";
 import { HoursFields } from "./HoursFields";
+import { pinOf, pinValue } from "./pin";
 import { deviceQuery, devicesQuery } from "./queries";
 import { dayOf, nowIn, overlapOf, type Plan, shortDay, WEEK } from "./schedule";
 import { type Draft, draftOf, entryOf, newKey, sameAs } from "./scheduleDraft";
@@ -98,6 +99,8 @@ export function ScheduleEditor({
   };
 
   const drafted = useMemo(() => slots.map(entryOf), [slots]);
+  const windows = device.sleep.windows;
+  const plan = useMemo(() => ({ schedule: { playlistId: usual, slots: drafted }, windows }), [usual, drafted, windows]);
   const overlap = useMemo(() => overlapOf(drafted), [drafted]);
   const noDays = slots.some((slot) => slot.days?.length === 0);
   const names = namesOf(playlists, screens);
@@ -128,11 +131,7 @@ export function ScheduleEditor({
           </p>
         ) : (
           <>
-            <Week
-              plan={{ schedule: { playlistId: usual, slots: drafted }, windows: device.sleep.windows }}
-              names={names}
-              timeZone={timeZone}
-            />
+            <Week plan={plan} names={names} timeZone={timeZone} />
             <div className="max-w-md">
               <Select
                 label="Usually shows"
@@ -285,13 +284,15 @@ function SlotRow({
  * It draws the schedule being edited over the saved sleep. */
 function Week({ plan, names, timeZone }: { plan: Plan; names: Names; timeZone: string | undefined }) {
   const now = timeZone ? nowIn(timeZone) : undefined;
+  // Laid out again only when the plan changes, not at each keystroke elsewhere.
+  const days = useMemo(() => WEEK.map((day) => [day, dayOf(plan, day)] as const), [plan]);
   return (
     <div role="group" aria-label="Each week" className="grid gap-2">
       <span aria-hidden="true" className="text-sm font-medium text-text-secondary">
         Each week
       </span>
       <div className="grid grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5">
-        {WEEK.map((day) => {
+        {days.map(([day, stretches]) => {
           const today = day === now?.day;
           return (
             <Fragment key={day}>
@@ -302,7 +303,7 @@ function Week({ plan, names, timeZone }: { plan: Plan; names: Names; timeZone: s
                 {shortDay(day)}
               </span>
               <DayTrack
-                marks={marksOf(dayOf(plan, day), names)}
+                marks={marksOf(stretches, names)}
                 now={today ? now?.minute : undefined}
                 label={today ? `${DAY_NAMES[day]}, today` : DAY_NAMES[day]}
               />
@@ -345,20 +346,24 @@ function PinRow({
     onError: (error) => toast.show({ text: `Not changed. ${messageOf(error)}`, sticky: true }),
   });
   const { playlistId, screenId } = device.shows;
-  const value =
-    playlistId !== undefined ? `playlist:${playlistId}` : screenId !== undefined ? `screen:${screenId}` : "";
+  const value = pinValue(device.shows);
   const lost =
     (playlistId !== undefined && !playlists.some((playlist) => playlist.id === playlistId)) ||
     (screenId !== undefined && !screens.some((screen) => screen.id === screenId));
-  const pinnedName =
-    playlistId !== undefined ? names.playlist(playlistId) : screenId !== undefined ? names.screen(screenId) : undefined;
+  // A playlist and a screen may share a name, so the kind is named too.
+  const pinned =
+    playlistId !== undefined
+      ? `the playlist ${names.playlist(playlistId)}`
+      : screenId !== undefined
+        ? `the screen ${names.screen(screenId)}`
+        : undefined;
   return (
     <SettingRow
       title="Showing"
       description={
-        pinnedName === undefined
+        pinned === undefined
           ? "Pin a playlist or a screen to show it in place of the schedule, until set back."
-          : `Pinned to ${pinnedName}. The schedule waits until this is set back to it.`
+          : `Pinned to ${pinned}. The schedule waits until this is set back to it.`
       }
     >
       <CellSelect
@@ -372,7 +377,10 @@ function PinRow({
             ? [
                 {
                   label: "Playlists",
-                  choices: playlists.map((playlist) => ({ value: `playlist:${playlist.id}`, label: playlist.name })),
+                  choices: playlists.map((playlist) => ({
+                    value: pinValue({ playlistId: playlist.id }),
+                    label: playlist.name,
+                  })),
                 },
               ]
             : []),
@@ -380,21 +388,14 @@ function PinRow({
             ? [
                 {
                   label: "Screens",
-                  choices: screens.map((screen) => ({ value: `screen:${screen.id}`, label: screen.name })),
+                  choices: screens.map((screen) => ({ value: pinValue({ screenId: screen.id }), label: screen.name })),
                 },
               ]
             : []),
         ]}
         value={value}
         onValueChange={(chosen) => {
-          const [kind, id] = chosen.split(":");
-          pin.mutate(
-            kind === "playlist"
-              ? { playlistId: Number(id) }
-              : kind === "screen"
-                ? { screenId: Number(id) }
-                : { schedule: {} },
-          );
+          pin.mutate(pinOf(chosen));
         }}
       />
     </SettingRow>

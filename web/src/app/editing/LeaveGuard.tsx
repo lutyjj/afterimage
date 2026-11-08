@@ -3,10 +3,12 @@ import { useEffect, useRef } from "react";
 import { useBlocker } from "react-router";
 
 /** Leaving with unsaved changes asks first, inside the app and when the tab
- * closes. `detail` says what is lost. */
-export function LeaveGuard({ unsaved, detail }: { unsaved: boolean; detail: string }) {
+ * closes. While the editor's own save or delete is under way (`settling`), it
+ * may move to another page without asking, as it does once that ends; closing
+ * the tab still asks, since the save may yet fail. `detail` says what is lost. */
+export function LeaveGuard({ unsaved, settling, detail }: { unsaved: boolean; settling: boolean; detail: string }) {
   const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) => unsaved && currentLocation.pathname !== nextLocation.pathname,
+    ({ currentLocation, nextLocation }) => unsaved && !settling && currentLocation.pathname !== nextLocation.pathname,
   );
   // Set as the person chooses to leave, so the dialog closing does not stay.
   const leaving = useRef(false);

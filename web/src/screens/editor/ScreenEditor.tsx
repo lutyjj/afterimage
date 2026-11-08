@@ -1,7 +1,6 @@
-import type { Device, Display, Playlist, Screen, ScreenDocument } from "@afterimage/management-client";
+import type { Display, Screen, ScreenDocument } from "@afterimage/management-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Button,
   buttonClass,
   CellSelect,
   classes,
@@ -29,6 +28,7 @@ import { playlistsQuery } from "../../playlists/queries";
 import { screenQuery, screensQuery } from "../queries";
 import { Editor, type EditorHandle, type Located } from "./Editor";
 import { SourcesPanel } from "./SourcesPanel";
+import { screenDeletion } from "./deletion";
 import { STARTERS } from "./starters";
 import { usePreview } from "./usePreview";
 import { openingText, parseYaml, rangeOf } from "./yamlDocument";
@@ -132,6 +132,8 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
     mutationFn: () => client.deleteScreen({ screenId: screen?.id ?? 0 }),
     onSuccess: async () => {
       setBaseline({ text, name: name.trim() });
+      // The screen is gone, so its own query is dropped rather than asked again.
+      if (screen) queryClient.removeQueries({ queryKey: screenQuery(screen.id).queryKey });
       await queryClient.invalidateQueries({ queryKey: screensQuery.queryKey });
       await queryClient.invalidateQueries({ queryKey: playlistsQuery.queryKey });
       await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
@@ -141,8 +143,6 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
     onError: (error) => toast.show({ text: `The screen was not deleted. ${messageOf(error)}`, sticky: true }),
   });
   const playlists = useQuery(playlistsQuery).data;
-  const holding = playlists?.filter((playlist) => screen !== undefined && playlist.screens.includes(screen.id)) ?? [];
-  const pinnedOn = devices?.filter((device) => screen !== undefined && device.shows.screenId === screen.id) ?? [];
 
   useSaveShortcut(() => {
     if (canSave) save.mutate();
@@ -363,31 +363,19 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
           open={confirmDelete}
           onOpenChange={setConfirmDelete}
           title={`Delete ${screen.name}?`}
-          detail={deleteDetail(holding, pinnedOn)}
+          detail={screenDeletion(screen.id, playlists, devices)}
           confirmLabel="Delete screen"
           destructive
           onConfirm={() => remove.mutate()}
         />
       )}
       <LeaveGuard
-        unsaved={dirty && !save.isPending && !remove.isPending}
+        unsaved={dirty}
+        settling={save.isPending || remove.isPending}
         detail="The changes to this screen since it was last saved are lost."
       />
     </div>
   );
-}
-
-/** What deleting the screen does to the playlists that hold it and the
- * displays pinned on it. */
-function deleteDetail(holding: readonly Playlist[], pinnedOn: readonly Device[]): string {
-  const names = (things: ReadonlyArray<{ name: string }>) => things.map((thing) => thing.name).join(", ");
-  const parts = [
-    holding.length > 0 &&
-      `It leaves ${holding.length === 1 ? "the playlist" : "the playlists"} ${names(holding)}, whose displays move on to their other screens.`,
-    pinnedOn.length > 0 &&
-      `${names(pinnedOn)} ${pinnedOn.length === 1 ? "goes" : "go"} back to ${pinnedOn.length === 1 ? "its" : "their"} schedule.`,
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(" ") : "No playlist holds it.";
 }
 
 /** Where in the document a problem arose. */

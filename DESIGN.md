@@ -125,7 +125,7 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 | Token | Marks |
 |---|---|
 | `ink` | What a hand can act on or has set: links, the current place, focus, the primary action, chosen days, the caret, layout guides, a finished firmware leg |
-| `warn` | A device state that wants the person: not checked in, not seen lately, nothing scheduled |
+| `warn` | A device state that wants the person: not checked in, not seen lately, nothing scheduled, an empty playlist |
 | `danger` | Removal and failure: destructive buttons, editor problems, a failed firmware leg |
 | `positive` | A broker that is connected |
 | `epaper` | The ground of every display's screen, in both themes |
@@ -144,7 +144,7 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 - linen's `Shell` holds every signed-in screen: the rail on a desk, and on a phone a bar along the top with the wordmark and the places, which scrolls away and leaves the whole screen to the content. The screen editor holds the rail folded so the YAML and a 1:1 preview share the width.
 - A display's card sets its screen beside its facts (at least 15rem) from 72rem, stacked below.
 - The editor is `wide`: its YAML (at least 24rem) beside a preview column as wide as the display, each scrolling on its own; below 64rem they stack.
-- A display and a screen name the list above them in a small trail over their title ("Devices /" over "Living room").
+- A display, a playlist and a screen name the list above them in a small trail over their title ("Devices /" over "Living room").
 
 ## Components
 

@@ -85,7 +85,8 @@ operation GetPlaylist {
 }
 
 /// Replaces the playlist's name and screens. Every device showing it takes the
-/// change at its next check-in and starts again at its first screen.
+/// change at its next check-in; a change of screens starts it again at the
+/// first.
 @idempotent
 @http(method: "PUT", uri: "/manage/playlists/{playlistId}")
 @optionalAuth

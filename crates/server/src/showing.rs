@@ -152,9 +152,7 @@ pub async fn next(
             {
                 // The device keeps its image, and the playlist moves past the screen
                 // that failed, so the next check-in shows the one after it.
-                devices
-                    .show(device.id, position, showing, now + wait)
-                    .await?;
+                devices.show(device, position, showing, now + wait).await?;
                 return Ok(Shown {
                     image: showing.image.clone(),
                     wait,
@@ -336,7 +334,7 @@ impl Record<'_> {
             asleep: drawn.asleep,
         };
         self.devices
-            .show(device.id, position, &showing, self.now + self.wait)
+            .show(device, position, &showing, self.now + self.wait)
             .await?;
         Ok(Shown {
             image,

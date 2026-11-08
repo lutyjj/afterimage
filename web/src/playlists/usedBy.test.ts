@@ -1,7 +1,7 @@
 import type { Device } from "@afterimage/management-client";
 import { describe, expect, it } from "vitest";
 
-import { usesOf } from "./usedBy";
+import { playlistDeletion, usesOf } from "./usedBy";
 
 function device(id: number, change: Partial<Device>): Device {
   return {
@@ -42,5 +42,14 @@ describe("the displays a playlist serves", () => {
       [1, ["Usually"]],
       [2, ["Pinned", "Weekdays, all day", "Sun, all day"]],
     ]);
+  });
+});
+
+describe("deleting a playlist", () => {
+  it("names the displays it leaves, and no one before they have loaded", () => {
+    const kitchen = device(1, { name: "Kitchen", schedule: { playlistId: 7, slots: [] } });
+    expect(playlistDeletion(usesOf(7, [kitchen]))).toMatch(/^It leaves the schedule of Kitchen\./);
+    expect(playlistDeletion([])).toBe("No display shows it.");
+    expect(playlistDeletion(undefined)).toMatch(/^It leaves every schedule that shows it\./);
   });
 });

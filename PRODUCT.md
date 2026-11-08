@@ -53,6 +53,6 @@ No screenshots, customers or testimonials exist; future work must not invent the
 ## Product Principles
 
 - The screens are the subject: the UI frames what a display will show and stays out of its way.
-- Every state a device can be in is visible and named plainly: waiting to be claimed, showing a screen, nothing scheduled, not seen lately.
+- Every state a device can be in is visible and named plainly: waiting to be claimed, showing a screen, nothing scheduled, an empty playlist, not seen lately.
 - Writing a screen is technical, everything around it is not.
 - Nothing destructive happens without saying what it does to the device.

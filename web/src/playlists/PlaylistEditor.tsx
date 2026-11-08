@@ -31,7 +31,7 @@ import { useSaveShortcut } from "../app/editing/useSaveShortcut";
 import { devicesQuery } from "../devices/queries";
 import { screensQuery } from "../screens/queries";
 import { playlistQuery, playlistsQuery } from "./queries";
-import { type Use, usesOf } from "./usedBy";
+import { playlistDeletion, type Use, usesOf } from "./usedBy";
 
 const TRAIL = [{ to: "/playlists", label: "Playlists" }];
 
@@ -101,6 +101,8 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
   const remove = useMutation({
     mutationFn: () => client.deletePlaylist({ playlistId: playlist?.id ?? 0 }),
     onSuccess: async () => {
+      // The playlist is gone, so its own query is dropped rather than asked again.
+      if (playlist) queryClient.removeQueries({ queryKey: playlistQuery(playlist.id).queryKey });
       await queryClient.invalidateQueries({ queryKey: playlistsQuery.queryKey });
       await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
       toast.show({ text: `${playlist?.name ?? "The playlist"} deleted` });
@@ -127,7 +129,8 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
     const unused = screens?.find((screen) => !chosen.includes(screen.id)) ?? screens?.[0];
     if (unused) setRows((all) => [...all, { key: nextKey++, screenId: unused.id }]);
   };
-  const uses = playlist ? usesOf(playlist.id, devices ?? []) : [];
+  // Unknown until the displays have loaded.
+  const uses = playlist && devices ? usesOf(playlist.id, devices) : undefined;
 
   return (
     <>
@@ -232,14 +235,15 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
           open={confirmDelete}
           onOpenChange={setConfirmDelete}
           title={`Delete ${playlist.name}?`}
-          detail={deleteDetail(uses)}
+          detail={playlistDeletion(uses)}
           confirmLabel="Delete playlist"
           destructive
           onConfirm={() => remove.mutate()}
         />
       )}
       <LeaveGuard
-        unsaved={dirty && !save.isPending && !remove.isPending}
+        unsaved={dirty}
+        settling={save.isPending || remove.isPending}
         detail="The changes to this playlist since it was last saved are lost."
       />
     </>
@@ -299,14 +303,18 @@ function ScreenRow({
 }
 
 /** The displays that show the playlist, and when. */
-function ShownOn({ uses }: { uses: readonly Use[] }) {
+function ShownOn({ uses }: { uses: readonly Use[] | undefined }) {
   return (
     <Card>
       <CardHead
         title="Shown on"
         description="A display takes a playlist in its schedule: as the one it usually shows, or for some days and hours."
       />
-      {uses.length === 0 ? (
+      {uses === undefined ? (
+        <CardBody>
+          <p className="text-sm text-text-muted">Reading displays</p>
+        </CardBody>
+      ) : uses.length === 0 ? (
         <CardBody>
           <p className="text-sm text-text-secondary">
             No display shows it yet. Choose it in a display's schedule on{" "}
@@ -336,11 +344,4 @@ function UseRow({ device, when }: { device: Device; when: readonly string[] }) {
       <span className="text-text-secondary">{when.join(" · ")}</span>
     </li>
   );
-}
-
-/** What deleting the playlist does to the displays that show it. */
-function deleteDetail(uses: readonly Use[]): string {
-  if (uses.length === 0) return "No display shows it.";
-  const names = uses.map(({ device }) => device.name).join(", ");
-  return `It leaves the schedule of ${names}. Where it was usually shown, nothing is scheduled until another playlist takes its place; a display pinned on it goes back to its schedule.`;
 }

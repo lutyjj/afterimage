@@ -66,8 +66,8 @@ pub struct Showing {
     pub image: String,
     /// The screen it was drawn from; `None` for one of the server's own.
     pub screen_id: Option<i64>,
-    /// The playlist the device was on; `None` for a pinned screen, a sleep
-    /// screen, or a check-in without a playlist.
+    /// The playlist it was drawn from; `None` for a pinned screen, a sleep
+    /// screen, or an image drawn with no playlist.
     pub playlist_id: Option<i64>,
     pub rendered_at: i64,
     /// Whether it is the device's sleep screen.
@@ -314,21 +314,44 @@ impl Devices {
         self.holding(registration).await
     }
 
-    /// Records the image a device now shows, where it stands in its playlist,
-    /// and when the device was asked to check in next.
+    /// Records the image `device` now shows, where it stands in its playlist,
+    /// and when it was asked to check in next. A playlist changed since the
+    /// check-in read `device` has started its devices again at its first screen,
+    /// and that start stands: the position moves only from where the check-in
+    /// found it.
     ///
     /// # Errors
     ///
     /// When storage fails.
     pub async fn show(
         &self,
-        id: i64,
+        device: &Device,
         position: Option<Position>,
         showing: &Showing,
         wakes_at: i64,
     ) -> Result<(), Error> {
-        let playlist = position.map(|position| position.playlist_id);
-        let index = position.and_then(|position| i64::try_from(position.index).ok());
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let Some(stored) = sqlx::query!(
+            "SELECT position_playlist_id, playlist_position FROM devices WHERE id = ?",
+            device.id
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        else {
+            // Removed while it was drawn.
+            return Ok(());
+        };
+        let (playlist, index) =
+            if self::position(stored.position_playlist_id, stored.playlist_position)
+                == device.position
+            {
+                (
+                    position.map(|position| position.playlist_id),
+                    position.and_then(|position| i64::try_from(position.index).ok()),
+                )
+            } else {
+                (stored.position_playlist_id, stored.playlist_position)
+            };
         sqlx::query!(
             "UPDATE devices SET position_playlist_id = ?, playlist_position = ?, image_name = ?,
                                 image_screen_id = ?, image_playlist_id = ?, rendered_at = ?,
@@ -342,10 +365,11 @@ impl Devices {
             showing.rendered_at,
             showing.asleep,
             wakes_at,
-            id
+            device.id
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+        tx.commit().await?;
         Ok(())
     }
 

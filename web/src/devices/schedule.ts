@@ -106,7 +106,16 @@ function shownAt(plan: Plan, day: Weekday, minute: number): Shown {
   return playlistId === undefined ? { kind: "nothing" } : { kind: "playlist", playlistId };
 }
 
-const same = (one: Shown, other: Shown) => JSON.stringify(one) === JSON.stringify(other);
+function same(one: Shown, other: Shown): boolean {
+  switch (one.kind) {
+    case "playlist":
+      return other.kind === "playlist" && other.playlistId === one.playlistId;
+    case "screen":
+      return other.kind === "screen" && other.screenId === one.screenId;
+    default:
+      return other.kind === one.kind;
+  }
+}
 
 /** What the device shows across `day`, from midnight to midnight, as stretches
  * that each show one thing. */
@@ -175,7 +184,7 @@ export function daysLabel(days: Weekday[] | undefined): string {
   return sorted.map(shortDay).join(", ");
 }
 
-/** "Mon–Fri, all day", "Every day, 07:00–09:00": a slot or window in words. */
+/** "Weekdays, all day", "Every day, 07:00–09:00": a slot or window in words. */
 export function hoursLabel(hours: Hours): string {
   const days = daysLabel(hours.days);
   const window = windowLabel(hours);
