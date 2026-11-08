@@ -152,16 +152,26 @@ function BrokerForm({ settings, save }: { settings: MqttSettings; save: Save }) 
   const publishing = settings.url !== undefined;
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    save.mutate({
-      url: url.trim(),
-      username: username.trim() || undefined,
-      // Empty keeps the saved password, and removing sends it empty.
-      password: removePassword ? "" : password || undefined,
-      topic: topic.trim(),
-      discoveryPrefix: prefix.trim(),
-    });
+    save.mutate(
+      {
+        url: url.trim(),
+        username: username.trim() || undefined,
+        // Empty keeps the saved password, and removing sends it empty.
+        password: removePassword ? "" : password || undefined,
+        topic: topic.trim(),
+        discoveryPrefix: prefix.trim(),
+      },
+      {
+        // The server never answers with the password, so a save that changes
+        // only the password leaves the settings, and this form, as they were.
+        onSuccess: () => {
+          setPassword("");
+          setRemovePassword(false);
+        },
+      },
+    );
   };
-  // A save remounts the form from what the server saved, which clears this.
+  // A save of anything else remounts the form from what the server saved.
   const unsaved =
     url.trim() !== (settings.url ?? "") ||
     username.trim() !== (settings.username ?? "") ||

@@ -76,10 +76,17 @@ export function DeviceDetail() {
               </Fact>
             </DeviceFacts>
           </Card>
-          <ScheduleEditor device={data} playlists={playlists} screens={screens} timeZone={timeZone} />
-          <SleepEditor device={data} screens={screens} timeZone={timeZone} />
-          <DeviceSettings device={data} models={models} />
-          <DeviceFirmware device={data} timeZone={timeZone} />
+          {/* Keyed by the display, so a draft never carries over to another. */}
+          <ScheduleEditor
+            key={`schedule-${data.id}`}
+            device={data}
+            playlists={playlists}
+            screens={screens}
+            timeZone={timeZone}
+          />
+          <SleepEditor key={`sleep-${data.id}`} device={data} screens={screens} timeZone={timeZone} />
+          <DeviceSettings key={`settings-${data.id}`} device={data} models={models} />
+          <DeviceFirmware key={`firmware-${data.id}`} device={data} timeZone={timeZone} />
           <RemoveDevice device={data} />
         </div>
       </Content>
