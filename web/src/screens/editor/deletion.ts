@@ -11,7 +11,7 @@ export function screenDeletion(
   devices: readonly Device[] | undefined,
 ): string {
   if (playlists === undefined || devices === undefined) {
-    return "It leaves every playlist that holds it, and displays pinned on it go back to their schedules.";
+    return "It leaves every playlist that holds it, which may leave one with no screens; displays pinned on it go back to their schedules, and those that sleep on it sleep on Afterimage's own sleep screen instead.";
   }
   const holding = playlists.filter((playlist) => playlist.screens.includes(screenId));
   const emptied = holding.filter((playlist) => playlist.screens.every((id) => id === screenId));

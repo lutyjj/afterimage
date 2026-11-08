@@ -51,6 +51,15 @@ pub struct Position {
     pub index: usize,
 }
 
+/// A step a check-in took through a playlist: the playlist's screens as the
+/// check-in read them, and the position of the one it showed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Step<'a> {
+    pub playlist_id: i64,
+    pub screens: &'a [i64],
+    pub index: usize,
+}
+
 /// When a device sleeps, and the screen it shows meanwhile; `None` for the
 /// server's own.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -314,58 +323,58 @@ impl Devices {
         self.holding(registration).await
     }
 
-    /// Records the image `device` now shows, where it stands in its playlist,
-    /// and when it was asked to check in next. A playlist changed since the
-    /// check-in read `device` has started its devices again at its first screen,
-    /// and that start stands: the position moves only from where the check-in
-    /// found it.
+    /// Records the image a device now shows, the step its check-in took
+    /// through a playlist, and when it was asked to check in next.
+    ///
+    /// The step counts only while the playlist still holds the screens the
+    /// check-in read: one whose screens changed meanwhile has started its
+    /// devices again at its first screen, and that start stands. A screen or
+    /// playlist the image came from that was deleted meanwhile is recorded as
+    /// none.
     ///
     /// # Errors
     ///
     /// When storage fails.
     pub async fn show(
         &self,
-        device: &Device,
-        position: Option<Position>,
+        id: i64,
+        step: Option<Step<'_>>,
         showing: &Showing,
         wakes_at: i64,
     ) -> Result<(), Error> {
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
-        let Some(stored) = sqlx::query!(
-            "SELECT position_playlist_id, playlist_position FROM devices WHERE id = ?",
-            device.id
-        )
-        .fetch_optional(&mut *tx)
-        .await?
-        else {
-            // Removed while it was drawn.
-            return Ok(());
-        };
-        let (playlist, index) =
-            if self::position(stored.position_playlist_id, stored.playlist_position)
-                == device.position
-            {
-                (
-                    position.map(|position| position.playlist_id),
-                    position.and_then(|position| i64::try_from(position.index).ok()),
+        if let Some(step) = step {
+            let screens = sqlx::query_scalar!(
+                "SELECT screen_id FROM playlist_screens WHERE playlist_id = ? ORDER BY position",
+                step.playlist_id
+            )
+            .fetch_all(&mut *tx)
+            .await?;
+            if screens == step.screens {
+                let index = i64::try_from(step.index).ok();
+                sqlx::query!(
+                    "UPDATE devices SET position_playlist_id = ?, playlist_position = ? WHERE id = ?",
+                    step.playlist_id,
+                    index,
+                    id
                 )
-            } else {
-                (stored.position_playlist_id, stored.playlist_position)
-            };
+                .execute(&mut *tx)
+                .await?;
+            }
+        }
         sqlx::query!(
-            "UPDATE devices SET position_playlist_id = ?, playlist_position = ?, image_name = ?,
-                                image_screen_id = ?, image_playlist_id = ?, rendered_at = ?,
-                                image_asleep = ?, wakes_at = ?
+            "UPDATE devices SET image_name = ?,
+                                image_screen_id = (SELECT id FROM screens WHERE id = ?),
+                                image_playlist_id = (SELECT id FROM playlists WHERE id = ?),
+                                rendered_at = ?, image_asleep = ?, wakes_at = ?
              WHERE id = ?",
-            playlist,
-            index,
             showing.image,
             showing.screen_id,
             showing.playlist_id,
             showing.rendered_at,
             showing.asleep,
             wakes_at,
-            device.id
+            id
         )
         .execute(&mut *tx)
         .await?;

@@ -5,6 +5,9 @@ mod common;
 
 use std::sync::{Arc, Mutex};
 
+use afterimage_server::clock::SystemClock;
+use afterimage_server::devices::{Devices, Showing, Step};
+use afterimage_server::playlists::Playlists;
 use afterimage_server::secrets::Secrets;
 use axum::Json;
 use axum::extract::State;
@@ -684,11 +687,20 @@ async fn a_new_name_alone_leaves_a_playlist_where_its_devices_stand() {
     );
 }
 
+/// The stores a check-in uses, on the server's own database, so a test can
+/// stand between a check-in's reads and its record.
+async fn stores(server: &common::Server) -> (Devices, Playlists) {
+    let pool = afterimage_server::database::open(&server.data.path().join("afterimage.db"))
+        .await
+        .unwrap();
+    (
+        Devices::new(pool.clone(), Arc::new(SystemClock)),
+        Playlists::new(pool),
+    )
+}
+
 #[tokio::test]
 async fn a_check_in_does_not_undo_a_playlist_change_made_while_it_drew() {
-    use afterimage_server::clock::SystemClock;
-    use afterimage_server::devices::{Devices, Position};
-
     let server = start().await;
     let account = server.sign_up().await["id"].as_i64().unwrap();
     let (device, key) = server.claim(&mac(1)).await;
@@ -698,35 +710,82 @@ async fn a_check_in_does_not_undo_a_playlist_change_made_while_it_drew() {
     let second = screen(&server, "Second", text("Second")).await;
     let third = screen(&server, "Third", text("Third")).await;
     let usual = play(&server, id, &[first, second, third]).await;
-    server.display(&key, &READINGS).await;
+    let (devices, playlists) = stores(&server).await;
+    let drawn = |screen_id| Showing {
+        image: "drawn".to_owned(),
+        screen_id: Some(screen_id),
+        playlist_id: Some(usual),
+        rendered_at: 0,
+        asleep: false,
+    };
 
-    // A check-in reads the device, standing at the first screen...
-    let pool = afterimage_server::database::open(&server.data.path().join("afterimage.db"))
-        .await
-        .unwrap();
-    let devices = Devices::new(pool, Arc::new(SystemClock));
-    let read = devices.get(account, id).await.unwrap().unwrap();
-    // ...the playlist changes before it records what it drew...
-    refill(&server, usual, &[third, first, second]).await;
-    let drawn = read.showing.clone().unwrap();
-    devices
-        .show(
-            &read,
-            Some(Position {
-                playlist_id: usual,
-                index: 1,
-            }),
-            &drawn,
-            0,
-        )
-        .await
-        .unwrap();
-    // ...and the change's fresh start stands.
-    server.display(&key, &READINGS).await;
-    assert_eq!(
-        self::device(&server, id).await["showing"]["screenId"],
-        third
-    );
+    // Before its first check-in and after one, a check-in reads the
+    // playlist, the playlist's screens change before it records its step, and
+    // the change's fresh start stands.
+    for (index, shown, changed) in [
+        (0, first, [third, first, second]),
+        (1, second, [second, third, first]),
+    ] {
+        let read = playlists.get(account, usual).await.unwrap().unwrap();
+        refill(&server, usual, &changed).await;
+        let step = Step {
+            playlist_id: usual,
+            screens: &read.screens,
+            index,
+        };
+        devices
+            .show(id, Some(step), &drawn(shown), 0)
+            .await
+            .unwrap();
+        server.display(&key, &READINGS).await;
+        assert_eq!(
+            self::device(&server, id).await["showing"]["screenId"],
+            changed[0],
+            "the changed playlist starts at its first screen"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_check_in_records_its_image_when_what_it_drew_from_is_deleted_meanwhile() {
+    let server = start().await;
+    let account = server.sign_up().await["id"].as_i64().unwrap();
+    let (device, _) = server.claim(&mac(1)).await;
+    let id = device["id"].as_i64().unwrap();
+    let only = screen(
+        &server,
+        "Only",
+        json!({ "content": { "title": { "text": "Only" } } }),
+    )
+    .await;
+    let usual = play(&server, id, &[only]).await;
+    let (devices, playlists) = stores(&server).await;
+    let read = playlists.get(account, usual).await.unwrap().unwrap();
+    for path in [
+        format!("/manage/playlists/{usual}"),
+        format!("/manage/screens/{only}"),
+    ] {
+        assert_eq!(
+            server.call("DELETE", &path, None).await.0,
+            StatusCode::NO_CONTENT
+        );
+    }
+    let step = Step {
+        playlist_id: usual,
+        screens: &read.screens,
+        index: 0,
+    };
+    let showing = Showing {
+        image: "drawn".to_owned(),
+        screen_id: Some(only),
+        playlist_id: Some(usual),
+        rendered_at: 0,
+        asleep: false,
+    };
+    devices.show(id, Some(step), &showing, 0).await.unwrap();
+    let shown = self::device(&server, id).await["showing"].clone();
+    assert!(shown.get("screenId").is_none(), "{shown}");
+    assert!(shown.get("playlistId").is_none(), "{shown}");
 }
 
 #[tokio::test]

@@ -15,7 +15,7 @@ use afterimage_render_typst::Renderer;
 use afterimage_trmnl::catalog::{Catalog, Model, Palette};
 use serde_json::{Value, json};
 
-use crate::devices::{Device, Devices, Position, Showing, Shows};
+use crate::devices::{Device, Devices, Position, Showing, Shows, Step};
 use crate::drawing::{self, Drawing, Problem};
 use crate::images::Images;
 use crate::playlists::{Playlist, Playlists};
@@ -114,14 +114,13 @@ pub async fn next(
         Some(id) => playlists.get(device.account_id, id).await?,
         None => None,
     };
-    let (screen, position) = match device.shows {
-        Shows::Screen(screen_id) => (Some(screen_id), device.position),
+    // A pinned screen, or nothing to show, leaves the playlist waiting.
+    let (screen, step) = match device.shows {
+        Shows::Screen(screen_id) => (Some(screen_id), None),
         Shows::Playlist(_) | Shows::Schedule => on
             .as_ref()
-            .and_then(|playlist| step(playlist, device.position))
-            .map_or((None, device.position), |(screen, position)| {
-                (Some(screen), Some(position))
-            }),
+            .and_then(|playlist| next_step(playlist, device.position))
+            .map_or((None, None), |(screen, step)| (Some(screen), Some(step))),
     };
     let playlist_id = on.as_ref().map(|playlist| playlist.id);
     let drawn = if let Some(screen_id) = screen {
@@ -152,7 +151,7 @@ pub async fn next(
             {
                 // The device keeps its image, and the playlist moves past the screen
                 // that failed, so the next check-in shows the one after it.
-                devices.show(device, position, showing, now + wait).await?;
+                devices.show(device.id, step, showing, now + wait).await?;
                 return Ok(Shown {
                     image: showing.image.clone(),
                     wait,
@@ -173,23 +172,24 @@ pub async fn next(
                 playlist_id,
                 asleep: false,
             },
-            position,
+            step,
         )
         .await
 }
 
-/// The screen to show next in `playlist`, and where the device then stands in
-/// it: the one after the device's position there, or the first when the device
-/// last went through another playlist; `None` for an empty playlist.
-fn step(playlist: &Playlist, position: Option<Position>) -> Option<(i64, Position)> {
+/// The screen to show next in `playlist`, and the step to it: the one after
+/// the device's position there, or the first when the device last went through
+/// another playlist; `None` for an empty playlist.
+fn next_step(playlist: &Playlist, position: Option<Position>) -> Option<(i64, Step<'_>)> {
     let last = position
         .filter(|position| position.playlist_id == playlist.id)
         .map(|position| position.index);
     let index = schedule::next(playlist.screens.len(), last)?;
     Some((
         playlist.screens[index],
-        Position {
+        Step {
             playlist_id: playlist.id,
+            screens: &playlist.screens,
             index,
         },
     ))
@@ -216,7 +216,7 @@ async fn asleep(
                     playlist_id: None,
                     asleep: true,
                 };
-                return shown.record(&bytes, drawn, device.position).await;
+                return shown.record(&bytes, drawn, None).await;
             }
             Err(Failed { name, problems }) => log_problems(device.id, &name, &problems),
         }
@@ -241,7 +241,7 @@ async fn asleep(
         playlist_id: None,
         asleep: true,
     };
-    shown.record(&image.bytes, drawn, device.position).await
+    shown.record(&image.bytes, drawn, None).await
 }
 
 /// A screen that could not be drawn as written, and why.
@@ -312,12 +312,12 @@ struct Record<'a> {
 
 impl Record<'_> {
     /// Saves the image and records it as what the device shows until it wakes,
-    /// and where the device now stands in its playlist.
+    /// with the step the check-in took through its playlist, if it took one.
     async fn record(
         &self,
         bytes: &[u8],
         drawn: Drawn,
-        position: Option<Position>,
+        step: Option<Step<'_>>,
     ) -> Result<Shown, Error> {
         let device = self.device;
         let image = self.images.save(device.id, bytes)?;
@@ -334,7 +334,7 @@ impl Record<'_> {
             asleep: drawn.asleep,
         };
         self.devices
-            .show(device, position, &showing, self.now + self.wait)
+            .show(device.id, step, &showing, self.now + self.wait)
             .await?;
         Ok(Shown {
             image,

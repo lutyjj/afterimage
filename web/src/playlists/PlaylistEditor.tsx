@@ -77,7 +77,8 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
   const navigate = useNavigate();
   const toast = useToast();
   const screens = useQuery(screensQuery).data;
-  const devices = useQuery(devicesQuery).data;
+  const displays = useQuery(devicesQuery);
+  const devices = displays.data;
   const [name, setName] = useState(playlist?.name ?? "");
   const [rows, setRows] = useState(() => rowsOf(playlist?.screens ?? []));
   const [baseline, setBaseline] = useState({ name: playlist?.name ?? "", screens: playlist?.screens ?? [] });
@@ -227,7 +228,7 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
               )}
             </CardBody>
           </Card>
-          {playlist && <ShownOn uses={uses} />}
+          {playlist && <ShownOn uses={uses} failure={displays.isError ? messageOf(displays.error) : undefined} />}
         </div>
       </Content>
       {playlist && (
@@ -303,7 +304,7 @@ function ScreenRow({
 }
 
 /** The displays that show the playlist, and when. */
-function ShownOn({ uses }: { uses: readonly Use[] | undefined }) {
+function ShownOn({ uses, failure }: { uses: readonly Use[] | undefined; failure: string | undefined }) {
   return (
     <Card>
       <CardHead
@@ -312,7 +313,13 @@ function ShownOn({ uses }: { uses: readonly Use[] | undefined }) {
       />
       {uses === undefined ? (
         <CardBody>
-          <p className="text-sm text-text-muted">Reading displays</p>
+          {failure === undefined ? (
+            <p className="text-sm text-text-muted">Reading displays</p>
+          ) : (
+            <p role="alert" className="text-sm text-danger">
+              The displays could not be read. {failure}
+            </p>
+          )}
         </CardBody>
       ) : uses.length === 0 ? (
         <CardBody>

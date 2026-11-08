@@ -44,6 +44,10 @@ describe("deleting a screen", () => {
   });
 
   it("names no one before the playlists and displays have loaded", () => {
-    expect(screenDeletion(3, undefined, [])).toMatch(/^It leaves every playlist that holds it/);
+    const neutral = screenDeletion(3, undefined, []);
+    expect(neutral).toMatch(/^It leaves every playlist that holds it/);
+    expect(neutral, "every effect, the sleep screen included").toMatch(
+      /pinned on it go back.*sleep on Afterimage's own/,
+    );
   });
 });
