@@ -1,6 +1,9 @@
 {
   lib,
   rustPlatform,
+  pkg-config,
+  aws-lc,
+  sqlite,
   contract,
   design,
   mosquitto,
@@ -34,6 +37,13 @@ rustPlatform.buildRustPackage {
     cp -r --no-preserve=mode ${contract} gen
     cp -r --no-preserve=mode ${design} gen/design
   '';
+
+  nativeBuildInputs = [ pkg-config ];
+
+  buildInputs = [
+    aws-lc
+    sqlite
+  ];
 
   cargoBuildFlags = [
     "--package"
