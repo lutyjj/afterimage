@@ -10,8 +10,7 @@ Afterimage is a self-hosted server for TRMNL e-paper displays. [The design](docs
 - Complete replacements in one change: remove obsolete code, configuration,
   callers, tests, and documentation. Keep one implementation of each contract.
 - Database migrations are the exception: never edit or delete a migration that
-  a release or deployment has run. Until the first one, the schema stays in
-  `0001_*.sql` and changes in place; recreate local databases after pulling.
+  a release or deployment has run. A schema change is a new migration.
 - Follow the [design principles](docs/design.md#principles): implement TRMNL's
   device API as published, generate from TRMNL's published sources, and keep
   device facts in data, never in code paths.
@@ -40,14 +39,15 @@ share one Cargo workspace, so every Cargo command needs `gen/` (the contract and
 the renderer's design): run `tools/generate` first in a fresh checkout.
 
 The flake owns the toolchains; do not install unmanaged versions on the host.
-The [README](README.md#development) lists the commands.
+[CONTRIBUTING.md](CONTRIBUTING.md) lists the commands.
 
 ## Workflow
 
-- Work on `main`, committing and pushing each working step. Use a branch only
-  when the maintainer asks for one; there are no pull requests. The project
-  moves fast and fixes forward: a defect found after a push gets a follow-up
-  commit, not a revert ritual.
+- Working for the maintainer, work on `main`, committing and pushing each
+  working step, and use a branch only when the maintainer asks for one. Anyone
+  else proposes a change as a pull request against `main`. The project moves
+  fast and fixes forward: a defect found after a push gets a follow-up commit,
+  not a revert ritual.
 - A spike answers one design question quickly. It lives in `spikes/<topic>/`
   with a README that records its method and measurements, outside every build,
   and it is deleted once its answer is in the design.

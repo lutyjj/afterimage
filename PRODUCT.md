@@ -48,7 +48,7 @@ One small server and one contract: the Smithy model defines every API, and scree
 
 ## Evidence on Hand
 
-No screenshots, customers or testimonials exist; future work must not invent them. Real screen previews come from the server.
+`docs/screenshots/` shows a server seeded with synthetic data. No customers or testimonials exist; never invent them.
 
 ## Product Principles
 

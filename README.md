@@ -1,67 +1,82 @@
 # Afterimage
 
-A self-hosted server for TRMNL e-paper displays. An e-paper screen keeps its last image with the power off, an afterimage of what it last showed. [The design](docs/design.md) explains how it works.
+A self-hosted server for [TRMNL](https://trmnl.com) e-paper displays. Displays keep their stock firmware; Afterimage draws their screens from your data.
 
-## Run it
+- Screens as YAML documents of TRMNL's components, rendered in TRMNL's design
+- Playlists, weekly schedules and sleep windows
+- Firmware updates for every TRMNL board
+- Home Assistant over MQTT
+- A management API and an MCP endpoint for scripts and agents
+- Password or OIDC sign-in
 
-`nix build` produces `result/bin/afterimage`. In a display's Wi-Fi setup portal, set the server URL to its address.
+[docs/design.md](docs/design.md) explains how it works.
 
-| Path | Serves |
+## Screenshots
+
+![Devices](docs/screenshots/devices.png)
+
+![Screen editor](docs/screenshots/editor.png)
+
+![Schedule](docs/screenshots/schedule.png)
+
+<img src="docs/screenshots/phone.png" alt="Devices on a phone, dark theme" width="320">
+
+## Installation
+
+### Docker
+
+```sh
+docker run -d -p 8080:8080 -v afterimage:/data -e TZ=Europe/Berlin ghcr.io/lutyjj/afterimage
+```
+
+### NixOS
+
+```nix
+imports = [ inputs.afterimage.nixosModules.default ];
+services.afterimage = {
+  enable = true;
+  openFirewall = true;
+};
+```
+
+| Option | Default |
 |---|---|
-| `/api/` | TRMNL's device API, for the displays |
-| `/manage/` | The management API, for the web UI, scripts and agents |
-| `/mcp` | The MCP endpoint, over streamable HTTP |
-| Everything else | The web UI |
+| `listenAddress`, `port` | `0.0.0.0`, `8080` |
+| `openFirewall` | `false` |
+| `settings` | `{ }`, the variables below |
+| `environmentFile` | A file of secret variables |
 
-Scripts and agents act with a personal access token, made in the web UI's settings and sent as `Authorization: Bearer <token>`. `tools/generate` writes the management API's OpenAPI document to `gen/management-api.openapi.json`.
+### First display
 
-## Settings
+1. Open `http://<host>:8080` and create the first account.
+2. In the display's Wi-Fi portal, set the server URL to `http://<host>:8080`.
+3. Enter the code the display shows under **Claim a display**.
 
-Each setting is an environment variable or the flag `afterimage --help` lists beside it.
+## Configuration
+
+Environment variables; `afterimage --help` lists the matching flags.
 
 | Variable | Default | Sets |
 |---|---|---|
-| `AFTERIMAGE_BIND` | `0.0.0.0:8080` | The address to listen on; displays must reach it |
-| `AFTERIMAGE_DATA_DIR` | `data` | The database's directory |
-| `AFTERIMAGE_CACHE_DIR` | `cache` in the data directory | Files the server can fetch again, such as firmware images |
-| `AFTERIMAGE_URL` | | The address browsers use, such as `https://afterimage.example`. OIDC needs it; an `https` address makes cookies `Secure` |
-| `AFTERIMAGE_WEB_DIR` | | The built web UI |
-| `AFTERIMAGE_TIME_ZONE` | The host's | The time zone of schedules and of dates on screens, such as `Europe/Berlin` |
-| `AFTERIMAGE_TRMNL_URL` | `https://trmnl.com` | TRMNL's site, which publishes the firmware displays install |
-| `AFTERIMAGE_PASSWORD_SIGN_IN` | `true` | Whether people may sign in with a password; `false` needs OIDC |
-| `AFTERIMAGE_OIDC_ISSUER` | | The OIDC provider. Its client allows the redirect `<AFTERIMAGE_URL>/manage/auth/oidc/callback` |
-| `AFTERIMAGE_OIDC_CLIENT_ID`, `AFTERIMAGE_OIDC_CLIENT_SECRET` | | The OIDC client |
-| `AFTERIMAGE_OIDC_NAME` | `Single sign-on` | What the sign-in button calls the provider |
-| `AFTERIMAGE_MQTT_URL` | | The broker that carries every display to Home Assistant, `mqtt://` or `mqtts://`. Unset, the first account sets it in the web UI |
-| `AFTERIMAGE_MQTT_USERNAME`, `AFTERIMAGE_MQTT_PASSWORD` | | The broker's credentials |
-| `AFTERIMAGE_MQTT_TOPIC` | `afterimage` | The topic every display publishes under |
-| `AFTERIMAGE_MQTT_DISCOVERY_PREFIX` | `homeassistant` | Home Assistant's discovery prefix |
-| `AFTERIMAGE_SECRET_<NAME>` | | A secret data sources read as `secrets.<NAME>` |
+| `AFTERIMAGE_BIND` | `0.0.0.0:8080` | Listen address |
+| `AFTERIMAGE_DATA_DIR` | `data` | Database and images |
+| `AFTERIMAGE_CACHE_DIR` | `<data>/cache` | Firmware images |
+| `AFTERIMAGE_URL` | | Public URL, such as `https://afterimage.example`; needed for OIDC |
+| `AFTERIMAGE_TIME_ZONE` | `TZ`, else the host's | Time zone of schedules and screens |
+| `AFTERIMAGE_WEB_DIR` | The packaged web UI | Built web UI |
+| `AFTERIMAGE_TRMNL_URL` | `https://trmnl.com` | Source of firmware |
+| `AFTERIMAGE_PASSWORD_SIGN_IN` | `true` | Password sign-in; `false` needs OIDC |
+| `AFTERIMAGE_OIDC_ISSUER` | | OIDC provider; redirect URL `<AFTERIMAGE_URL>/manage/auth/oidc/callback` |
+| `AFTERIMAGE_OIDC_CLIENT_ID`, `_CLIENT_SECRET` | | OIDC client |
+| `AFTERIMAGE_OIDC_NAME` | `Single sign-on` | Sign-in button label |
+| `AFTERIMAGE_MQTT_URL` | | `mqtt://` or `mqtts://` broker; unset, set it in the web UI |
+| `AFTERIMAGE_MQTT_USERNAME`, `_PASSWORD` | | Broker credentials |
+| `AFTERIMAGE_MQTT_TOPIC` | `afterimage` | Base topic |
+| `AFTERIMAGE_MQTT_DISCOVERY_PREFIX` | `homeassistant` | Home Assistant discovery prefix |
+| `AFTERIMAGE_SECRET_<NAME>` | | Secret that data sources read as `{{ secrets.<NAME> }}` |
 
-## NixOS
+Scripts and agents authenticate with a token from **Settings → Tokens and MCP** (`Authorization: Bearer <token>`). The management API is at `/manage/`, with its OpenAPI document in each [release](https://github.com/lutyjj/afterimage/releases); MCP is at `/mcp`.
 
-The flake's `nixosModules.default` runs the server as `services.afterimage`, with the database in the service's state directory and firmware images in its cache directory.
+## License
 
-| Option | Default | Sets |
-|---|---|---|
-| `listenAddress`, `port` | `0.0.0.0`, `8080` | Where the server listens |
-| `openFirewall` | `false` | Opens `port` for clients that reach the server without a reverse proxy |
-| `settings` | `{ }` | The `AFTERIMAGE_*` variables. The module sets the bind address, data and cache directories, and the time zone from `time.timeZone` |
-| `environmentFile` | | A file of secrets: the OIDC client, the MQTT password and the `AFTERIMAGE_SECRET_*` values |
-
-## Development
-
-`nix develop` provides every tool at its pinned version.
-
-| Command | Does |
-|---|---|
-| `tools/generate` | Generates `gen/`: from `model/smithy/` both services' Rust server crates and OpenAPI documents and the management API's TypeScript client, and the renderer's design tokens and fonts from the pinned release of TRMNL's design system (`tools/trmnl-release.json`) |
-| `pnpm --filter afterimage-web add <tarball URL>` | Moves the web UI to another [linen release](https://github.com/lutyjj/linen/releases). Then set `hash = lib.fakeHash;` in `deploy/nix/web.nix`, run `nix build .#web` and copy the hash it reports |
-| `cargo test --workspace` | Runs every Rust test, the conformance test included |
-| `pnpm install` | Installs the web UI's dependencies, after `tools/generate` |
-| `pnpm --filter afterimage-web dev` | Serves the web UI with hot reload at `http://127.0.0.1:5173`, sending `/api`, `/manage` and `/mcp` to a server on port 8080, or to the one `AFTERIMAGE_SERVER` names (an OIDC sign-in returns to that server's own address, so sign in there with a password) |
-| `pnpm --filter afterimage-web check` | Checks the web UI's formatting, type-checks it with the generated client and runs its tests; `format` fixes the formatting |
-| `nix run .#parity [CASE...]` | Draws the cases in `tools/parity/cases/` with TRMNL's framework and with a server of its own, writes them side by side to `build/parity/`, and fails where a case differs from TRMNL by more than its limit |
-| `tools/trmnl-excerpt` | Refreshes the excerpt of TRMNL's published device contract |
-| `tools/trmnl-catalog` | Refreshes the snapshot of TRMNL's display models and palettes |
-| `nix flake check` | Builds the server and the web UI from the pinned contract, runs every test, runs clippy and rustfmt, and boots the NixOS module in a VM |
+[MIT](LICENSE)
