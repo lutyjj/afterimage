@@ -115,7 +115,7 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 - Hue 218, teal-blue: the cool complement a warm light leaves behind.
 - Schibsted Grotesk for every word; JetBrains Mono for what is typed or copied verbatim.
 - Displays at 1:1 (up to 800 pixels) on e-paper white in both themes.
-- The icon, the comet: a yellow light and the sky-blue afterimage it leaves behind, dissolving into halftone dots, on a night tile. `web/public/icon.svg` is its one drawing; `tools/icons` renders the PNGs.
+- The icon, the comet: a yellow light and the sky-blue afterimage it leaves behind, dissolving into halftone dots, at 88% of a night disc. `web/public/icon.svg` is its one drawing, used as the favicon, the in-app mark and the README's; `tools/icons` renders the PNGs, with a full night square where iOS and Android cut their own shape.
 - When a display's image changes, the one before lingers and fades.
 
 ## Colors

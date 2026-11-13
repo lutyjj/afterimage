@@ -8,26 +8,27 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 public="$root/web/public"
 resvg=$(nix build --no-link --print-out-paths --inputs-from "$root" nixpkgs#resvg)/bin/resvg
 
-# The tile's color, and everything drawn on it.
-tile=$(sed -n 's/.*<rect [^>]*rx="[^"]*" fill="\([^"]*\)".*/\1/p' "$public/icon.svg")
-[ -n "$tile" ] || { echo 'tools/icons: icon.svg has no rounded tile to take the color from' >&2; exit 1; }
-content=$(sed -e '1d' -e '$d' -e '/<rect [^>]*rx=/d' -e '/<!--/,/-->/d' "$public/icon.svg")
+# The disc's color, and the comet drawn on it.
+ground=$(sed -n 's/.*<circle cx="48" cy="48" r="48" fill="\([^"]*\)".*/\1/p' "$public/icon.svg")
+[ -n "$ground" ] || { echo 'tools/icons: icon.svg has no disc to take the color from' >&2; exit 1; }
+comet=$(sed -e '1d' -e '$d' -e '/<!--/,/-->/d' -e '/<circle cx="48" cy="48" r="48"/d' "$public/icon.svg")
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 # Platforms that cut their own shape out of a full square (maskable icons,
-# iOS) get the drawing on a square of the tile's color, shrunk to 72% so it
-# stays inside the central 80% circle every launcher's mask keeps.
+# iOS) get the comet on a square of the disc's color. The drawing holds it at
+# 88%; scaling that by 9/11 leaves it at 72%, inside the central 80% circle
+# every launcher's mask keeps.
 cat > "$work/square.svg" <<SVG
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
-<rect width="96" height="96" fill="$tile"/>
-<g transform="translate(13.44 13.44) scale(0.72)">
-$content
+<rect width="96" height="96" fill="$ground"/>
+<g transform="translate(8.7273 8.7273) scale(0.81818)">
+$comet
 </g>
 </svg>
 SVG
 
-# Purpose "any": the rounded tile itself, on transparency.
+# Purpose "any": the disc itself, on transparency.
 "$resvg" -w 192 -h 192 "$public/icon.svg" "$public/icon-192.png"
 "$resvg" -w 512 -h 512 "$public/icon.svg" "$public/icon-512.png"
 # Purpose "maskable", and iOS, which fills transparency with black.
