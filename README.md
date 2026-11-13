@@ -1,15 +1,16 @@
 # Afterimage
 
-A self-hosted server for [TRMNL](https://trmnl.com) e-paper displays. Displays keep their stock firmware; Afterimage draws their screens from your data.
+Lightweight [TRMNL](https://trmnl.com) BYOS server, written in Rust and TypeScript. The goal of the project is to keep it simple, performant, and hella easy to maintain. We don't reinvent the wheel: displays run TRMNL's stock firmware, and screens are built from TRMNL's own components and design system.
 
-- Screens as YAML documents of TRMNL's components, rendered in TRMNL's design
-- Playlists, weekly schedules and sleep windows
-- Firmware updates for every TRMNL board
-- Home Assistant over MQTT
-- A management API and an MCP endpoint for scripts and agents
+- Everything is defined in [Smithy](https://smithy.io). One model generates the server, the web UI's client, the OpenAPI docs and the MCP tools, so they can't drift apart
+- Proper MQTT controls for every display, OTA updates included, so Home Assistant automations can put a display to sleep, pin a screen, install firmware or react to its button
+- Screens are small YAML docs rendered natively with [Typst](https://typst.app). No headless browser, ~13 ms a screen
+- OTA firmware for every TRMNL board, served locally
+- Playlists, weekly schedules, and sleep windows that save battery
+- Scripts and agents get the same API as the UI, plus an MCP endpoint
 - Password or OIDC sign-in
 
-[docs/design.md](docs/design.md) explains how it works.
+How it works under the hood: [docs/design.md](docs/design.md).
 
 ## Screenshots
 
@@ -48,13 +49,13 @@ services.afterimage = {
 
 ### First display
 
-1. Open `http://<host>:8080` and create the first account.
+1. Open `http://<host>:8080` and make the first account (it's the admin).
 2. In the display's Wi-Fi portal, set the server URL to `http://<host>:8080`.
 3. Enter the code the display shows under **Claim a display**.
 
 ## Configuration
 
-Environment variables; `afterimage --help` lists the matching flags.
+Everything is an environment variable (`afterimage --help` shows the matching flags).
 
 | Variable | Default | Sets |
 |---|---|---|
@@ -64,18 +65,18 @@ Environment variables; `afterimage --help` lists the matching flags.
 | `AFTERIMAGE_URL` | | Public URL, such as `https://afterimage.example`; needed for OIDC |
 | `AFTERIMAGE_TIME_ZONE` | `TZ`, else the host's | Time zone of schedules and screens |
 | `AFTERIMAGE_WEB_DIR` | The packaged web UI | Built web UI |
-| `AFTERIMAGE_TRMNL_URL` | `https://trmnl.com` | Source of firmware |
+| `AFTERIMAGE_TRMNL_URL` | `https://trmnl.com` | Where firmware comes from |
 | `AFTERIMAGE_PASSWORD_SIGN_IN` | `true` | Password sign-in; `false` needs OIDC |
-| `AFTERIMAGE_OIDC_ISSUER` | | OIDC provider; redirect URL `<AFTERIMAGE_URL>/manage/auth/oidc/callback` |
+| `AFTERIMAGE_OIDC_ISSUER` | | OIDC provider; redirect URL is `<AFTERIMAGE_URL>/manage/auth/oidc/callback` |
 | `AFTERIMAGE_OIDC_CLIENT_ID`, `_CLIENT_SECRET` | | OIDC client |
 | `AFTERIMAGE_OIDC_NAME` | `Single sign-on` | Sign-in button label |
-| `AFTERIMAGE_MQTT_URL` | | `mqtt://` or `mqtts://` broker; unset, set it in the web UI |
+| `AFTERIMAGE_MQTT_URL` | | `mqtt://` or `mqtts://` broker; leave unset to set it in the web UI |
 | `AFTERIMAGE_MQTT_USERNAME`, `_PASSWORD` | | Broker credentials |
 | `AFTERIMAGE_MQTT_TOPIC` | `afterimage` | Base topic |
 | `AFTERIMAGE_MQTT_DISCOVERY_PREFIX` | `homeassistant` | Home Assistant discovery prefix |
-| `AFTERIMAGE_SECRET_<NAME>` | | Secret that data sources read as `{{ secrets.<NAME> }}` |
+| `AFTERIMAGE_SECRET_<NAME>` | | A secret data sources read as `{{ secrets.<NAME> }}` |
 
-Scripts and agents authenticate with a token from **Settings → Tokens and MCP** (`Authorization: Bearer <token>`). The management API is at `/manage/`, with its OpenAPI document in each [release](https://github.com/lutyjj/afterimage/releases); MCP is at `/mcp`.
+For scripts and agents, make a token in **Settings → Tokens and MCP** and send it as `Authorization: Bearer <token>`. The API lives at `/manage/` (its OpenAPI doc is attached to each [release](https://github.com/lutyjj/afterimage/releases)), MCP at `/mcp`.
 
 ## License
 
