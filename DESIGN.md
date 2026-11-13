@@ -115,7 +115,7 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 - Hue 218, teal-blue: the cool complement a warm light leaves behind.
 - Schibsted Grotesk for every word; JetBrains Mono for what is typed or copied verbatim.
 - Displays at 1:1 (up to 800 pixels) on e-paper white in both themes.
-- The mark: a square and the fainter square it leaves behind.
+- The icon, the comet: an amber light and the blue afterimages it leaves behind, smaller and fainter, in halftone dots on a cool paper tile. `web/public/icon.svg` is its one drawing; `tools/icons` renders the PNGs.
 - When a display's image changes, the one before lingers and fades.
 
 ## Colors
@@ -150,13 +150,13 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 
 | Component | What it is |
 |---|---|
-| Display panel | The image as the display holds it: e-paper white, 6px corners, a 1px ring in `border-strong`, pixelated at 1:1. Beneath: palette swatches, palette name, size and scale. Empty: the mark at 40px over "No image yet". Busy: 60% opacity. |
+| Display panel | The image as the display holds it: e-paper white, 6px corners, a 1px ring in `border-strong`, pixelated at 1:1. Beneath: palette swatches, palette name, size and scale. Empty: the icon at 40px over "No image yet". Busy: 60% opacity. |
 | Afterimage | When the image changes, the previous one is laid over it with `mix-blend-mode: multiply` and fades from 40% to none while blurring to 1.5px over 2000ms (`animate-afterimage`); 1ms under reduced motion. |
 | Day track | A day from midnight to midnight on `sunken`, each stretch as long as it lasts and named where it fits: a playlist or pinned screen lit as paper (`surface` with a `border-strong` hairline), sleep as the bare track, nothing scheduled in dashed `warn`; a line at now in `text`. A display's week is seven tracks, today's day in `text`. It reports; it never takes the ink. |
 | Claim code | Six 5:6 cells over one real input that takes typing and paste; the active cell takes the ink border and a 3px halo, an invalid code turns every cell red. |
 | Firmware legs | Requested, sent, installed as columns under 3px rules: done in ink, current dashed, waiting in `border`, failed in `danger`. |
 | State badge | A row chip in `warn` with a dot. A state that ends while the page is open stays, struck through at 55% opacity. |
-| Wordmark | The lowercase name at 16px after the 16px mark; the mark alone heads the folded rail. Either leads to the first screen. |
+| Wordmark | The lowercase name at 16px after the 20px icon; the icon alone heads the folded rail. Either leads to the first screen. |
 | Save button | The editor's one primary act. While there is something to save it is in ink and reads "Save"; once saved it turns quiet and reads "Saved", keeping its width. Delete stands beside it as a trash icon. |
 
 ## Do's and Don'ts

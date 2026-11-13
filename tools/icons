@@ -1,0 +1,35 @@
+#!/bin/sh
+# Renders the web UI's PNG icons from web/public/icon.svg, the one drawing of
+# the icon. Run it after changing that file and commit what it writes. resvg
+# comes from the nixpkgs flake.lock pins, so the same drawing renders to the
+# same pixels.
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+public="$root/web/public"
+resvg=$(nix build --no-link --print-out-paths --inputs-from "$root" nixpkgs#resvg)/bin/resvg
+
+# The tile's color, and everything drawn on it.
+tile=$(sed -n 's/.*<rect [^>]*rx="[^"]*" fill="\([^"]*\)".*/\1/p' "$public/icon.svg")
+[ -n "$tile" ] || { echo 'tools/icons: icon.svg has no rounded tile to take the color from' >&2; exit 1; }
+content=$(sed -e '1d' -e '$d' -e '/<rect [^>]*rx=/d' -e '/<!--/,/-->/d' "$public/icon.svg")
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+# Platforms that cut their own shape out of a full square (maskable icons,
+# iOS) get the drawing on a square of the tile's color, shrunk to 72% so it
+# stays inside the central 80% circle every launcher's mask keeps.
+cat > "$work/square.svg" <<SVG
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+<rect width="96" height="96" fill="$tile"/>
+<g transform="translate(13.44 13.44) scale(0.72)">
+$content
+</g>
+</svg>
+SVG
+
+# Purpose "any": the rounded tile itself, on transparency.
+"$resvg" -w 192 -h 192 "$public/icon.svg" "$public/icon-192.png"
+"$resvg" -w 512 -h 512 "$public/icon.svg" "$public/icon-512.png"
+# Purpose "maskable", and iOS, which fills transparency with black.
+"$resvg" -w 512 -h 512 "$work/square.svg" "$public/icon-maskable-512.png"
+"$resvg" -w 180 -h 180 "$work/square.svg" "$public/apple-touch-icon.png"

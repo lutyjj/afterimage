@@ -19,9 +19,9 @@ OWN-WORLD: Cool paper neutrals at hue 218 with a whisper of chroma, white cards 
 
 STORY: The visitor sees each display as it is now, with its facts and today's playlist beside it, and knows which need them; claims a new display by typing its code; writes a screen while the preview redraws; finds tokens, the MCP address and the broker in Settings.
 
-FIRST VIEWPORT: A sunken rail at the left: the wordmark (a square and its fainter afterimage), Devices, Screens, Settings, and the account at the foot. The content column holds "Devices", a line naming the playlists' time zone, and "Claim a display" at the right; under it one card per display: its screen at 1:1 (800 pixels) on the left, its name with any state badge, its facts, and today's timeline on the right.
+FIRST VIEWPORT: A sunken rail at the left: the wordmark (the comet icon and the name), Devices, Screens, Settings, and the account at the foot. The content column holds "Devices", a line naming the playlists' time zone, and "Claim a display" at the right; under it one card per display: its screen at 1:1 (800 pixels) on the left, its name with any state badge, its facts, and today's timeline on the right.
 
-FORM: Pinned: linen's calm working-tool vibe, with Afterimage's own palette and mark. Signature move: the afterimage: when a panel's image changes, the one before lingers under it, multiplied and fading over two seconds, as e-paper ghosts after a refresh.
+FORM: Pinned: linen's calm working-tool vibe, with Afterimage's own palette and icon. Signature move: the afterimage: when a panel's image changes, the one before lingers under it, multiplied and fading over two seconds, as e-paper ghosts after a refresh.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 

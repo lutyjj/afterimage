@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "Afterimage",
+  "short_name": "Afterimage",
+  "description": "A self-hosted server for TRMNL e-paper displays",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7fafb",
+  "theme_color": "#f7fafb",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

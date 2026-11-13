@@ -17,6 +17,7 @@ pnpm --filter afterimage-web dev                                 # web UI on :51
 | `nix flake check` | Everything CI runs: builds, tests, lints, release image, NixOS VM test |
 | `nix run .#parity [CASE...]` | Compares renders with TRMNL's into `build/parity/` |
 | `tools/trmnl-excerpt`, `tools/trmnl-catalog` | Refresh TRMNL's device API excerpt and model catalog |
+| `tools/icons` | Renders the PNG icons from `web/public/icon.svg`, the one drawing of the icon |
 
 API changes start in `model/smithy/`, then `tools/generate`. `gen/` is generated, so don't edit it by hand.
 

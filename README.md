@@ -1,3 +1,5 @@
+<img src="web/public/icon.svg" alt="" width="72">
+
 # Afterimage
 
 Lightweight [TRMNL](https://trmnl.com) BYOS server, written in Rust and TypeScript. The goal of the project is to keep it simple, performant, and hella easy to maintain. We don't reinvent the wheel: displays run TRMNL's stock firmware, and screens are built from TRMNL's own components and design system.
