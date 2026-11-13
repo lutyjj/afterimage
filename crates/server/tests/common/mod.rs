@@ -212,19 +212,6 @@ async fn start_full(entropy: Arc<dyn Entropy>, settings: &[&str], secrets: Secre
     start_at(new_clock(), entropy, settings, secrets).await
 }
 
-/// The server on a data directory the test prepared, such as a database
-/// migrated to an earlier schema.
-pub async fn start_on_data(data: TempDir) -> Server {
-    start_on(
-        Arc::new(data),
-        new_clock(),
-        Arc::new(OsEntropy),
-        &[],
-        Secrets::default(),
-    )
-    .await
-}
-
 impl Server {
     /// Another handle on this server, with this one's cookies.
     /// The server's database, for what a test sets up or checks directly.

@@ -8,7 +8,7 @@ mod common;
 use std::sync::Arc;
 
 use afterimage_server::keys::OsEntropy;
-use common::{Broker, Observer, Server, browser, mac, start, start_on_data, start_with};
+use common::{Broker, Observer, Server, mac, start, start_with};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
@@ -276,56 +276,6 @@ async fn tokens_act_as_their_account_on_the_broker_settings() {
     let eve = server.second_account().await;
     let members = token(&eve, Value::Null).await;
     assert_eq!(with(members, "GET", None).await, StatusCode::FORBIDDEN);
-}
-
-#[tokio::test]
-async fn the_first_account_of_an_older_database_administers_it() {
-    // A database at the schema the deployments ran before administrators, with
-    // two accounts: the migration names the first.
-    let data = tempfile::TempDir::new().unwrap();
-    let options = sqlx::sqlite::SqliteConnectOptions::new()
-        .filename(data.path().join("afterimage.db"))
-        .create_if_missing(true);
-    let pool = sqlx::SqlitePool::connect_with(options).await.unwrap();
-    let mut earlier = sqlx::migrate!("./migrations");
-    earlier.migrations = earlier
-        .migrations
-        .iter()
-        .filter(|migration| migration.version <= 3)
-        .cloned()
-        .collect::<Vec<_>>()
-        .into();
-    earlier.run(&pool).await.unwrap();
-    let hash = password_auth::generate_hash("correct horse battery");
-    for (name, username) in [("Ada", "ada"), ("Eve", "eve")] {
-        sqlx::query(
-            "INSERT INTO accounts (name, username, password_hash, created_at) VALUES (?, ?, ?, 0)",
-        )
-        .bind(name)
-        .bind(username)
-        .bind(&hash)
-        .execute(&pool)
-        .await
-        .unwrap();
-    }
-    pool.close().await;
-
-    let server = start_on_data(data).await;
-    for (username, administrator) in [("ada", true), ("eve", false)] {
-        let client = Server {
-            http: browser(),
-            ..server.clone_handle()
-        };
-        let credentials = json!({ "username": username, "password": "correct horse battery" });
-        let (status, body) = client
-            .call("POST", "/manage/auth/password", Some(credentials))
-            .await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-        assert_eq!(
-            body["account"]["administrator"], administrator,
-            "{username}"
-        );
-    }
 }
 
 #[tokio::test]

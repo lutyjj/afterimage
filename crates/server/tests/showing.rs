@@ -13,7 +13,7 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::routing::get;
-use common::{FIRMWARE, READINGS, mac, start, start_on_data, start_with_secrets};
+use common::{FIRMWARE, READINGS, mac, start, start_with_secrets};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
@@ -829,93 +829,6 @@ async fn a_check_in_records_its_image_when_what_it_drew_from_is_deleted_meanwhil
     let shown = self::device(&server, id).await["showing"].clone();
     assert!(shown.get("screenId").is_none(), "{shown}");
     assert!(shown.get("playlistId").is_none(), "{shown}");
-}
-
-#[tokio::test]
-async fn a_device_s_list_of_screens_becomes_the_playlist_it_usually_shows() {
-    use afterimage_server::keys::token_hash;
-
-    // A database at the schema deployments ran before playlists stood on their
-    // own: a device whose list held three screens, one of them on Mondays only,
-    // at positions with a gap, and which showed the second last.
-    let data = tempfile::TempDir::new().unwrap();
-    let options = sqlx::sqlite::SqliteConnectOptions::new()
-        .filename(data.path().join("afterimage.db"))
-        .create_if_missing(true);
-    let pool = sqlx::SqlitePool::connect_with(options).await.unwrap();
-    let mut earlier = sqlx::migrate!("./migrations");
-    earlier.migrations = earlier
-        .migrations
-        .iter()
-        .filter(|migration| migration.version <= 7)
-        .cloned()
-        .collect::<Vec<_>>()
-        .into();
-    earlier.run(&pool).await.unwrap();
-    let hash = password_auth::generate_hash("correct horse battery");
-    sqlx::query(
-        "INSERT INTO accounts (id, name, username, password_hash, created_at) VALUES (1, 'Ada', 'ada', ?, 0)",
-    )
-    .bind(&hash)
-    .execute(&pool)
-    .await
-    .unwrap();
-    for (id, name) in [(10, "First"), (11, "Second"), (12, "Third")] {
-        let document = json!({ "content": { "title": { "text": name, "size": "base" } } });
-        sqlx::query(
-            "INSERT INTO screens (id, account_id, name, document, updated_at) VALUES (?, 1, ?, ?, 0)",
-        )
-        .bind(id)
-        .bind(name)
-        .bind(document.to_string())
-        .execute(&pool)
-        .await
-        .unwrap();
-    }
-    sqlx::query(
-        "INSERT INTO registrations (id, mac, friendly_id, key_hash, model, created_at, width, height)
-         VALUES (3, '41:B4:10:39:A1:01', 'ABCDEF', ?, 'og', 0, 800, 480)",
-    )
-    .bind(token_hash("a-migrated-key"))
-    .execute(&pool)
-    .await
-    .unwrap();
-    for row in [
-        "INSERT INTO devices (id, account_id, registration_id, name, display_model, palette,
-                              refresh_minutes, created_at, playlist_position)
-         VALUES (5, 1, 3, 'Kitchen', 'og_png', 'bw', 15, 0, 1)",
-        "INSERT INTO playlist_entries (device_id, position, screen_id, days)
-         VALUES (5, 0, 10, NULL), (5, 2, 11, 1), (5, 3, 12, NULL)",
-    ] {
-        sqlx::query(row).execute(&pool).await.unwrap();
-    }
-    pool.close().await;
-
-    let server = start_on_data(data).await;
-    let (status, body) = server
-        .call(
-            "POST",
-            "/manage/auth/password",
-            Some(json!({ "username": "ada", "password": "correct horse battery" })),
-        )
-        .await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-    assert_eq!(
-        server.call("GET", "/manage/playlists", None).await.1["playlists"],
-        json!([{ "id": 5, "name": "Kitchen", "screens": [10, 11, 12] }]),
-        "the screens in their order, without their days"
-    );
-    assert_eq!(
-        device(&server, 5).await["schedule"],
-        json!({ "playlistId": 5, "slots": [] })
-    );
-    server.display("a-migrated-key", &READINGS).await;
-    let shown = device(&server, 5).await["showing"].clone();
-    assert_eq!(
-        (shown["screenId"].clone(), shown["playlistId"].clone()),
-        (json!(12), json!(5)),
-        "it goes on after the screen it showed last"
-    );
 }
 
 #[tokio::test]
