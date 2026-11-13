@@ -1,0 +1,32 @@
+name: Check
+
+# Every push to main and every pull request runs the flake's checks: the
+# server's and the web UI's builds with their tests, clippy and rustfmt, the
+# token generator's test, the parity harness's build, the release image, and
+# the NixOS module booted in a VM.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read # checks out the repository
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
+        with:
+          # The module check boots a NixOS VM.
+          extra_nix_config: system-features = nixos-test benchmark big-parallel kvm
+      - name: Check
+        run: nix flake check

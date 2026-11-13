@@ -1,0 +1,80 @@
+name: Release
+
+# A tag such as v0.2.0, naming the version in Cargo.toml, builds the image on
+# each architecture from the locked dependencies, which runs the server's and
+# the web UI's tests, and publishes it to the GitHub Container Registry under
+# the version and `latest`. Then it creates the tag's GitHub release with notes
+# generated from the commits since the previous release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+jobs:
+  image:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read # checks out the repository
+      packages: write # pushes the image
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
+      - name: Check the tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(nix eval --raw .#container.imageTag)
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::$TAG does not name the version in Cargo.toml, $version"
+            exit 1
+          fi
+      - name: Build the image
+        run: nix build .#container
+      - name: Push the image
+        env:
+          TAG: ${{ github.ref_name }}
+          ARCH: ${{ matrix.arch }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ github.token }}
+        # The source is the archive this job built, so there is no signature
+        # for a policy to check.
+        run: |
+          skopeo() { nix run --inputs-from . nixpkgs#skopeo -- --insecure-policy "$@"; }
+          echo "$REGISTRY_PASSWORD" | skopeo login ghcr.io --username "$REGISTRY_USER" --password-stdin
+          skopeo copy docker-archive:result "docker://ghcr.io/${GITHUB_REPOSITORY,,}:${TAG#v}-$ARCH"
+
+  release:
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # creates the release
+      packages: write # tags the image of both architectures
+    steps:
+      - name: Tag the image of both architectures
+        env:
+          TAG: ${{ github.ref_name }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ github.token }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          version="${TAG#v}"
+          echo "$REGISTRY_PASSWORD" | docker login ghcr.io --username "$REGISTRY_USER" --password-stdin
+          docker buildx imagetools create --tag "$image:$version" --tag "$image:latest" \
+            "$image:$version-amd64" "$image:$version-arm64"
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --title "Afterimage ${TAG#v}" --generate-notes

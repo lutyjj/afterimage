@@ -1,7 +1,7 @@
 {
   lib,
   runCommand,
-  makeWrapper,
+  makeBinaryWrapper,
   server,
   web,
   design,
@@ -11,7 +11,7 @@
 # with the licences of the design system and fonts it embeds.
 runCommand "afterimage-${server.version}"
   {
-    nativeBuildInputs = [ makeWrapper ];
+    nativeBuildInputs = [ makeBinaryWrapper ];
     inherit (server) version;
     passthru = { inherit server web; };
     meta = server.meta // {

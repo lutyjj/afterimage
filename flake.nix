@@ -32,16 +32,16 @@
     {
       packages = forSystems (system: {
         default = scope.${system}.afterimage;
-        inherit (scope.${system}) contract design server web tokens;
+        inherit (scope.${system}) container contract design server web tokens;
       });
 
       # The server's build runs every Rust test; lint runs clippy and rustfmt; the
       # web UI's build type-checks it with the generated client and runs its tests;
       # tokens tests the token generator's reading of the stylesheet; parity builds
-      # the parity harness, which runs on demand; module boots the NixOS module in
-      # a VM.
+      # the parity harness, which runs on demand; container builds the image a
+      # release publishes; module boots the NixOS module in a VM.
       checks = forSystems (system: {
-        inherit (scope.${system}) server lint web parity;
+        inherit (scope.${system}) server lint web parity container;
         tokens = scope.${system}.tokensTest;
         module = scope.${system}.moduleTest;
       });
