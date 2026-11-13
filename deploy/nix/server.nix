@@ -44,6 +44,9 @@ rustPlatform.buildRustPackage {
     aws-lc
     sqlite
   ];
+  # aws-lc-sys finds the system AWS-LC on its own; libsqlite3-sys compiles its
+  # bundled SQLite unless told to look for the system's.
+  env.LIBSQLITE3_SYS_USE_PKG_CONFIG = "1";
 
   cargoBuildFlags = [
     "--package"
