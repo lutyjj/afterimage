@@ -1,8 +1,8 @@
 name: Release
 
 # A tag such as v0.2.0, naming the version in Cargo.toml, builds the image on
-# each architecture from the locked dependencies, which runs the server's and
-# the web UI's tests, and publishes it to the GitHub Container Registry under
+# each architecture from the locked dependencies, which runs the web UI's
+# tests, and publishes it to the GitHub Container Registry under
 # the version and `latest`. Then it creates the tag's GitHub release with notes
 # generated from the commits since the previous release, and the management
 # API's OpenAPI document attached for scripts.
@@ -35,6 +35,10 @@ jobs:
       - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
         with:
           extra_nix_config: build-dir = /nix/build
+      - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: afterimage
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: Check the tag
         env:
           TAG: ${{ github.ref_name }}
