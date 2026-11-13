@@ -1,5 +1,6 @@
 {
   "name": "afterimage",
   "private": true,
+  "license": "MIT",
   "packageManager": "pnpm@12.9.0"
 }

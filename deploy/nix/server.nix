@@ -56,6 +56,7 @@ rustPlatform.buildRustPackage {
 
   meta = {
     inherit (manifest.package) description;
+    license = lib.licenses.mit;
     mainProgram = "afterimage";
     platforms = lib.platforms.linux;
   };
