@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 const ALPHABET = /[2-9A-HJ-NP-Z]/;
 export const CODE_LENGTH = 6;
 
-export function cleanCode(text: string): string {
+function cleanCode(text: string): string {
   return [...text.toUpperCase()]
     .filter((character) => ALPHABET.test(character))
     .join("")

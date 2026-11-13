@@ -13,7 +13,6 @@ runCommand "afterimage-${server.version}"
   {
     nativeBuildInputs = [ makeBinaryWrapper ];
     inherit (server) version;
-    passthru = { inherit server web; };
     meta = server.meta // {
       mainProgram = "afterimage";
     };

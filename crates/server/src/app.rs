@@ -57,8 +57,8 @@ const CONTRACT: &str = include_str!(concat!(
 
 /// The broker to publish to: the deployment's, or else the one the
 /// administrator saved, or none until one is saved. A saved broker the server
-/// no longer reads, such as an address with a query that an earlier release
-/// took, leaves publishing off, so the web UI that corrects it still starts.
+/// cannot read, such as an address with a query, leaves publishing off, so the
+/// web UI that corrects it still starts.
 async fn broker(config: &Config, saved: &Saved) -> Result<Option<telemetry::Settings>, Error> {
     if let Some(settings) = config.mqtt() {
         return Ok(Some(settings));

@@ -12,7 +12,7 @@
 # generated client it compiles from source, runs its unit tests, and bundles it.
 let
   fs = lib.fileset;
-  version = (lib.importJSON ../../web/package.json).version or "0.1.0";
+  inherit ((lib.importTOML ../../Cargo.toml).workspace.package) version;
   src = fs.toSource {
     root = ../..;
     fileset = fs.unions [

@@ -79,7 +79,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "tower 0.5.3",
- "tracing",
 ]
 
 [[package]]
@@ -120,7 +119,6 @@ dependencies = [
  "esp-idf-part",
  "getrandom 0.4.3",
  "http",
- "http-body",
  "http-body-util",
  "hyper",
  "jiff",

@@ -21,7 +21,6 @@ rmcp = { version = "3.9.0", default-features = false, features = ["server", "tra
 serde_json.workspace = true
 thiserror = "2.0.21"
 tower = { version = "0.5.3", features = ["util"] }
-tracing = "0.1.44"
 
 [lints]
 workspace = true

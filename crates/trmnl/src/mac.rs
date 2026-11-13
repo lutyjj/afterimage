@@ -19,13 +19,6 @@ impl fmt::Display for MacError {
 
 impl std::error::Error for MacError {}
 
-impl Mac {
-    #[must_use]
-    pub const fn octets(self) -> [u8; 6] {
-        self.0
-    }
-}
-
 impl FromStr for Mac {
     type Err = MacError;
 
@@ -67,7 +60,7 @@ mod tests {
     #[test]
     fn reads_the_firmware_form_and_writes_it_back() {
         let mac: Mac = "41:B4:10:39:A1:24".parse().unwrap();
-        assert_eq!(mac.octets(), [0x41, 0xB4, 0x10, 0x39, 0xA1, 0x24]);
+        assert_eq!(mac.0, [0x41, 0xB4, 0x10, 0x39, 0xA1, 0x24]);
         assert_eq!(mac.to_string(), "41:B4:10:39:A1:24");
     }
 

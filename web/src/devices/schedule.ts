@@ -16,7 +16,7 @@ export const WEEK: readonly Weekday[] = ["monday", "tuesday", "wednesday", "thur
 
 export const DAY_MINUTES = 24 * 60;
 
-export function minuteOf(time: string | undefined): number | undefined {
+function minuteOf(time: string | undefined): number | undefined {
   if (!time) return undefined;
   const [hours, minutes] = time.split(":").map(Number);
   return (hours ?? 0) * 60 + (minutes ?? 0);
@@ -152,7 +152,7 @@ export function isAllDay(hours: Hours): boolean {
 }
 
 /** How long the hours run on one of their days, for a label such as "07:00–09:30". */
-export function windowLabel(hours: Hours): string {
+function windowLabel(hours: Hours): string {
   if (isAllDay(hours)) return "All day";
   return `${timeOfDay(minuteOf(hours.from) ?? 0)}–${timeOfDay((minuteOf(hours.until) ?? DAY_MINUTES) % DAY_MINUTES)}`;
 }
