@@ -1,19 +1,29 @@
 {
   lib,
   pkgs,
+  crane,
 }:
 
 lib.makeScope pkgs.newScope (self: {
   # The latest stable release; nixpkgs trails it.
   rust = pkgs.rust-bin.stable."1.99.1".minimal;
-  rustPlatform = pkgs.makeRustPlatform {
-    cargo = self.rust;
-    rustc = self.rust;
-  };
+  # crane on that toolchain, with clippy and rustfmt for the lints.
+  craneLib = (crane.mkLib pkgs).overrideToolchain (
+    _:
+    self.rust.override {
+      extensions = [
+        "clippy"
+        "rustfmt"
+      ];
+    }
+  );
   smithy-cli = self.callPackage ./smithy-cli.nix { };
 
   contract = self.callPackage ./contract.nix { };
-  server = self.callPackage ./server.nix { };
+  # The server, the workspace's tests, clippy and rustfmt, on dependencies built
+  # once.
+  rustWorkspace = self.callPackage ./rust.nix { };
+  inherit (self.rustWorkspace) server;
   web = self.callPackage ./web.nix { };
   # The server with the web UI it serves.
   afterimage = self.callPackage ./package.nix { };
@@ -23,7 +33,6 @@ lib.makeScope pkgs.newScope (self: {
   containerTest = self.callPackage ./container-test.nix { };
   # Boots the NixOS module (module.nix) with that package.
   moduleTest = self.callPackage ./module-test.nix { };
-  lint = self.callPackage ./lint.nix { };
   # The token generator with the release pins it reads, laid out as in tools/.
   tokensSource = lib.fileset.toSource {
     root = ../../tools;

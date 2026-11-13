@@ -7,6 +7,7 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    crane.url = "github:ipetkov/crane";
   };
 
   outputs =
@@ -14,6 +15,7 @@
       self,
       nixpkgs,
       rust-overlay,
+      crane,
     }:
     let
       inherit (nixpkgs) lib;
@@ -24,7 +26,7 @@
       scope = forSystems (
         system:
         import ./deploy/nix {
-          inherit lib;
+          inherit lib crane;
           pkgs = nixpkgs.legacyPackages.${system}.extend rust-overlay.overlays.default;
         }
       );
@@ -35,14 +37,15 @@
         inherit (scope.${system}) container contract design server web tokens;
       });
 
-      # The server's build runs every Rust test; lint runs clippy and rustfmt; the
-      # web UI's build type-checks it with the generated client and runs its tests;
-      # tokens tests the token generator's reading of the stylesheet; parity builds
-      # the parity harness, which runs on demand; container runs the image a
-      # release publishes under podman in a VM; module boots the NixOS module in
-      # a VM.
+      # The server builds; tests runs every Rust test; clippy and fmt lint the
+      # workspace; the web UI's build type-checks it with the generated client and
+      # runs its tests; tokens tests the token generator's reading of the
+      # stylesheet; parity builds the parity harness, which runs on demand;
+      # container runs the image a release publishes under podman in a VM; module
+      # boots the NixOS module in a VM.
       checks = forSystems (system: {
-        inherit (scope.${system}) server lint web parity;
+        inherit (scope.${system}) server web parity;
+        inherit (scope.${system}.rustWorkspace) tests clippy fmt;
         tokens = scope.${system}.tokensTest;
         container = scope.${system}.containerTest;
         module = scope.${system}.moduleTest;
