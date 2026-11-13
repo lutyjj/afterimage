@@ -19,6 +19,8 @@ lib.makeScope pkgs.newScope (self: {
   afterimage = self.callPackage ./package.nix { };
   # That package as the OCI image a release publishes.
   container = self.callPackage ./container.nix { };
+  # Runs that image under podman.
+  containerTest = self.callPackage ./container-test.nix { };
   # Boots the NixOS module (module.nix) with that package.
   moduleTest = self.callPackage ./module-test.nix { };
   lint = self.callPackage ./lint.nix { };
