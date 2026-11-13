@@ -73,12 +73,15 @@ in
   );
 
   # Every crate's tests, the conformance test against TRMNL's document included,
-  # with the broker the MQTT tests publish to.
+  # with the broker the MQTT tests publish to. The checks keep no cargo
+  # artifacts: nothing builds on them, and the binary cache would store a
+  # copy of the target directory for every change.
   tests = craneLib.cargoTest (
     commonArgs
     // {
       inherit cargoArtifacts;
       nativeCheckInputs = [ mosquitto ];
+      doInstallCargoArtifacts = false;
     }
   );
 
@@ -87,9 +90,13 @@ in
     // {
       inherit cargoArtifacts;
       cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+      doInstallCargoArtifacts = false;
     }
   );
 
   # rustfmt over the workspace members; `--all` would reach into gen/.
-  fmt = craneLib.cargoFmt { inherit (commonArgs) pname version src postPatch; };
+  fmt = craneLib.cargoFmt {
+    inherit (commonArgs) pname version src postPatch;
+    doInstallCargoArtifacts = false;
+  };
 }
