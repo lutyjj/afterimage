@@ -5,20 +5,18 @@
 #             OpenAPI document, and the management API's TypeScript client
 #   design    the renderer's design tokens and fonts, which the flake's design
 #             package resolves from the pinned release of TRMNL's design system
-#   linen     the web UI's design language, at the revision flake.lock pins
 #
-# Without an argument, all three. The Nix builds lay gen/ out the same way:
-# deploy/nix/contract.nix runs this script's contract part, the server's build
-# copies the design package to gen/design, and the web UI's build copies the
-# linen package to gen/linen.
+# Without an argument, both. The Nix builds lay gen/ out the same way:
+# deploy/nix/contract.nix runs this script's contract part, and the server's
+# build copies the design package to gen/design.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 part=${1:-all}
 case $part in
-all | contract | design | linen) ;;
+all | contract | design) ;;
 *)
-	echo "usage: tools/generate [contract | design | linen]" >&2
+	echo "usage: tools/generate [contract | design]" >&2
 	exit 2
 	;;
 esac
@@ -42,14 +40,4 @@ if wants design; then
 	nix build "$root#design" --out-link build/design
 	rm -rf gen/design
 	cp -rL --no-preserve=mode build/design gen/design
-fi
-
-# A gen/linen that links to a linen checkout stays for a plain run; asking for
-# the linen part by name puts the pinned copy back.
-if [ "$part" = all ] && [ -L gen/linen ]; then
-	echo "gen/linen links to $(readlink gen/linen); left as it is" >&2
-elif wants linen; then
-	nix build "$root#linen" --out-link build/linen
-	rm -rf gen/linen
-	cp -rL --no-preserve=mode build/linen gen/linen
 fi

@@ -55,8 +55,8 @@ The flake's `nixosModules.default` runs the server as `services.afterimage`, wit
 
 | Command | Does |
 |---|---|
-| `tools/generate` | Generates `gen/`: from `model/smithy/` both services' Rust server crates and OpenAPI documents and the management API's TypeScript client, the renderer's design tokens and fonts from the pinned release of TRMNL's design system (`tools/trmnl-release.json`), and the web UI's design language, linen, at the revision `flake.lock` pins. A `gen/linen` that links to a linen checkout stays; `tools/generate linen` puts the pinned copy back |
-| `nix flake update linen`, then `tools/generate linen` and `pnpm install` | Moves the web UI to linen's newest revision. Then set `hash = lib.fakeHash;` in `deploy/nix/web.nix`, run `nix build .#web` and copy the hash it reports |
+| `tools/generate` | Generates `gen/`: from `model/smithy/` both services' Rust server crates and OpenAPI documents and the management API's TypeScript client, and the renderer's design tokens and fonts from the pinned release of TRMNL's design system (`tools/trmnl-release.json`) |
+| `pnpm --filter afterimage-web add <tarball URL>` | Moves the web UI to another [linen release](https://github.com/lutyjj/linen/releases). Then set `hash = lib.fakeHash;` in `deploy/nix/web.nix`, run `nix build .#web` and copy the hash it reports |
 | `cargo test --workspace` | Runs every Rust test, the conformance test included |
 | `pnpm install` | Installs the web UI's dependencies, after `tools/generate` |
 | `pnpm --filter afterimage-web dev` | Serves the web UI with hot reload at `http://127.0.0.1:5173`, sending `/api`, `/manage` and `/mcp` to a server on port 8080, or to the one `AFTERIMAGE_SERVER` names (an OIDC sign-in returns to that server's own address, so sign in there with a password) |

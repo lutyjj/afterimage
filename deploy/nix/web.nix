@@ -6,7 +6,6 @@
   pnpm,
   nodejs_24,
   contract,
-  linen,
 }:
 
 # The web UI's static files. Its build type-checks the app together with the
@@ -28,12 +27,9 @@ let
       ))
     ];
   };
-  # The workspace includes the generated client and linen, laid out as
-  # tools/generate writes them in a checkout.
-  withContract = ''
-    cp -r --no-preserve=mode ${contract} gen
-    cp -r --no-preserve=mode ${linen} gen/linen
-  '';
+  # The workspace includes the generated client, laid out as tools/generate
+  # writes it in a checkout.
+  withContract = "cp -r --no-preserve=mode ${contract} gen";
 in
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "afterimage-web";
@@ -54,7 +50,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     postPatch = withContract;
     inherit pnpm;
     fetcherVersion = 5;
-    hash = "sha256-0CZh51R82aHhQJ09nPnRdpMD/jR9TNNkvLi4OdlmbSs=";
+    hash = "sha256-QM0xAlpEXhtvPjAfdud3tfG2+mjO9105H3/MBdVzAxM=";
   };
 
   buildPhase = ''

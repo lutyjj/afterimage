@@ -1,9 +1,8 @@
-# The web UI, and what tools/generate writes for it: the TypeScript client and
-# linen, whose dependencies the web UI's build needs.
+# The web UI, and the TypeScript client tools/generate writes for it, whose
+# dependencies the web UI's build needs.
 packages:
   - web
   - gen/management-client
-  - gen/linen
 minimumReleaseAgeExclude:
   - '@tanstack/query-core@5.106.1'
   - '@tanstack/react-query@5.106.1'

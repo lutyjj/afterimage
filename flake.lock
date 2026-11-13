@@ -1,21 +1,5 @@
 {
   "nodes": {
-    "linen": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1794304853,
-        "narHash": "sha256-5Cdl1VZOZcdMye0fkMIS6qQszpGjWNfMRX363lw0TjE=",
-        "owner": "lutyjj",
-        "repo": "linen",
-        "rev": "c0aefab053f4ba178c91e3e0f2b547b8b9c8cd25",
-        "type": "github"
-      },
-      "original": {
-        "owner": "lutyjj",
-        "repo": "linen",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1793726008,
@@ -34,7 +18,6 @@
     },
     "root": {
       "inputs": {
-        "linen": "linen",
         "nixpkgs": "nixpkgs",
         "rust-overlay": "rust-overlay"
       }

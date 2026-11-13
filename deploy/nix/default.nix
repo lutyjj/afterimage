@@ -1,7 +1,6 @@
 {
   lib,
   pkgs,
-  linenSource,
 }:
 
 lib.makeScope pkgs.newScope (self: {
@@ -15,8 +14,6 @@ lib.makeScope pkgs.newScope (self: {
 
   contract = self.callPackage ./contract.nix { };
   server = self.callPackage ./server.nix { };
-  # linen, the design language the web UI wears, at the revision flake.lock pins.
-  linen = pkgs.runCommandLocal "linen" { } "cp -r ${linenSource} $out";
   web = self.callPackage ./web.nix { };
   # The server with the web UI it serves.
   afterimage = self.callPackage ./package.nix { };
