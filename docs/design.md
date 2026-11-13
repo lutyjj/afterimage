@@ -166,7 +166,7 @@ Secret values are replaced by their names in answers and problems.
 |---|---|
 | Fetching sources and images | 11 s |
 | Running templates | 2 s |
-| Whole drawing | 13 s (firmware waits 15 s) |
+| Starting templates or the render | Within 13 s of the drawing's start (firmware waits 15 s) |
 | Components | 2,000 |
 | Images | 16 |
 | Items in `each` or `table` without `limit` | 100 |
