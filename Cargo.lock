@@ -10,7 +10,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "afterimage-conformance"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -67,7 +67,7 @@ dependencies = [
 
 [[package]]
 name = "afterimage-mcp"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.23.1",
  "bytes",
@@ -83,7 +83,7 @@ dependencies = [
 
 [[package]]
 name = "afterimage-render-typst"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "afterimage-trmnl",
  "include_dir",
@@ -101,7 +101,7 @@ dependencies = [
 
 [[package]]
 name = "afterimage-server"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "afterimage-device-api",
  "afterimage-management-api",
@@ -148,7 +148,7 @@ dependencies = [
 
 [[package]]
 name = "afterimage-trmnl"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
