@@ -1,5 +1,5 @@
 """The generator's reading of the stylesheet's rules, from computed values the
-release gives on TRMNL's own displays (Chromium, framework 3.4.4)."""
+release gives on TRMNL's own displays (Chromium, framework 3.4.6)."""
 
 import unittest
 

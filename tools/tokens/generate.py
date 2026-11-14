@@ -26,10 +26,10 @@ import urllib.request
 from pathlib import Path
 
 
-FRAMEWORK = "3.4.4"
-# The commit tag v3.4.4 names; a tag can move, a commit cannot. Every file of the
+FRAMEWORK = "3.4.6"
+# The commit tag v3.4.6 names; a tag can move, a commit cannot. Every file of the
 # release comes from it, the compiled stylesheet that trmnl.com serves included.
-REPOSITORY = "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/f366a9303bbce97adca73d5747da8e2212379bbc"
+REPOSITORY = "https://raw.githubusercontent.com/usetrmnl/trmnl-framework/07a0b39e41c9a702e3f21834853d68720f96c170"
 STYLESHEET = f"{REPOSITORY}/public/css/{FRAMEWORK}/plugins.css"
 TOKEN_LIST = f"{REPOSITORY}/public/framework/docs/3.4/tokens.md"
 FONT_REGISTRY = f"{REPOSITORY}/db/data/framework_fonts.yml"
