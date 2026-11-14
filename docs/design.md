@@ -173,11 +173,11 @@ Secret values are replaced by their names in answers and problems.
 
 ### Typst renderer
 
-`crates/render-typst` lays out components with TRMNL's design tokens, rasterizes at the model's scale, rotates, maps to the palette, and writes the smallest PNG. It renders in 13 ms and 19 MiB, against 1.3 s and about 1 GiB for TRMNL's design system in Chromium.
+`crates/render-typst` lays out components with TRMNL's design tokens, rasterizes at the model's scale, rotates, maps to the palette, and writes the smallest PNG. It renders in 13 ms and 19 MiB, against 1.3 s and about 1 GiB for TRMNL's design system in Chromium. Only Firefox, the browser TRMNL renders with, draws the framework exactly, at about 130 ms and 0.8 GiB a render with the page kept loaded; no embeddable engine runs the framework's stylesheet and script faithfully (Servo and Blitz differ in 8 to 13% of pixels, measured with framework 3.4.6). So the server runs no browser, and the parity harness bounds how far the renderer may differ.
 
 ### Token generator
 
-`tools/tokens` loads the pinned release of TRMNL's stylesheet (`tools/trmnl-release.json`) in headless Chromium and records each token's computed value per display profile, plus what each component paints. Chromium runs only at build time.
+`tools/tokens` loads the pinned release of TRMNL's stylesheet (`tools/trmnl-release.json`) in headless Chromium and records each token's computed value per display profile, plus what each component paints and how it is spaced, on its own and inside an item. Chromium runs only at build time.
 
 ### Parity harness
 
