@@ -251,8 +251,8 @@ importers:
         specifier: 1.0.9
         version: 1.0.9(@codemirror/language@6.13.1)(@codemirror/state@6.7.6)(@codemirror/view@6.43.15)
       linen:
-        specifier: https://github.com/lutyjj/linen/releases/download/v0.1.0/linen-0.1.0.tgz
-        version: https://github.com/lutyjj/linen/releases/download/v0.1.0/linen-0.1.0.tgz(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(lucide-react@1.68.0(@types/react@19.3.0)(react@19.3.1))(motion@14.10.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react-router@8.5.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.4)
+        specifier: https://github.com/lutyjj/linen/releases/download/v0.1.1/linen-0.1.1.tgz
+        version: https://github.com/lutyjj/linen/releases/download/v0.1.1/linen-0.1.1.tgz(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(lucide-react@1.68.0(@types/react@19.3.0)(react@19.3.1))(motion@14.10.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react-router@8.5.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.4)
       lucide-react:
         specifier: ^1.68.0
         version: 1.68.0(@types/react@19.3.0)(react@19.3.1)
@@ -1352,9 +1352,9 @@ packages:
     resolution: {integrity: sha512-WkUDrojuJs0xkgGf2udWxa3yGBRxPtxUkB79i6aCZLRgc7PM8fZe9TosfPDcvEpQZbuFASnHYmRLBLUbmLOIIA==}
     engines: {node: '>= 12.0.0'}
 
-  linen@https://github.com/lutyjj/linen/releases/download/v0.1.0/linen-0.1.0.tgz:
-    resolution: {integrity: sha512-Tat/O5V1vyeW3QaaiI+aPZpenTdbPjE/Y5YBY3UtTPBi0x9xCe0pycUbI6vq/nzdVPDwYnUCNBP8IylfE9H4jA==, tarball: https://github.com/lutyjj/linen/releases/download/v0.1.0/linen-0.1.0.tgz}
-    version: 0.1.0
+  linen@https://github.com/lutyjj/linen/releases/download/v0.1.1/linen-0.1.1.tgz:
+    resolution: {integrity: sha512-1st7GMJ5tCYpTp48Ew9OivtRaGT2SvmQSxgzkmYoHwT4yyJrGZnPi1Xhg+7yFD4GMTDu8O7u3Z494RH9mH/q/g==, tarball: https://github.com/lutyjj/linen/releases/download/v0.1.1/linen-0.1.1.tgz}
+    version: 0.1.1
     peerDependencies:
       '@base-ui/react': ^1.9.0
       lucide-react: ^1.68.0
@@ -2834,7 +2834,7 @@ snapshots:
       lightningcss-win32-arm64-msvc: 1.33.0
       lightningcss-win32-x64-msvc: 1.33.0
 
-  linen@https://github.com/lutyjj/linen/releases/download/v0.1.0/linen-0.1.0.tgz(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(lucide-react@1.68.0(@types/react@19.3.0)(react@19.3.1))(motion@14.10.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react-router@8.5.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.4):
+  linen@https://github.com/lutyjj/linen/releases/download/v0.1.1/linen-0.1.1.tgz(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(lucide-react@1.68.0(@types/react@19.3.0)(react@19.3.1))(motion@14.10.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react-router@8.5.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.4):
     dependencies:
       '@base-ui/react': 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       lucide-react: 1.68.0(@types/react@19.3.0)(react@19.3.1)

@@ -26,7 +26,7 @@
     "codemirror": "^6.0.2",
     "codemirror-json-schema": "^0.8.1",
     "codemirror-wrapped-line-indent": "1.0.9",
-    "linen": "https://github.com/lutyjj/linen/releases/download/v0.1.0/linen-0.1.0.tgz",
+    "linen": "https://github.com/lutyjj/linen/releases/download/v0.1.1/linen-0.1.1.tgz",
     "lucide-react": "^1.68.0",
     "motion": "^14.10.0",
     "react": "^19.3.1",
