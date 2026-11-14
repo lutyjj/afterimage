@@ -625,32 +625,45 @@
   }
 }
 
+// TRMNL's title bar is a row in which the title keeps its own width and the
+// instance, in the title's face, takes what is left after a gap, at its end.
+// Each stays on one line and is cut with an ellipsis: the title only once the
+// instance has given way, and an instance with less than an em of room is left
+// out.
 #let title-bar(t, images, bar) = {
-  let face = typeface(t, "--title-bar", "base")
   let bar-paint = paint(t, "title-bar")
-  let ink = rgb(bar-paint.at("ink", default: "#000000"))
+  let face = (..typeface(t, "--title-bar", "base"), fill: rgb(bar-paint.at("ink", default: "#000000")))
   let icon = bar.at("icon", default: none)
   let icon = if image-of(images, icon) == none { none } else {
     std.image(image-of(images, icon), height: px(t, "--title-bar-image-height", default: 24))
   }
+  let gap = px(t, "--gap", default: 10)
+  let title = shown(bar.title)
+  let instance = shown(bar.at("instance", default: none))
+  // One line of `words` in `room`: whole where it fits, else cut.
+  let line(words, room) = pad(top: px(t, "--title-bar-padding-top"), haloed(t,
+    if measure(text(..face, words)).width <= room { text(..face, words) } else { box(width: room, clamped(face, words, 1)) }))
   block(
     width: 100%,
     height: px(t, "--title-bar-height", default: 40),
     fill: fill-of(t, bar-paint),
     radius: px(t, "--title-bar-border-radius", default: 10),
-    inset: (x: px(t, "--gap", default: 10)),
-    // Without an icon the title starts at the bar's padding, with no gutter
-    // before it; the instance takes the title's face, as TRMNL's does.
-    grid(
-      columns: if icon == none { (0pt, auto, 1fr, auto) } else { (auto, auto, 1fr, auto) },
-      column-gutter: (if icon == none { 0pt } else { px(t, "--gap-small", default: 7) }, px(t, "--gap-small", default: 7)),
-      align: horizon,
-      rows: (100%,),
-      if icon == none { [] } else { icon },
-      pad(top: px(t, "--title-bar-padding-top"), haloed(t, text(..face, fill: ink, shown(bar.title)))),
-      [],
-      haloed(t, text(..face, fill: ink, shown(bar.at("instance", default: none)))),
-    ),
+    inset: (x: gap),
+    layout(region => {
+      let lead = if icon == none { 0pt } else { measure(icon).width + px(t, "--gap-small", default: 7) }
+      let room = region.width - lead - (if instance == "" { 0pt } else { gap })
+      let title-room = calc.min(measure(text(..face, title)).width, room)
+      let instance-room = room - title-room
+      grid(
+        columns: (lead, title-room, 1fr),
+        column-gutter: (0pt, if instance == "" { 0pt } else { gap }),
+        align: (left + horizon, left + horizon, right + horizon),
+        rows: (100%,),
+        if icon == none { [] } else { icon },
+        line(title, title-room),
+        if instance == "" or instance-room < face.size { [] } else { line(instance, instance-room) },
+      )
+    }),
   )
 }
 

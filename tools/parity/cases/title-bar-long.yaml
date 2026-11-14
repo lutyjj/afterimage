@@ -1,0 +1,18 @@
+# A title bar whose instance is cut short: the title keeps its width and the
+# instance takes what is left, with an ellipsis.
+trmnl: |
+  <div class="layout layout--col gap" style="justify-content:flex-start;align-items:flex-start"><span class="title">Hello</span></div>
+  <div class="title_bar"><span class="title">Departures from the central station, northbound</span><span class="instance">Platforms one to twelve, every train leaving within the next hour and a half</span></div>
+afterimage:
+  titleBar: { title: "Departures from the central station, northbound", instance: "Platforms one to twelve, every train leaving within the next hour and a half" }
+  content:
+    column:
+      children:
+        - title: { text: Hello }
+# The profiles it is drawn on, each with the share of pixels, in percent, that
+# may differ from TRMNL's rendering.
+limits:
+  og_png/bw: 0.039
+  og_plus/gray-4: 0.54
+  v2/bw: 0.83
+  v2/gray-4: 2.4
