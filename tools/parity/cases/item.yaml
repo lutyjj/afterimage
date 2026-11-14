@@ -23,7 +23,7 @@ afterimage:
 # The profiles it is drawn on, each with the share of pixels, in percent, that
 # may differ from TRMNL's rendering.
 limits:
-  og_png/bw: 0.84
-  og_plus/gray-4: 1.1
-  v2/bw: 0.47
-  v2/gray-4: 0.59
+  og_png/bw: 0.064
+  og_plus/gray-4: 0.26
+  v2/bw: 0.077
+  v2/gray-4: 0.19

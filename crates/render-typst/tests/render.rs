@@ -683,9 +683,10 @@ fn is_gray(pixel: [u8; 3]) -> bool {
 
 #[test]
 fn a_small_label_takes_its_line_box() {
-    // TRMNL's `label--small` sets TRMNL12 at 12 pixels in a 12-pixel line, so
-    // two of them stacked with no gap start 12 pixels apart. A line only as
-    // tall as the font's capitals would put them 8 apart.
+    // TRMNL's `label--small` sets TRMNL12 at 12 pixels in a 12-pixel line with a
+    // pixel of padding above and below, so two of them stacked with no gap start
+    // 14 pixels apart. A line only as tall as the font's capitals would put them
+    // 10 apart.
     let labels = json!({ "content": { "column": { "gap": "none", "align": "start", "justify": "start", "grow": false,
         "children": [small_label("MON"), small_label("MON")] } } });
     let (rows, _) = inked(&render(&labels, "og_plus", "gray-4"));
@@ -695,7 +696,7 @@ fn a_small_label_takes_its_line_box() {
         .map(|pair| pair[1])
         .collect();
     assert_eq!(breaks.len(), 1, "two separate lines of ink: {rows:?}");
-    assert_eq!(breaks[0] - rows[0], 12, "{rows:?}");
+    assert_eq!(breaks[0] - rows[0], 14, "{rows:?}");
 }
 
 #[test]

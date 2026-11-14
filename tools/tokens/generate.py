@@ -86,6 +86,43 @@ PAINTS = {
     "divider": ".divider",
 }
 
+# How each component is spaced, read from the release's own markup like the
+# paints: titles, descriptions and every label size and style, on their own and
+# inside an item, and the item.
+LABELS = [(size, style) for size in ("small", "base", "large", "xlarge", "xxlarge")
+          for style in ("plain", "outline", "underline", "gray", "filled")]
+TEXT = {"title": "title", "description": "description",
+        **{f"label-{size}-{style}": f"label.label--{size}.label--{style}" for size, style in LABELS}}
+TEXT_MARKUP = "".join(f'<span class="{" ".join(classes.split("."))}">T</span>' for classes in TEXT.values())
+BOX_MARKUP = (f'<div class="layout layout--col">{TEXT_MARKUP}</div>'
+              f'<div class="item"><div class="meta"></div><div class="content">{TEXT_MARKUP}</div></div>')
+BOXES = {
+    "item": ".item",
+    "item-meta": ".item .meta",
+    **{name: f".layout .{classes}" for name, classes in TEXT.items()},
+    **{f"item/{name}": f".item .{classes}" for name, classes in TEXT.items()},
+}
+# Each box's padding, margin and border widths (top, right, bottom, left), gap
+# and corner radius, in pixels.
+BOX_PROBE = """
+([markup, boxes]) => {
+  const root = document.createElement('div');
+  root.innerHTML = markup;
+  document.querySelector('.screen').appendChild(root);
+  const out = {};
+  for (const [name, selector] of Object.entries(boxes)) {
+    const style = getComputedStyle(root.querySelector(selector));
+    const sides = pattern => ['top', 'right', 'bottom', 'left'].map(side => parseFloat(style.getPropertyValue(pattern.replace('*', side))) || 0);
+    out[name] = {
+      padding: sides('padding-*'), margin: sides('margin-*'), border: sides('border-*-width'),
+      gap: parseFloat(style.columnGap) || 0, radius: parseFloat(style.borderTopLeftRadius) || 0,
+    };
+  }
+  root.remove();
+  return out;
+}
+"""
+
 # Each token goes through the CSS property that resolves its kind, so lengths come
 # back in pixels and colors as rgb().
 PROBE = """
@@ -277,6 +314,11 @@ def paint(raw):
     return {key: value for key, value in found.items() if value is not None}
 
 
+def box(raw: dict) -> dict:
+    """A box's spacing, without the parts that are zero."""
+    return {key: value for key, value in raw.items() if (any(value) if isinstance(value, list) else value)}
+
+
 def profiles(catalog: Path):
     """Each model and palette pair, with the classes and inline variables its
     screen element carries."""
@@ -355,6 +397,8 @@ def main(catalog: Path, output: Path) -> None:
                 painted = page.evaluate(PAINT_PROBE, [PAINT_MARKUP, PAINTS, inverse])
                 prefix = "paint/inverse/" if inverse else "paint/"
                 tokens.update({prefix + name: paint(painted[name]) for name in PAINTS})
+            spaced = page.evaluate(BOX_PROBE, [BOX_MARKUP, BOXES])
+            tokens.update({"box/" + name: box(spaced[name]) for name in BOXES})
             key = json.dumps(tokens, sort_keys=True)
             if key not in index:
                 index[key] = len(sets)

@@ -58,6 +58,20 @@
   if found == none { (:) } else { found }
 }
 
+// How the stylesheet spaces one component (`tools/tokens` reads it from the
+// release's own markup), inside an item where it is in one: its padding, margin
+// and border as sides for `pad` and `box`, its gap and its corner radius.
+#let spacing(t, name) = {
+  let found = if t.at("@item", default: false) { tok(t, "box/item/" + name) } else { none }
+  let found = if found == none { tok(t, "box/" + name, default: (:)) } else { found }
+  let sides(key) = {
+    let (top, right, bottom, left) = found.at(key, default: (0, 0, 0, 0)).map(v => v * 1pt)
+    (top: top, right: right, bottom: bottom, left: left)
+  }
+  (padding: sides("padding"), margin: sides("margin"), border: sides("border"),
+   gap: found.at("gap", default: 0) * 1pt, radius: found.at("radius", default: 0) * 1pt)
+}
+
 // A paint's fill: its color under its dither tile, or its rule: a row of the
 // display's own pixels repeating over its CSS period, which runs down instead of
 // across where `down` is set. Pixels the row leaves transparent show what is
@@ -170,32 +184,37 @@
 #let text-component(t, component, value) = {
   let size = value.at("size", default: "base")
   let face = typeface(t, component, size)
-  clamped(face, shown(value.text), value.at("clamp", default: none))
+  pad(..spacing(t, component.trim("-", at: start)).padding, clamped(face, shown(value.text), value.at("clamp", default: none)))
 }
 
 #let label(t, value, grays) = {
   let size = value.at("size", default: "base")
   let face = typeface(t, "--label", size)
   let body = clamped(face, shown(value.text), value.at("clamp", default: none))
-  let inset = (x: px(t, "--gap-xsmall", default: 5), y: 1pt)
-  let radius = px(t, "--rounded-xsmall", default: 5)
   let style = value.at("style", default: "plain")
+  let space = spacing(t, "label-" + size + "-" + style)
+  // A border box, as CSS draws one: the border inside the box's edge, around
+  // the padding, where Typst would centre a stroke on the edge.
+  let border = space.border.top
+  let inset = (:)
+  for (side, length) in space.padding { inset.insert(side, length + space.border.at(side)) }
+  let framed(..args, body) = box(inset: inset, outset: -border / 2, radius: space.radius, ..args, body)
   if style == "outline" {
-    box(stroke: 1pt + ink(t), inset: inset, radius: radius, body)
+    framed(stroke: border + ink(t), body)
   } else if style == "underline" {
-    // TRMNL's underline: a one-pixel bar along the bottom of the label's box,
-    // where layout puts it, rather than a stroke under the glyphs.
-    context {
-      let width = measure(body).width
-      stack(body, rect(width: width, height: 1pt, fill: ink(t), stroke: none))
-    }
+    // TRMNL's underline: a one-pixel bar over the bottom edge of the label's
+    // box, rather than a stroke under the glyphs.
+    framed(context {
+      body
+      place(bottom, dy: space.padding.bottom, rect(width: measure(body).width, height: 1pt, fill: ink(t), stroke: none))
+    })
   } else if style == "gray" {
-    text(fill: gray-ink(t, grays), body)
+    framed(text(fill: gray-ink(t, grays), body))
   } else if style == "filled" {
     let canvas = paint(t, "canvas").at("color", default: "#FFFFFF")
-    box(fill: ink(t), inset: inset, radius: radius, text(fill: rgb(canvas), body))
+    framed(fill: ink(t), text(fill: rgb(canvas), body))
   } else {
-    body
+    framed(body)
   }
 }
 
@@ -409,10 +428,11 @@
   let index = v.at("index", default: none)
   let face = typeface(t, "--item-index", "base")
   grid(
-    columns: (if index == none { px(t, "--item-meta-width", default: 10) } else { auto }, if bounds.w { 1fr } else { auto }),
-    column-gutter: px(t, "--gap-small", default: 7),
-    grid.cell(fill: meta, inset: if index == none { 0pt } else { (x: 4pt, y: 2pt) },
-      if index == none { [] } else { align(center + horizon, text(..face, shown(index))) }),
+    // The bar keeps its width, with any index centred on it.
+    columns: (px(t, "--item-meta-width", default: 10), if bounds.w { 1fr } else { auto }),
+    // The item's gap and the bar's margin, as the stylesheet spaces them.
+    column-gutter: spacing(t, "item").gap + spacing(t, "item-meta").margin.right,
+    grid.cell(fill: meta, if index == none { [] } else { align(center + horizon, text(..face, shown(index))) }),
     content,
   )
 }
@@ -587,7 +607,7 @@
       ..v.cells.map(cell => grid.cell(colspan: calc.min(int(cell.at("span", default: 1)), columns), node(t, images, grays, cell.content, bounds: cells)))
     )
   } else if kind == "item" {
-    surface(t, v, bounds, t => item(t, v, bounds, (child, bounds) => node(t, images, grays, child, bounds: bounds)))
+    surface(t, v, bounds, t => item(t, v, bounds, (child, bounds) => node((..t, "@item": true), images, grays, child, bounds: bounds)))
   } else if kind == "title" {
     text-component(t, "--title", v)
   } else if kind == "description" {
@@ -650,7 +670,7 @@
     radius: px(t, "--title-bar-border-radius", default: 10),
     inset: (x: gap),
     layout(region => {
-      let lead = if icon == none { 0pt } else { measure(icon).width + px(t, "--gap-small", default: 7) }
+      let lead = if icon == none { 0pt } else { measure(icon).width + gap }
       let room = region.width - lead - (if instance == "" { 0pt } else { gap })
       let title-room = calc.min(measure(text(..face, title)).width, room)
       let instance-room = room - title-room
