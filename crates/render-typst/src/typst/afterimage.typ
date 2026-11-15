@@ -9,7 +9,7 @@
 
 // A token's value; lengths are pixels.
 #let tok(t, name, default: none) = t.at(name, default: default)
-#let px(t, name, default: 0) = tok(t, name, default: default) * 1pt
+#let px(t, name) = t.at(name) * 1pt
 
 // A token for one size of a component, such as `--label-small-font-size`, or the
 // component's base token when that size has none.
@@ -21,12 +21,8 @@
 // TRMNL's stylesheet names Inter "Inter Variable"; the font file calls it Inter.
 #let family(name) = if name == none { "Inter" } else if name.starts-with("Inter") { "Inter" } else { name }
 
-// A line height that is a ratio of its font size; a value the tokens lack falls
-// back to 1.2.
-#let leading-of(t, component, size) = {
-  let ratio = sized(t, component, size, "-line-height")
-  if ratio == none or ratio <= 0 { 1.2 } else { ratio }
-}
+// A line height, as a ratio of its font size.
+#let leading-of(t, component, size) = sized(t, component, size, "-line-height")
 
 // CSS's line box as the text's edges: `ratio` times the size tall, with the
 // font's ascent and descent (`@metrics`, read from the font files) centred in
@@ -79,7 +75,7 @@
 #let fill-of(t, p, down: false) = {
   let base = if "color" in p { rgb(p.color) } else { none }
   if "tile" in p {
-    let size = px(t, "--dither-bg-size", default: 16)
+    let size = px(t, "--dither-bg-size")
     return tiling(size: (size, size), {
       if base != none { place(rect(width: size, height: size, fill: base, stroke: none)) }
       place(std.image(bytes(p.tile), format: "svg", width: size, height: size))
@@ -103,7 +99,7 @@
 }
 
 // The ink text and lines take: black, or white inside an inverse element.
-#let ink(t) = rgb(paint(t, "canvas").at("ink", default: "#000000"))
+#let ink(t) = rgb(paint(t, "canvas").ink)
 
 // How thick a rule the stylesheet draws: one device pixel on most displays.
 #let thickness-of(t, name) = paint(t, name).at("pattern", default: (thickness: 1)).thickness * 1pt
@@ -121,13 +117,13 @@
 // small text without one. Inside an inverse element, the inverse's gray.
 #let gray-ink(t, grays) = if not grays { ink(t) } else {
   let gray = paint(t, "label-gray")
-  rgb(gray.at("ink", default: gray.at("color", default: "#999999")))
+  rgb(if "ink" in gray { gray.ink } else { gray.color })
 }
 
 // Text kept legible over a dithered fill: an outline of `color` under the ink,
 // as TRMNL's title bar and index digits draw it (`--title-bar-text-stroke-width`).
 #let haloed(t, body, color: white) = {
-  let width = px(t, "--title-bar-text-stroke-width", default: 3.5)
+  let width = px(t, "--title-bar-text-stroke-width")
   box({
     place(text(stroke: width + color, body))
     body
@@ -135,9 +131,9 @@
 }
 
 #let gap(t, name) = if name == "none" { 0pt } else if name == "medium" {
-  px(t, "--gap", default: 10)
+  px(t, "--gap")
 } else {
-  px(t, "--gap-" + name, default: 10)
+  px(t, "--gap-" + name)
 }
 
 // Text in `face`, cut to `lines` lines with an ellipsis, as TRMNL's clamp: the
@@ -401,7 +397,7 @@
   let inverse = v.at("inverse", default: false)
   let padding = gap(t, v.at("padding", default: "none"))
   let rounded = v.at("rounded", default: "none")
-  let radius = if rounded == "none" { 0pt } else if rounded == "base" { px(t, "--rounded", default: 10) } else { px(t, "--rounded-" + rounded, default: 10) }
+  let radius = if rounded == "none" { 0pt } else if rounded == "base" { px(t, "--rounded") } else { px(t, "--rounded-" + rounded) }
   if not inverse and padding == 0pt and radius == 0pt { return body(t) }
   let t = if inverse { (..t, "@inverse": true) } else { t }
   let canvas = paint(t, "canvas")
@@ -429,7 +425,7 @@
   let face = typeface(t, "--item-index", "base")
   grid(
     // The bar keeps its width, with any index centred on it.
-    columns: (px(t, "--item-meta-width", default: 10), if bounds.w { 1fr } else { auto }),
+    columns: (px(t, "--item-meta-width"), if bounds.w { 1fr } else { auto }),
     // The item's gap and the bar's margin, as the stylesheet spaces them.
     column-gutter: spacing(t, "item").gap + spacing(t, "item-meta").margin.right,
     grid.cell(fill: meta, if index == none { [] } else { align(center + horizon, text(..face, shown(index))) }),
@@ -451,15 +447,15 @@
   let infix = if size == "base" { "" } else { "-" + size }
   let head-face = typeface(t, "--title", if small { "small" } else { "base" })
   let cell-face = typeface(t, "--label", if small { "small" } else { "base" })
-  let head-height = px(t, "--table" + infix + "-thead-height", default: 36)
-  let row-height = px(t, "--table" + infix + "-tbody-height", default: 46)
+  let head-height = px(t, "--table" + infix + "-thead-height")
+  let row-height = px(t, "--table" + infix + "-tbody-height")
   let columns = v.at("columns", default: ())
   let rows = v.at("rows", default: ())
   let more = v.at("more", default: none)
   let indexed = v.at("indexed", default: false)
-  let meta-width = px(t, "--item-meta-width", default: 10)
+  let meta-width = px(t, "--item-meta-width")
   // The index bar and the space after it, before the first column.
-  let lead = if indexed { meta-width + px(t, "--gap-small", default: 7) } else { 0pt }
+  let lead = if indexed { meta-width + px(t, "--gap-small") } else { 0pt }
   layout(region => {
     let widest(index) = {
       let heading = measure(text(..head-face, shown(columns.at(index).heading))).width
@@ -485,8 +481,8 @@
         let last = at == rows.len() - 1 and more == none
         let meta = paint(t, "table-meta")
         let index = paint(t, "table-index")
-        let index-ink = rgb(index.at("ink", default: "#000000"))
-        let halo = rgb(index.at("halo", default: "#FFFFFF"))
+        let index-ink = rgb(index.ink)
+        let halo = rgb(index.halo)
         let start = if not indexed { [] } else {
           place(left + top, dy: 4pt, rect(width: meta-width, height: row-height - 8pt, radius: 3pt, fill: fill-of(t, meta), stroke: none))
           place(left + horizon, box(width: meta-width, align(center, haloed(t, color: halo, text(..typeface(t, "--item-index", "base"), fill: index-ink, str(at + 1))))))
@@ -494,7 +490,7 @@
         row-of(row-height, columns.enumerate().map(((index, column)) => cell(cell-face, row.at(index, default: none), column)), if last { none } else { "table-body-rule" }, start)
       }),
       ..if more == none { () } else {
-        (block(height: if small { px(t, "--table-xsmall-tbody-height", default: 22) } else { px(t, "--table-small-tbody-height", default: 31) },
+        (block(height: if small { px(t, "--table-xsmall-tbody-height") } else { px(t, "--table-small-tbody-height") },
           align(horizon, pad(left: lead, text(..typeface(t, "--label", "small"), shown(more))))),)
       },
     )
@@ -508,8 +504,8 @@
   let size = v.at("size", default: "base")
   let small = size in ("xsmall", "small")
   let infix = if size == "base" { "" } else { "-" + size }
-  let height = px(t, "--progress-bar-height" + infix, default: 24)
-  let radius = px(t, "--progress-bar-radius", default: 10)
+  let height = px(t, "--progress-bar-height" + infix)
+  let radius = px(t, "--progress-bar-radius")
   let value = number(v.at("value", default: none))
   let maximum = number(v.at("max", default: 100))
   let share = if value == none or maximum == none or maximum <= 0 { 0 } else { calc.clamp(value / maximum, 0, 1) }
@@ -528,9 +524,9 @@
         text(..typeface(t, "--label", if small { "small" } else { "base" }), shown(label)),
         text(..typeface(t, "--value", "xxsmall"), shown(figure)),
       )
-      std.v(px(t, "--gap-xsmall", default: 5), weak: false)
+      std.v(px(t, "--gap-xsmall"), weak: false)
     }
-    block(width: 100%, height: height, radius: radius, inset: 1pt, fill: rgb(track.at("border", default: "#000000")),
+    block(width: 100%, height: height, radius: radius, inset: 1pt, fill: rgb(track.border),
       block(width: 100%, height: 100%, radius: calc.max(radius - 1pt, 0pt), clip: true, fill: fill-of(t, track),
         block(width: share * 100%, height: 100%, fill: fill-of(t, fill))))
   })
@@ -541,15 +537,15 @@
 #let progress-dots(t, v) = {
   let size = v.at("size", default: "base")
   let infix = if size == "base" { "" } else { "-" + size }
-  let diameter = px(t, "--progress-dot-size" + infix, default: 16)
+  let diameter = px(t, "--progress-dot-size" + infix)
   let whole(value) = { let n = number(value); if n == none { 0 } else { int(calc.max(n, 0)) } }
   let count = calc.min(whole(v.at("count", default: 0)), 64)
   let filled = calc.min(whole(v.at("value", default: 0)), count)
   let current = v.at("current", default: false)
-  stack(dir: ltr, spacing: px(t, "--gap-small", default: 7), ..range(count).map(at => {
+  stack(dir: ltr, spacing: px(t, "--gap-small"), ..range(count).map(at => {
     let name = if at < filled { "progress-dot-filled" } else if current and at == filled { "progress-dot-current" } else { "progress-dot" }
     let dot = paint(t, name)
-    box(width: diameter, height: diameter, radius: 50%, inset: 1pt, fill: rgb(dot.at("border", default: "#000000")),
+    box(width: diameter, height: diameter, radius: 50%, inset: 1pt, fill: rgb(dot.border),
       box(width: 100%, height: 100%, radius: 50%, fill: fill-of(t, dot)))
   }))
 }
@@ -583,7 +579,7 @@
     blocks(v.at("blocks", default: ()))
   }
   layout(region => {
-    let limit = calc.min(region.width, px(t, "--richtext-content-max-width", default: 640))
+    let limit = calc.min(region.width, px(t, "--richtext-content-max-width"))
     let width = measure(body, width: limit).width
     block(width: if bounds.w { 100% } else { auto }, align(horizontal, block(width: width, body)))
   })
@@ -652,12 +648,12 @@
 // out.
 #let title-bar(t, images, bar) = {
   let bar-paint = paint(t, "title-bar")
-  let face = (..typeface(t, "--title-bar", "base"), fill: rgb(bar-paint.at("ink", default: "#000000")))
+  let face = (..typeface(t, "--title-bar", "base"), fill: rgb(bar-paint.ink))
   let icon = bar.at("icon", default: none)
   let icon = if image-of(images, icon) == none { none } else {
-    std.image(image-of(images, icon), height: px(t, "--title-bar-image-height", default: 24))
+    std.image(image-of(images, icon), height: px(t, "--title-bar-image-height"))
   }
-  let gap = px(t, "--gap", default: 10)
+  let gap = px(t, "--gap")
   let title = shown(bar.title)
   let instance = shown(bar.at("instance", default: none))
   // One line of `words` in `room`: whole where it fits, else cut.
@@ -665,9 +661,9 @@
     if measure(text(..face, words)).width <= room { text(..face, words) } else { box(width: room, clamped(face, words, 1)) }))
   block(
     width: 100%,
-    height: px(t, "--title-bar-height", default: 40),
+    height: px(t, "--title-bar-height"),
     fill: fill-of(t, bar-paint),
-    radius: px(t, "--title-bar-border-radius", default: 10),
+    radius: px(t, "--title-bar-border-radius"),
     inset: (x: gap),
     layout(region => {
       let lead = if icon == none { 0pt } else { measure(icon).width + gap }
@@ -690,13 +686,13 @@
 // The whole screen, `width` by `height` layout pixels; `grays` tells whether the
 // palette has a gray for gray text.
 #let screen(document, t, images, grays, width, height) = {
-  set page(width: width * 1pt, height: height * 1pt, margin: px(t, "--gap", default: 10), fill: white)
+  set page(width: width * 1pt, height: height * 1pt, margin: px(t, "--gap"), fill: white)
   set text(font: ("Inter",), size: 16pt, fill: black)
   let bar = document.at("titleBar", default: none)
   let content = node(t, images, grays, document.content)
   if bar == none {
     block(width: 100%, height: 100%, content)
   } else {
-    grid(rows: (1fr, auto), row-gutter: px(t, "--gap", default: 10), block(width: 100%, height: 100%, content), title-bar(t, images, bar))
+    grid(rows: (1fr, auto), row-gutter: px(t, "--gap"), block(width: 100%, height: 100%, content), title-bar(t, images, bar))
   }
 }
