@@ -23,6 +23,8 @@ use serde_json::{Value, json};
 struct Source {
     answer: Arc<Mutex<Option<Value>>>,
     headers: Arc<Mutex<HeaderMap>>,
+    /// How long it takes to answer.
+    delay: Arc<Mutex<std::time::Duration>>,
 }
 
 impl Source {
@@ -33,6 +35,8 @@ impl Source {
         ) -> axum::response::Response {
             use axum::response::IntoResponse;
             *source.headers.lock().unwrap() = headers;
+            let delay = *source.delay.lock().unwrap();
+            tokio::time::sleep(delay).await;
             match source.answer.lock().unwrap().clone() {
                 Some(value) => Json(value).into_response(),
                 None => StatusCode::SERVICE_UNAVAILABLE.into_response(),
@@ -49,6 +53,10 @@ impl Source {
 
     fn set(&self, answer: Option<Value>) {
         *self.answer.lock().unwrap() = answer;
+    }
+
+    fn answer_after(&self, delay: std::time::Duration) {
+        *self.delay.lock().unwrap() = delay;
     }
 
     /// Every value of the header `name` in the last request, in the order sent.
@@ -1400,5 +1408,34 @@ async fn a_device_held_asleep_names_no_wake_even_in_a_window() {
         image().await,
         held,
         "in a window alone, it says when it wakes"
+    );
+}
+
+#[tokio::test]
+async fn a_slow_source_leaves_the_templates_their_own_time() {
+    // A source may take most of the fetch time; the templates' two seconds start
+    // once it has answered, so a screen whose source answers in three still
+    // draws whole.
+    let source = Source::default();
+    source.set(Some(json!({ "temperature": 7.4 })));
+    source.answer_after(std::time::Duration::from_secs(3));
+    let url = source.serve().await;
+    let server = start().await;
+    server.sign_up().await;
+    let document = json!({
+        "sources": { "weather": { "url": url } },
+        "content": { "value": { "text": "{{ weather.temperature }}°" } }
+    });
+    let (_, body) = server
+        .call(
+            "POST",
+            "/manage/preview",
+            Some(json!({ "document": document, "display": { "model": "og_plus", "palette": "gray-4" } })),
+        )
+        .await;
+    assert_eq!(body["problems"], json!([]), "{body}");
+    assert_eq!(
+        body["sources"]["weather"]["data"]["temperature"], 7.4,
+        "{body}"
     );
 }

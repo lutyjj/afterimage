@@ -457,6 +457,8 @@ struct Resolver {
     /// Key, URL and document path of each distinct image.
     images: Vec<(String, String, String)>,
     components: usize,
+    /// When the document's templates began: [`RESOLVE_TIME`] bounds them, not
+    /// the fetches before them.
     started: std::time::Instant,
     /// The document went past a bound and the rest of it was left out.
     exhausted: bool,
@@ -579,6 +581,7 @@ impl Resolver {
     }
 
     fn document(&mut self, document: &Value, scope: &Template) -> Value {
+        self.started = std::time::Instant::now();
         let mut resolved = Map::new();
         if let Some(bar) = document.get("titleBar") {
             let mut bar = self.fields(bar, scope, "/titleBar");
