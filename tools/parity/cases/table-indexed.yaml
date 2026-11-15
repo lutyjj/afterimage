@@ -1,0 +1,33 @@
+# An indexed table, base and small.
+trmnl: |
+  <div class="layout layout--col gap" style="justify-content:flex-start;align-items:flex-start">
+  <table class="table table--indexed"><thead><tr><th><span class="title"></span></th><th><span class="title">Name</span></th><th><span class="title">Role</span></th><th><span class="title">Score</span></th></tr></thead><tbody><tr><td><span class="meta"><span class="index">1</span></span></td><td><span class="label">Ada Morrow</span></td><td><span class="label">Reception</span></td><td><span class="label">3</span></td></tr><tr><td><span class="meta"><span class="index">2</span></span></td><td><span class="label">Ben Okafor</span></td><td><span class="label">Sales</span></td><td><span class="label">12</span></td></tr><tr><td><span class="meta"><span class="index">3</span></span></td><td><span class="label">Cleo Varga</span></td><td><span class="label">Sales</span></td><td><span class="label">27</span></td></tr></tbody></table>
+  <table class="table table--small table--indexed"><thead><tr><th><span class="title title--small"></span></th><th><span class="title title--small">Name</span></th><th><span class="title title--small">Role</span></th><th><span class="title title--small">Score</span></th></tr></thead><tbody><tr><td><span class="meta"><span class="index">1</span></span></td><td><span class="label label--small">Ada Morrow</span></td><td><span class="label label--small">Reception</span></td><td><span class="label label--small">3</span></td></tr><tr><td><span class="meta"><span class="index">2</span></span></td><td><span class="label label--small">Ben Okafor</span></td><td><span class="label label--small">Sales</span></td><td><span class="label label--small">12</span></td></tr><tr><td><span class="meta"><span class="index">3</span></span></td><td><span class="label label--small">Cleo Varga</span></td><td><span class="label label--small">Sales</span></td><td><span class="label label--small">27</span></td></tr></tbody></table>
+  </div>
+afterimage:
+  content:
+    column:
+      children:
+        - table:
+            size: base
+            indexed: true
+            items: '{{ [["Ada Morrow", "Reception", "3"], ["Ben Okafor", "Sales", "12"], ["Cleo Varga", "Sales", "27"]] }}'
+            columns:
+              - { heading: Name, text: "{{ item[0] }}" }
+              - { heading: Role, text: "{{ item[1] }}" }
+              - { heading: Score, text: "{{ item[2] }}" }
+        - table:
+            size: small
+            indexed: true
+            items: '{{ [["Ada Morrow", "Reception", "3"], ["Ben Okafor", "Sales", "12"], ["Cleo Varga", "Sales", "27"]] }}'
+            columns:
+              - { heading: Name, text: "{{ item[0] }}" }
+              - { heading: Role, text: "{{ item[1] }}" }
+              - { heading: Score, text: "{{ item[2] }}" }
+# The profiles it is drawn on, each with the share of pixels, in percent, that
+# may differ from TRMNL's rendering.
+limits:
+  og_png/bw: 0.53
+  og_plus/gray-4: 1.1
+  v2/bw: 0.33
+  v2/gray-4: 0.64

@@ -55,8 +55,8 @@
 }
 
 // How the stylesheet spaces one component (`tools/tokens` reads it from the
-// release's own markup), inside an item where it is in one: its padding, margin
-// and border as sides for `pad` and `box`, its gap and its corner radius.
+// release's own markup), inside an item where it is in one: its padding, margin,
+// border and offsets as sides for `pad` and `box`, its gap and its corner radius.
 #let spacing(t, name) = {
   let found = if t.at("@item", default: false) { tok(t, "box/item/" + name) } else { none }
   let found = if found == none { tok(t, "box/" + name, default: (:)) } else { found }
@@ -64,7 +64,7 @@
     let (top, right, bottom, left) = found.at(key, default: (0, 0, 0, 0)).map(v => v * 1pt)
     (top: top, right: right, bottom: bottom, left: left)
   }
-  (padding: sides("padding"), margin: sides("margin"), border: sides("border"),
+  (padding: sides("padding"), margin: sides("margin"), border: sides("border"), inset: sides("inset"),
    gap: found.at("gap", default: 0) * 1pt, radius: found.at("radius", default: 0) * 1pt)
 }
 
@@ -196,19 +196,19 @@
   for (side, length) in space.padding { inset.insert(side, length + space.border.at(side)) }
   let framed(..args, body) = box(inset: inset, outset: -border / 2, radius: space.radius, ..args, body)
   if style == "outline" {
-    framed(stroke: border + ink(t), body)
+    framed(stroke: border + rgb(paint(t, "label-outline").border), body)
   } else if style == "underline" {
-    // TRMNL's underline: a one-pixel bar over the bottom edge of the label's
-    // box, rather than a stroke under the glyphs.
+    // TRMNL's underline: a rule over the bottom edge of the label's box, rather
+    // than a stroke under the glyphs.
     framed(context {
       body
-      place(bottom, dy: space.padding.bottom, rect(width: measure(body).width, height: 1pt, fill: ink(t), stroke: none))
+      place(bottom, dy: space.padding.bottom, rule(t, "label-underline", length: measure(body).width))
     })
   } else if style == "gray" {
     framed(text(fill: gray-ink(t, grays), body))
   } else if style == "filled" {
-    let canvas = paint(t, "canvas").at("color", default: "#FFFFFF")
-    framed(fill: ink(t), text(fill: rgb(canvas), body))
+    let filled = paint(t, "label-filled")
+    framed(fill: fill-of(t, filled), text(fill: rgb(filled.ink), body))
   } else {
     framed(body)
   }
@@ -454,14 +454,18 @@
   let more = v.at("more", default: none)
   let indexed = v.at("indexed", default: false)
   let meta-width = px(t, "--item-meta-width")
-  // The index bar and the space after it, before the first column.
-  let lead = if indexed { meta-width + px(t, "--gap-small") } else { 0pt }
+  // The index column: its bar and the space after it.
+  let lead = if indexed { spacing(t, "table-cell-indexed").padding.left } else { 0pt }
+  let marker = spacing(t, "table-meta")
   layout(region => {
     let widest(index) = {
       let heading = measure(text(..head-face, shown(columns.at(index).heading))).width
       calc.max(heading, ..rows.map(row => measure(text(..cell-face, shown(row.at(index, default: none)))).width), 1pt)
     }
     let widths = range(columns.len()).map(widest)
+    // The index is a column of its own, as wide as its padding, so it takes its
+    // share of a fixed width too.
+    let lead = if bounds.w and lead > 0pt { region.width * (lead / (lead + widths.sum(default: 0pt))) } else { lead }
     let tracks = if bounds.w { widths.map(width => width / 1pt * 1fr) } else { widths }
     let row-of(height, cells, rule-name, start) = block(width: if bounds.w { 100% } else { auto }, breakable: false, {
       grid(
@@ -484,7 +488,8 @@
         let index-ink = rgb(index.ink)
         let halo = rgb(index.halo)
         let start = if not indexed { [] } else {
-          place(left + top, dy: 4pt, rect(width: meta-width, height: row-height - 8pt, radius: 3pt, fill: fill-of(t, meta), stroke: none))
+          place(left + top, dy: marker.inset.top, rect(width: meta-width, height: row-height - marker.inset.top - marker.inset.bottom,
+            radius: marker.radius, fill: fill-of(t, meta), stroke: none))
           place(left + horizon, box(width: meta-width, align(center, haloed(t, color: halo, text(..typeface(t, "--item-index", "base"), fill: index-ink, str(at + 1))))))
         }
         row-of(row-height, columns.enumerate().map(((index, column)) => cell(cell-face, row.at(index, default: none), column)), if last { none } else { "table-body-rule" }, start)
@@ -497,15 +502,16 @@
   })
 }
 
-// TRMNL's progress bar: the label and figure on one line, then a track with a
-// one-pixel border whose fill reaches `value` of `max`. It fills what its parent
-// fixes, or is 320 pixels wide.
+// TRMNL's progress bar: the label and figure on one line, then a bordered track
+// whose fill reaches `value` of `max`. It fills what its parent fixes, or is 320
+// pixels wide.
 #let progress-bar(t, v, bounds) = {
   let size = v.at("size", default: "base")
   let small = size in ("xsmall", "small")
   let infix = if size == "base" { "" } else { "-" + size }
   let height = px(t, "--progress-bar-height" + infix)
-  let radius = px(t, "--progress-bar-radius")
+  let edge = spacing(t, "progress-track")
+  let (border, radius) = (edge.border.top, edge.radius)
   let value = number(v.at("value", default: none))
   let maximum = number(v.at("max", default: 100))
   let share = if value == none or maximum == none or maximum <= 0 { 0 } else { calc.clamp(value / maximum, 0, 1) }
@@ -524,15 +530,15 @@
         text(..typeface(t, "--label", if small { "small" } else { "base" }), shown(label)),
         text(..typeface(t, "--value", "xxsmall"), shown(figure)),
       )
-      std.v(px(t, "--gap-xsmall"), weak: false)
+      std.v(spacing(t, "progress-content").margin.bottom, weak: false)
     }
-    block(width: 100%, height: height, radius: radius, inset: 1pt, fill: rgb(track.border),
-      block(width: 100%, height: 100%, radius: calc.max(radius - 1pt, 0pt), clip: true, fill: fill-of(t, track),
+    block(width: 100%, height: height, radius: radius, inset: border, fill: rgb(track.border),
+      block(width: 100%, height: 100%, radius: calc.max(radius - border, 0pt), clip: true, fill: fill-of(t, track),
         block(width: share * 100%, height: 100%, fill: fill-of(t, fill))))
   })
 }
 
-// TRMNL's progress dots: `count` round dots with a one-pixel border, the first
+// TRMNL's progress dots: `count` round bordered dots, the first
 // `value` filled and, where `current`, the next marked as the step under way.
 #let progress-dots(t, v) = {
   let size = v.at("size", default: "base")
@@ -542,10 +548,11 @@
   let count = calc.min(whole(v.at("count", default: 0)), 64)
   let filled = calc.min(whole(v.at("value", default: 0)), count)
   let current = v.at("current", default: false)
-  stack(dir: ltr, spacing: px(t, "--gap-small"), ..range(count).map(at => {
+  let border = spacing(t, "progress-dot").border.top
+  stack(dir: ltr, spacing: spacing(t, "progress-dots-track").gap, ..range(count).map(at => {
     let name = if at < filled { "progress-dot-filled" } else if current and at == filled { "progress-dot-current" } else { "progress-dot" }
     let dot = paint(t, name)
-    box(width: diameter, height: diameter, radius: 50%, inset: 1pt, fill: rgb(dot.border),
+    box(width: diameter, height: diameter, radius: 50%, inset: border, fill: rgb(dot.border),
       box(width: 100%, height: 100%, radius: 50%, fill: fill-of(t, dot)))
   }))
 }

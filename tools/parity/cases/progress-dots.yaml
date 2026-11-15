@@ -1,0 +1,21 @@
+# Progress dots, small, base and large, two done and the third under way.
+trmnl: |
+  <div class="layout layout--col gap" style="justify-content:flex-start;align-items:flex-start">
+  <div class="progress-dots progress-dots--small"><div class="track"><div class="dot dot--filled"></div><div class="dot dot--filled"></div><div class="dot dot--current"></div><div class="dot"></div><div class="dot"></div></div></div>
+  <div class="progress-dots"><div class="track"><div class="dot dot--filled"></div><div class="dot dot--filled"></div><div class="dot dot--current"></div><div class="dot"></div><div class="dot"></div></div></div>
+  <div class="progress-dots progress-dots--large"><div class="track"><div class="dot dot--filled"></div><div class="dot dot--filled"></div><div class="dot dot--current"></div><div class="dot"></div><div class="dot"></div></div></div>
+  </div>
+afterimage:
+  content:
+    column:
+      children:
+        - progressDots: { count: "5", value: "2", current: true, size: small }
+        - progressDots: { count: "5", value: "2", current: true }
+        - progressDots: { count: "5", value: "2", current: true, size: large }
+# The profiles it is drawn on, each with the share of pixels, in percent, that
+# may differ from TRMNL's rendering.
+limits:
+  og_png/bw: 0.04
+  og_plus/gray-4: 0.12
+  v2/bw: 0.018
+  v2/gray-4: 0.028

@@ -4,10 +4,10 @@ For each combination of CSS classes the catalogue's models and palettes give a
 screen (device, size, density, bit depth), the script loads the pinned compiled
 stylesheet in headless Chromium, applies every token the release documents to a
 probe element of the matching kind and records the computed value. It also lays
-out the release's own markup for each component and records what each part
-paints, on the screen and inside an `.inverse` element: a color, a dither tile,
-or a row of pixels for a rule. It copies the release's fonts with their notices
-and the licence texts that cover them and the tokens.
+out the release's own markup for each component and records how each part is
+spaced and what it paints, on the screen and inside an `.inverse` element: a
+color, a dither tile, or a row of pixels for a rule. It copies the release's
+fonts with their notices and the licence texts that cover them and the tokens.
 
 Usage: generate.py CATALOG_DIR OUTPUT_DIR [SOURCES_DIR]
 
@@ -57,14 +57,17 @@ PAINT_MARKUP = """
 <table class="table table--indexed"><thead><tr><th><span class="title">H</span></th></tr></thead>
 <tbody><tr><td><div class="meta"><span class="index">1</span></div><span class="label">A</span></td></tr>
 <tr><td><span class="label">B</span></td></tr></tbody></table>
-<div class="progress-bar"><div class="track"><div class="fill" style="width: 50%"></div></div></div>
+<div class="progress-bar"><div class="content"><span class="label">L</span><span class="value value--xxsmall">1</span></div>
+<div class="track"><div class="fill" style="width: 50%"></div></div></div>
 <div class="progress-bar progress-bar--emphasis-2"><div class="track"><div class="fill" style="width: 50%"></div></div></div>
 <div class="progress-bar progress-bar--emphasis-3"><div class="track"><div class="fill" style="width: 50%"></div></div></div>
 <div class="progress-dots"><div class="track"><div class="dot dot--filled"></div><div class="dot dot--current"></div><div class="dot"></div></div></div>
 <span class="label label--gray">G</span>
+<span class="label label--outline">O</span><span class="label label--underline">U</span><span class="label label--filled">F</span>
 <div class="divider"></div>
 """
-# Paint name: the element's selector within the markup.
+# Paint name: the element's selector within the markup, with the pseudo-element
+# that paints it where one does.
 PAINTS = {
     "canvas": ":scope",
     "title-bar": ".title_bar",
@@ -83,27 +86,40 @@ PAINTS = {
     "progress-dot-current": ".dot--current",
     "progress-dot-filled": ".dot--filled",
     "label-gray": ".label--gray",
+    "label-outline": ".label--outline",
+    "label-underline": ".label--underline::after",
+    "label-filled": ".label--filled",
     "divider": ".divider",
 }
 
 # How each component is spaced, read from the release's own markup like the
 # paints: titles, descriptions and every label size and style, on their own and
-# inside an item, and the item.
+# inside an item, the item, and the parts of tables and progress indicators.
 LABELS = [(size, style) for size in ("small", "base", "large", "xlarge", "xxlarge")
           for style in ("plain", "outline", "underline", "gray", "filled")]
 TEXT = {"title": "title", "description": "description",
         **{f"label-{size}-{style}": f"label.label--{size}.label--{style}" for size, style in LABELS}}
 TEXT_MARKUP = "".join(f'<span class="{" ".join(classes.split("."))}">T</span>' for classes in TEXT.values())
 BOX_MARKUP = (f'<div class="layout layout--col">{TEXT_MARKUP}</div>'
-              f'<div class="item"><div class="meta"></div><div class="content">{TEXT_MARKUP}</div></div>')
+              f'<div class="item"><div class="meta"></div><div class="content">{TEXT_MARKUP}</div></div>'
+              + PAINT_MARKUP)
 BOXES = {
     "item": ".item",
     "item-meta": ".item .meta",
     **{name: f".layout .{classes}" for name, classes in TEXT.items()},
     **{f"item/{name}": f".item .{classes}" for name, classes in TEXT.items()},
+    "table-meta": ".table--indexed tbody .meta",
+    "table-cell-indexed": ".table--indexed tbody td:has(.meta)",
+    "progress-content": ".progress-bar .content",
+    "progress-track": ".progress-bar .track",
+    "progress-dots-track": ".progress-dots .track",
+    "progress-dot": ".progress-dots .dot",
 }
-# Each box's padding, margin and border widths (top, right, bottom, left), gap
-# and corner radius, in pixels.
+# Each box's padding, margin, border widths and offsets (top, right, bottom,
+# left), gap and corner radius, in pixels; a value that is not a length, such as
+# a percentage, is none. A positioned box's offsets resolve to where layout put
+# it, so they are read as computed: an offset left `auto` is none rather than
+# where the probe's text happened to end.
 BOX_PROBE = """
 ([markup, boxes]) => {
   const root = document.createElement('div');
@@ -111,11 +127,16 @@ BOX_PROBE = """
   document.querySelector('.screen').appendChild(root);
   const out = {};
   for (const [name, selector] of Object.entries(boxes)) {
-    const style = getComputedStyle(root.querySelector(selector));
-    const sides = pattern => ['top', 'right', 'bottom', 'left'].map(side => parseFloat(style.getPropertyValue(pattern.replace('*', side))) || 0);
+    const element = root.querySelector(selector);
+    const style = getComputedStyle(element);
+    const computed = element.computedStyleMap();
+    const length = value => /^-?[0-9.]+px$/.test(value) ? Math.round(parseFloat(value) * 1e4) / 1e4 : 0;
+    const sides = (pattern, read = property => style.getPropertyValue(property)) =>
+      ['top', 'right', 'bottom', 'left'].map(side => length(read(pattern.replace('*', side))));
     out[name] = {
       padding: sides('padding-*'), margin: sides('margin-*'), border: sides('border-*-width'),
-      gap: parseFloat(style.columnGap) || 0, radius: parseFloat(style.borderTopLeftRadius) || 0,
+      inset: sides('*', property => computed.get(property).toString()),
+      gap: length(style.columnGap), radius: length(style.borderTopLeftRadius),
     };
   }
   root.remove();
@@ -175,9 +196,10 @@ PAINT_PROBE = """
   const ratio = parseFloat(getComputedStyle(screen).getPropertyValue('--dither-ratio')) || 1;
   const out = {};
   for (const [name, selector] of Object.entries(paints)) {
-    const element = selector === ':scope' ? root : root.querySelector(selector);
+    const [path, pseudo] = selector.split('::');
+    const element = path === ':scope' ? root : root.querySelector(path);
     if (!element) { out[name] = null; continue; }
-    const style = getComputedStyle(element);
+    const style = getComputedStyle(element, pseudo ? `::${pseudo}` : null);
     out[name] = {
       color: style.backgroundColor,
       image: style.backgroundImage,
