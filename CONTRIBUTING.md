@@ -32,6 +32,6 @@ To try an unreleased linen, run `pnpm link <linen checkout>` in `web/`. It touch
 
 ## Commits and releases
 
-Commits: `type(scope): imperative subject`. Pull requests target `main`.
+Commits: `type(scope): imperative subject`. Pull requests target `main`. `feat` and `fix` make the next release: a new TRMNL design system release is a `feat`, since it changes what screens draw, and other dependency bumps, linen's included, are `chore`.
 
-To release, tag `vX.Y.Z` (matching `Cargo.toml`). CI publishes `ghcr.io/lutyjj/afterimage:X.Y.Z` and `:latest` for amd64 and arm64, and a GitHub release with the OpenAPI document.
+[Release Please](https://github.com/googleapis/release-please) keeps a release pull request open from the `feat` and `fix` commits since the last release: before 1.0, a `feat` bumps the patch version and a breaking change the minor one. Merging it, with a rebase, updates `Cargo.toml`, `Cargo.lock` and `CHANGELOG.md` and tags `vX.Y.Z`. CI then publishes `ghcr.io/lutyjj/afterimage:X.Y.Z` and `:latest` for amd64 and arm64, and the GitHub release with the changelog and the OpenAPI document. A new workspace crate also goes into the `Cargo.lock` filter in `release-please-config.json`.

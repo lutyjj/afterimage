@@ -45,9 +45,10 @@ The flake owns the toolchains; do not install unmanaged versions on the host.
 
 - Working for the maintainer, work on `main`, committing and pushing each
   working step, and use a branch only when the maintainer asks for one. Anyone
-  else proposes a change as a pull request against `main`. The project moves
-  fast and fixes forward: a defect found after a push gets a follow-up commit,
-  not a revert ritual.
+  else proposes a change as a pull request against `main`. A release is the
+  release pull request Release Please keeps, merged with a rebase when the
+  maintainer asks for one. The project moves fast and fixes forward: a defect
+  found after a push gets a follow-up commit, not a revert ritual.
 - A spike answers one design question quickly. It lives in `spikes/<topic>/`
   with a README that records its method and measurements, outside every build,
   and it is deleted once its answer is in the design.
@@ -76,7 +77,9 @@ The flake owns the toolchains; do not install unmanaged versions on the host.
 
 Use Conventional Comments for reviews: `label (decoration): subject`, such as
 `issue: ...` or `suggestion (non-blocking): ...`.
-Commit messages use `type(scope): imperative subject`.
+Commit messages use `type(scope): imperative subject`, typed as
+[CONTRIBUTING.md](CONTRIBUTING.md#commits-and-releases) sets out, since the
+types decide releases.
 
 Prose in documentation and comments states what is true now. No em dashes, no
 attribution trailers, filler, or change-history narration; history belongs in

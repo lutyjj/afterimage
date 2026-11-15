@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "pull-request-title-pattern": "chore: release ${version}",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "include-component-in-tag": false,
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "draft": true,
+      "force-tag-creation": true,
+      "extra-files": [
+        { "type": "generic", "path": "Cargo.toml" },
+        {
+          "type": "toml",
+          "path": "Cargo.lock",
+          "jsonpath": "$.package[?(@.name.value=='afterimage-conformance' || @.name.value=='afterimage-mcp' || @.name.value=='afterimage-render-typst' || @.name.value=='afterimage-server' || @.name.value=='afterimage-trmnl')].version"
+        }
+      ]
+    }
+  }
+}
