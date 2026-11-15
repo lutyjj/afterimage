@@ -52,6 +52,22 @@ use smithy.framework#ValidationException
 /// source requests may read), when another one takes its place. It sleeps in its
 /// sleep windows (`SetSleep`), which take the same days and times.
 ///
+/// A screen is read at a glance: TRMNL's design guide gives a reader about three
+/// seconds to see what a figure is, what it means and where it comes from, which
+/// are a `value`, its label and the title bar. Size, weight, space and position
+/// set the order, not color, which many displays lack: one large `value` leads,
+/// with three to five figures at most and gaps or a `divider` between groups. On
+/// an 800 by 480 display, `description` and the `small` sizes are 12-pixel text,
+/// for minor details such as when data was fetched; a caption a reader needs is
+/// a base `label` (16 pixels, bold), and a name over a figure is a `title` (21
+/// pixels). Before writing components, plan the blocks, the share of the screen
+/// each takes, the axis they run along and what is left out when room runs
+/// short; a `grid` with `span` splits a width unevenly, such as a chart beside a
+/// short table. A `value` whose length varies takes `fit`, an `item`'s `index`
+/// holds only a short number, and `inverse` sets one element apart, such as today
+/// in a calendar. The fonts have no emoji. Preview every draft on each display
+/// that shows it before saving it.
+///
 /// Every operation needs a credential except those that exist to start a
 /// session (`GetSignInOptions`, `CreateFirstAccount`, `SignIn`,
 /// `StartOidcSignIn`, `CompleteOidcSignIn`): the session cookie a browser holds,
