@@ -83,7 +83,8 @@ types decide releases.
 
 Prose in documentation and comments states what is true now. No em dashes, no
 attribution trailers, filler, or change-history narration; history belongs in
-commit messages.
+commit messages and in the `CHANGELOG.md` Release Please writes, which nobody
+edits by hand.
 
 Record durable lessons in their owning code, automation, or documentation.
 Add a rule here only when it applies across the repository and fills a gap;

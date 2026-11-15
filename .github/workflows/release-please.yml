@@ -1,0 +1,52 @@
+name: Release Please
+
+# Once Check passes on a push to main, Release Please refreshes the release pull
+# request it keeps from the Conventional Commits since the last release: the
+# version in Cargo.toml and Cargo.lock, and CHANGELOG.md. Once its merge passes
+# Check, it tags vX.Y.Z, drafts the release with the changelog's notes and calls
+# the Release workflow to publish it, since a tag or release made with the
+# workflow's token starts no other workflow. Runs go one at a time, so two never
+# release the same merge.
+on:
+  workflow_run:
+    workflows: [Check]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    # A passing Check of a push to this repository's main, never of a pull
+    # request, whose branch may also be named main.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # writes the release branch and tag, drafts the release
+      issues: write # labels the release pull request
+      pull-requests: write # opens and updates the release pull request
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+
+  release:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    permissions:
+      contents: write # publishes the release
+      packages: write # pushes and tags the images
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag }}
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
