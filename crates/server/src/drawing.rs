@@ -1136,6 +1136,27 @@ mod tests {
         cut
     }
 
+    #[tokio::test]
+    async fn resolving_hands_the_drawing_deadline_to_the_templates() {
+        // A drawing past its deadline still gets a free place, and its templates
+        // then stop at once.
+        let drawing = Drawing::new(Secrets::from_vars([]), TimeZone::named("UTC").unwrap());
+        let by = Instant::now().checked_sub(Duration::from_secs(1)).unwrap();
+        let document = json!({ "content": { "label": { "text": "late" } } });
+        let (screen, resolver) = drawing
+            .resolve(resolver(), document, context! {}, by)
+            .await
+            .unwrap();
+        assert_eq!(screen["content"], empty());
+        let problems = resolver.finish();
+        assert!(
+            problems
+                .iter()
+                .any(|problem| problem.message.contains("ran out of time")),
+            "{problems:?}"
+        );
+    }
+
     #[test]
     fn templates_get_their_own_time_up_to_the_drawing_deadline() {
         let now = std::time::Instant::now();
