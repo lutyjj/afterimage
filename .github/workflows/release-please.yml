@@ -1,12 +1,12 @@
 name: Release Please
 
-# Once Check passes on a push to main, Release Please refreshes the release pull
-# request it keeps from the Conventional Commits since the last release: the
-# version in Cargo.toml and Cargo.lock, and CHANGELOG.md. Once its merge passes
-# Check, it tags vX.Y.Z, drafts the release with the changelog's notes and calls
-# the Release workflow to publish it, since a tag or release made with the
-# workflow's token starts no other workflow. Runs go one at a time, so two never
-# release the same merge.
+# Each time Check passes on a push to main, Release Please refreshes the release
+# pull request it keeps from the Conventional Commits since the last release:
+# the version in Cargo.toml and Cargo.lock, and CHANGELOG.md. The first such run
+# after the pull request is merged tags vX.Y.Z on the merge, drafts the release
+# with the changelog's notes and calls the Release workflow to publish it, since
+# a tag or release made with the workflow's token starts no other workflow. Runs
+# go one at a time, so two never release the same merge.
 on:
   workflow_run:
     workflows: [Check]

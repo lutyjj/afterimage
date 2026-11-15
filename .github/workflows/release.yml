@@ -93,14 +93,21 @@ jobs:
         run: nix build .#contract
       - name: Tag the image of both architectures
         env:
+          GH_TOKEN: ${{ github.token }}
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_PASSWORD: ${{ github.token }}
+        # `latest` follows the newest release only, so publishing an older tag
+        # again leaves it where it is.
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
           version="${TAG#v}"
+          published=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || true)
+          tags=(--tag "$image:$version")
+          if [ "$(printf '%s\n' "$TAG" "$published" | sort -V | tail -1)" = "$TAG" ]; then
+            tags+=(--tag "$image:latest")
+          fi
           echo "$REGISTRY_PASSWORD" | docker login ghcr.io --username "$REGISTRY_USER" --password-stdin
-          docker buildx imagetools create --tag "$image:$version" --tag "$image:latest" \
-            "$image:$version-amd64" "$image:$version-arm64"
+          docker buildx imagetools create "${tags[@]}" "$image:$version-amd64" "$image:$version-arm64"
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}

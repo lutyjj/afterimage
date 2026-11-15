@@ -11,8 +11,10 @@ on:
 
 permissions: {}
 
+# A pull request's newer push replaces its older check. Every push to main is
+# checked on its own, since Release Please may tag any of them.
 concurrency:
-  group: check-${{ github.ref }}
+  group: check-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
 
 jobs:
