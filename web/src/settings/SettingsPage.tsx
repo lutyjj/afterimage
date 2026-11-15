@@ -10,10 +10,10 @@ import { accountQuery } from "../app/client";
 export function SettingsPage() {
   const administrator = useQuery(accountQuery).data?.administrator ?? false;
   const sections: Section[] = [
-    { to: "/settings/preferences", label: "Preferences" },
-    { to: "/settings/tokens", label: "Tokens and MCP" },
-    ...(administrator ? [{ to: "/settings/home-assistant", label: "Home Assistant" }] : []),
-    { to: "/settings/server", label: "Server" },
+    { href: "/settings/preferences", label: "Preferences" },
+    { href: "/settings/tokens", label: "Tokens and MCP" },
+    ...(administrator ? [{ href: "/settings/home-assistant", label: "Home Assistant" }] : []),
+    { href: "/settings/server", label: "Server" },
   ];
   return (
     <>

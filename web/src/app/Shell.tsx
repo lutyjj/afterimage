@@ -15,13 +15,13 @@ import { accountQuery } from "./client";
 import { THEME_OPTIONS, useTheme } from "./theme";
 import { Mark, Wordmark } from "./Wordmark";
 
-const HOME = { to: "/", label: "Afterimage" };
+const HOME = { href: "/", label: "Afterimage" };
 
 const PLACES: readonly Place[] = [
-  { to: "/devices", label: "Devices", icon: Tablet },
-  { to: "/playlists", label: "Playlists", icon: ListVideo },
-  { to: "/screens", label: "Screens", icon: PanelsTopLeft },
-  { to: "/settings", label: "Settings", icon: Settings },
+  { href: "/devices", label: "Devices", icon: Tablet },
+  { href: "/playlists", label: "Playlists", icon: ListVideo },
+  { href: "/screens", label: "Screens", icon: PanelsTopLeft },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 /** The screen a path shows, whose change fades the next one in. Settings is

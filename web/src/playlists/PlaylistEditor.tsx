@@ -33,7 +33,7 @@ import { screensQuery } from "../screens/queries";
 import { playlistQuery, playlistsQuery } from "./queries";
 import { playlistDeletion, type Use, usesOf } from "./usedBy";
 
-const TRAIL = [{ to: "/playlists", label: "Playlists" }];
+const TRAIL = [{ href: "/playlists", label: "Playlists" }];
 
 /** As many screens as the server keeps in a playlist. */
 const MOST_SCREENS = 32;

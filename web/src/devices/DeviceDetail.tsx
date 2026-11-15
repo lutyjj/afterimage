@@ -16,7 +16,7 @@ import { SleepEditor } from "./SleepEditor";
 import { deviceStates, useShownStates } from "./states";
 import { StateBadge } from "./StateBadge";
 
-const TRAIL = [{ to: "/devices", label: "Devices" }];
+const TRAIL = [{ href: "/devices", label: "Devices" }];
 
 export function DeviceDetail() {
   const deviceId = Number(useParams().deviceId);

@@ -33,7 +33,7 @@ import { STARTERS } from "./starters";
 import { usePreview } from "./usePreview";
 import { openingText, parseYaml, rangeOf } from "./yamlDocument";
 
-const TRAIL = [{ to: "/screens", label: "Screens" }];
+const TRAIL = [{ href: "/screens", label: "Screens" }];
 
 /** Writing a screen: its YAML beside a preview the server draws at the display's
  * own pixels, with what each source answered and every problem in place. */
