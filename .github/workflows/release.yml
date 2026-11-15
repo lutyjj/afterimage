@@ -101,7 +101,7 @@ jobs:
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
           version="${TAG#v}"
-          published=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || true)
+          published=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
           tags=(--tag "$image:$version")
           if [ "$(printf '%s\n' "$TAG" "$published" | sort -V | tail -1)" = "$TAG" ]; then
             tags+=(--tag "$image:latest")
