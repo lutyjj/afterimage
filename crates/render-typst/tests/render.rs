@@ -673,6 +673,29 @@ fn gray_text_takes_the_stylesheets_gray() {
     assert!(colors.contains(&[0x77, 0x77, 0x77]), "{colors:?}");
 }
 
+#[test]
+fn a_charts_series_take_the_stylesheets_series_ramp() {
+    // On sixteen grays the stylesheet spreads two series over its ramp as ink and
+    // #BBBBBB, so the second line is drawn in that gray.
+    let chart =
+        |series: Value| screen_of(&json!({ "lineChart": { "grow": true, "series": series } }));
+    let gray = |bytes: &[u8]| {
+        pixels(bytes)
+            .iter()
+            .flatten()
+            .filter(|pixel| **pixel == [0xBB, 0xBB, 0xBB])
+            .count()
+    };
+    let one = json!([{ "values": [1, 3, 2, 4] }]);
+    let two = json!([{ "values": [1, 3, 2, 4] }, { "values": [2, 2, 2, 2] }]);
+    let one = gray(&render(&chart(one), "kobo_aura_one", "gray-16"));
+    let two = gray(&render(&chart(two), "kobo_aura_one", "gray-16"));
+    assert!(
+        two > one + 1000,
+        "{one} gray pixels with one series, {two} with two"
+    );
+}
+
 fn small_label(text: &str) -> Value {
     json!({ "label": { "text": text, "size": "small", "style": "plain" } })
 }

@@ -41,9 +41,10 @@ OFL = "https://raw.githubusercontent.com/rsms/inter/e3a3d4c57d5ecc01453a57562188
 # another digest, stops the run and prints the digest it got, to review and
 # record there after changing a pin.
 PINS = json.loads((Path(__file__).parent.parent / "trmnl-release.json").read_text())
-# Internal custom properties that are not documented tokens but that drawing
-# needs: the size of a dither tile.
-FILLS = ["--dither-bg-size"]
+# Custom properties that are not documented tokens but that drawing needs: the
+# size of a dither tile, and how many slots the chart series ramp has and how far
+# along them series spread, which TRMNL's chart documentation names public.
+UNDOCUMENTED = ["--dither-bg-size", "--framework-chart-series-count", "--framework-chart-series-span"]
 
 # What each component paints, read from the computed style of the release's own
 # markup rather than from the slots behind it, so the stylesheet's cascade picks
@@ -65,7 +66,12 @@ PAINT_MARKUP = """
 <span class="label label--gray">G</span>
 <span class="label label--outline">O</span><span class="label label--underline">U</span><span class="label label--filled">F</span>
 <div class="divider"></div>
+<div class="border--h-65"></div><div class="border--h-black"></div>
 """
+# The chart series ramp, one element painted with each slot, as TRMNLPaint.series
+# reads the slots.
+SERIES_SLOT = ('<div class="chart-series-{0}" style="background-color: var(--framework-chart-series-{0}-color); '
+               'background-image: var(--framework-chart-series-{0}-image)"></div>')
 # Paint name: the element's selector within the markup, with the pseudo-element
 # that paints it where one does.
 PAINTS = {
@@ -90,6 +96,10 @@ PAINTS = {
     "label-underline": ".label--underline::after",
     "label-filled": ".label--filled",
     "divider": ".divider",
+    # TRMNLCharts' grid lines and axis line: TRMNLPaint.border(65) and
+    # TRMNLPaint.border('black').
+    "chart-grid": ".border--h-65::before",
+    "chart-axis": ".border--h-black::before",
 }
 
 # How each component is spaced, read from the release's own markup like the
@@ -173,6 +183,7 @@ names => {
       value = ['ratio', `${style.getPropertyValue('line-height')} ${style.getPropertyValue('font-size')}`];
       probe.removeAttribute('style');
     }
+    else if (/-(count|span)$/.test(name)) value = ['number', raw(name)];
     else if (/^--(gray|black|white|color)/.test(name))
       value = ['color', through('color', name)];
     else if (/-font-smoothing$/.test(name)) value = ['text', raw(name)];
@@ -413,12 +424,15 @@ def main(catalog: Path, output: Path) -> None:
                 " s.className = 'screen ' + classes; s.setAttribute('style', variables); }",
                 [classes, variables],
             )
-            raw = page.evaluate(PROBE, names + FILLS)
-            tokens = {name: typed(*raw[name]) for name in names + FILLS}
+            raw = page.evaluate(PROBE, names + UNDOCUMENTED)
+            tokens = {name: typed(*raw[name]) for name in names + UNDOCUMENTED}
+            slots = range(int(tokens["--framework-chart-series-count"] or 0))
+            markup = PAINT_MARKUP + "".join(SERIES_SLOT.format(slot) for slot in slots)
+            paints = {**PAINTS, **{f"chart-series-{slot}": f".chart-series-{slot}" for slot in slots}}
             for inverse in (False, True):
-                painted = page.evaluate(PAINT_PROBE, [PAINT_MARKUP, PAINTS, inverse])
+                painted = page.evaluate(PAINT_PROBE, [markup, paints, inverse])
                 prefix = "paint/inverse/" if inverse else "paint/"
-                tokens.update({prefix + name: paint(painted[name]) for name in PAINTS})
+                tokens.update({prefix + name: paint(painted[name]) for name in paints})
             spaced = page.evaluate(BOX_PROBE, [BOX_MARKUP, BOXES])
             tokens.update({"box/" + name: box(spaced[name]) for name in BOXES})
             key = json.dumps(tokens, sort_keys=True)

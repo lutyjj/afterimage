@@ -34,13 +34,16 @@
   (top-edge: (ascent + half) * size, bottom-edge: -(descent + half) * size)
 }
 
+// A component's face. One without a weight token, such as `--font-small`, takes
+// CSS's normal weight.
 #let typeface(t, component, size) = {
   let name = family(sized(t, component, size, "-font-family"))
   let em = sized(t, component, size, "-font-size") * 1pt
+  let weight = sized(t, component, size, "-font-weight")
   (
     font: (name, "Inter"),
     size: em,
-    weight: int(sized(t, component, size, "-font-weight") / 100) * 100,
+    weight: if weight == none { 400 } else { int(weight / 100) * 100 },
     ..line-box(t, name, em, leading-of(t, component, size)),
   )
 }
@@ -244,14 +247,25 @@
   10 * magnitude
 }
 
+// The fill of series `at` of `count`, spread over the stylesheet's chart series
+// ramp as TRMNLPaint.series spreads them: evenly along the ramp's legible span.
+#let series-fill(t, at, count) = {
+  let slot = if count <= 1 { 0 } else { calc.round(at * tok(t, "--framework-chart-series-span") / (count - 1)) }
+  fill-of(t, paint(t, "chart-series-" + str(int(calc.min(slot, tok(t, "--framework-chart-series-count") - 1)))))
+}
+
 // A chart fills what its parent fixes; on an axis sized to content it takes at
 // most 320 pixels of width, and half its width but at most 200 pixels of height.
+// Its text, lines and series take what TRMNL's charts take (TRMNLCharts): the
+// small text, the muted rule along the grid and the strong one along the axis,
+// and the series ramp.
 #let chart(t, value, kind, bounds) = layout(region => {
+  let small = typeface(t, "--font", "small")
   let series = value.series
     .filter(s => type(s.values) == array)
     .map(s => (..s, values: s.values.map(number)))
     .filter(s => s.values.any(v => v != none))
-  if series.len() == 0 { return text(..typeface(t, "--label", "small"), "No data") }
+  if series.len() == 0 { return text(..small, "No data") }
   let all = series.map(s => s.values).flatten().filter(v => v != none)
   let low = value.at("min", default: none)
   let high = value.at("max", default: none)
@@ -262,7 +276,6 @@
   let step = step-for(high - low, 4)
   let low = calc.floor(low / step) * step
   let high = calc.ceil(high / step) * step
-  let small = typeface(t, "--label", "small")
   let labels = value.at("labels", default: none)
   let axis-width = 36pt
   let label-height = if labels == none { 0pt } else { small.size + 6pt }
@@ -281,8 +294,8 @@
   box(width: outer-width, height: height + label-height + 4pt, {
     let tick = low
     while tick <= high + step / 2 {
-      let dash = if tick == low { none } else { "dotted" }
-      place(dx: axis-width, dy: y(tick), line(length: width, stroke: (paint: ink(t), thickness: 1pt, dash: dash)))
+      let rail = if tick == low { "chart-axis" } else { "chart-grid" }
+      place(dx: axis-width, dy: y(tick) - thickness-of(t, rail) / 2, rule(t, rail, length: width))
       let shown = if calc.abs(tick - calc.round(tick)) < 1e-9 { str(int(calc.round(tick))) } else { str(calc.round(tick, digits: 2)) }
       place(dy: calc.round((y(tick) - small.size / 2) / 1pt) * 1pt, box(width: axis-width - 8pt, align(right, text(..small, shown))))
       tick += step
@@ -299,16 +312,15 @@
         }
       }
     }
-    let dashes = (none, "dashed", "dotted", "dash-dotted")
     for (n, s) in series.enumerate() {
       let values = s.values
+      let shade = series-fill(t, n, series.len())
       if kind == "bar" {
         let slot = width / count / series.len()
         for (i, v) in values.enumerate() {
           if v == none { continue }
           let top = y(calc.max(v, 0))
           let bottom = y(calc.min(v, 0))
-          let shade = if n == 0 { ink(t) } else { fill-of(t, paint(t, "item-meta-emphasis-2")) }
           place(dx: axis-width + width * i / count + slot * n + slot * 0.15, dy: top,
             rect(width: slot * 0.7, height: calc.max(bottom - top, 1pt), fill: shade, stroke: none))
         }
@@ -318,10 +330,10 @@
         for (i, v) in values.enumerate() {
           if v == none { if runs.at(-1) != () { runs.push(()) } } else { runs.at(-1).push((x(i), y(v))) }
         }
-        let stroke = (paint: ink(t), thickness: if n == 0 { 4pt } else { 3pt }, cap: "round", join: "round", dash: dashes.at(calc.rem(n, 4)))
+        let stroke = (paint: shade, thickness: if n == 0 { 4pt } else { 3pt }, cap: "round", join: "round")
         for points in runs.filter(run => run.len() > 0) {
           if points.len() == 1 {
-            place(dx: points.at(0).at(0) - 2pt, dy: points.at(0).at(1) - 2pt, circle(radius: 2pt, fill: ink(t), stroke: none))
+            place(dx: points.at(0).at(0) - 2pt, dy: points.at(0).at(1) - 2pt, circle(radius: 2pt, fill: shade, stroke: none))
             continue
           }
           let segments = (curve.move(points.at(0)),)
