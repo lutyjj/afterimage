@@ -165,7 +165,7 @@ Secret values are replaced by their names in answers and problems.
 | Limit | Value |
 |---|---|
 | Fetching sources and images | 11 s |
-| Running templates | 2 s |
+| Running templates | 2 s, ending within 13 s of the drawing's start |
 | Starting templates or the render | Within 13 s of the drawing's start (firmware waits 15 s) |
 | Components | 2,000 |
 | Images | 16 |

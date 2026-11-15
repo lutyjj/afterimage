@@ -10,9 +10,9 @@
 //! editor can point at it.
 //!
 //! A drawing is bounded, since a device's check-in waits on it: its fetches end
-//! within [`FETCH_TIME`], its templates run for at most [`RESOLVE_TIME`], and it
-//! gives up when it cannot start its templates or its render within
-//! [`PLACE_TIME`]. A document expands to at most [`MAX_COMPONENTS`] components and
+//! within [`FETCH_TIME`], its templates run for at most [`RESOLVE_TIME`] and stop
+//! by [`PLACE_TIME`], and it gives up when it cannot start its templates or its
+//! render within [`PLACE_TIME`]. A document expands to at most [`MAX_COMPONENTS`] components and
 //! [`MAX_IMAGES`] images.
 
 use std::collections::BTreeMap;
@@ -281,6 +281,7 @@ impl Drawing {
         let place = self.place(by).await?;
         tokio::task::spawn_blocking(move || {
             let _place = place;
+            resolver.deadline = Some(by.into_std());
             let screen = resolver.document(&document, &scope);
             (screen, resolver)
         })
@@ -457,9 +458,13 @@ struct Resolver {
     /// Key, URL and document path of each distinct image.
     images: Vec<(String, String, String)>,
     components: usize,
-    /// When the document's templates began: [`RESOLVE_TIME`] bounds them, not
-    /// the fetches before them.
-    started: std::time::Instant,
+    /// When the drawing must begin its render, if it has a deadline; templates
+    /// stop there too.
+    deadline: Option<std::time::Instant>,
+    /// When the document's templates stop: [`RESOLVE_TIME`] after they begin,
+    /// not counting the fetches before them, or at the deadline if that is
+    /// sooner.
+    until: std::time::Instant,
     /// The document went past a bound and the rest of it was left out.
     exhausted: bool,
 }
@@ -472,7 +477,8 @@ impl Resolver {
             dropped: 0,
             images: Vec::new(),
             components: 0,
-            started: std::time::Instant::now(),
+            deadline: None,
+            until: std::time::Instant::now() + RESOLVE_TIME,
             exhausted: false,
         }
     }
@@ -581,7 +587,10 @@ impl Resolver {
     }
 
     fn document(&mut self, document: &Value, scope: &Template) -> Value {
-        self.started = std::time::Instant::now();
+        let budget = std::time::Instant::now() + RESOLVE_TIME;
+        self.until = self
+            .deadline
+            .map_or(budget, |deadline| deadline.min(budget));
         let mut resolved = Map::new();
         if let Some(bar) = document.get("titleBar") {
             let mut bar = self.fields(bar, scope, "/titleBar");
@@ -674,14 +683,11 @@ impl Resolver {
                 path,
                 format!("the screen expands to more than {MAX_COMPONENTS} components; the rest is left out"),
             );
-        } else if self.started.elapsed() > RESOLVE_TIME {
+        } else if std::time::Instant::now() > self.until {
             self.exhausted = true;
             self.problem(
                 path,
-                format!(
-                    "the screen's templates ran longer than {} seconds; the rest is left out",
-                    RESOLVE_TIME.as_secs()
-                ),
+                "the screen's templates ran out of time; the rest is left out".to_owned(),
             );
         }
         !self.exhausted
@@ -1100,6 +1106,22 @@ mod tests {
                 .unwrap()
                 .len(),
             2
+        );
+    }
+
+    #[test]
+    fn templates_past_the_drawing_deadline_leave_the_content_out() {
+        let mut resolver = resolver();
+        resolver.deadline = Some(std::time::Instant::now());
+        let document = json!({ "content": { "label": { "text": "late" } } });
+        let screen = resolver.document(&document, &context! {});
+        assert_eq!(screen["content"], empty());
+        let problems = resolver.finish();
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert_eq!(problems[0].path.as_deref(), Some("/content"));
+        assert!(
+            problems[0].message.contains("ran out of time"),
+            "{problems:?}"
         );
     }
 
