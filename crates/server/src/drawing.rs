@@ -587,7 +587,17 @@ impl Resolver {
     }
 
     fn document(&mut self, document: &Value, scope: &Template) -> Value {
-        let budget = std::time::Instant::now() + RESOLVE_TIME;
+        self.document_from(std::time::Instant::now(), document, scope)
+    }
+
+    /// The document's templates, timed from `start`.
+    fn document_from(
+        &mut self,
+        start: std::time::Instant,
+        document: &Value,
+        scope: &Template,
+    ) -> Value {
+        let budget = start + RESOLVE_TIME;
         self.until = self
             .deadline
             .map_or(budget, |deadline| deadline.min(budget));
@@ -1109,20 +1119,33 @@ mod tests {
         );
     }
 
-    #[test]
-    fn templates_past_the_drawing_deadline_leave_the_content_out() {
+    /// Draws a one-label document whose templates began at `start`, past a
+    /// drawing deadline if one is given, and answers whether its content was
+    /// left out for lack of time.
+    fn out_of_time(start: std::time::Instant, deadline: Option<std::time::Instant>) -> bool {
         let mut resolver = resolver();
-        resolver.deadline = Some(std::time::Instant::now());
+        resolver.deadline = deadline;
         let document = json!({ "content": { "label": { "text": "late" } } });
-        let screen = resolver.document(&document, &context! {});
-        assert_eq!(screen["content"], empty());
+        let screen = resolver.document_from(start, &document, &context! {});
         let problems = resolver.finish();
-        assert_eq!(problems.len(), 1, "{problems:?}");
-        assert_eq!(problems[0].path.as_deref(), Some("/content"));
-        assert!(
-            problems[0].message.contains("ran out of time"),
-            "{problems:?}"
-        );
+        let cut = problems.iter().any(|problem| {
+            problem.path.as_deref() == Some("/content")
+                && problem.message.contains("ran out of time")
+        });
+        assert_eq!(cut, screen["content"] == empty(), "{problems:?}");
+        cut
+    }
+
+    #[test]
+    fn templates_get_their_own_time_up_to_the_drawing_deadline() {
+        let now = std::time::Instant::now();
+        let ago = |seconds| now.checked_sub(Duration::from_secs(seconds)).unwrap();
+        // Two seconds from their start, without a deadline or before one.
+        assert!(!out_of_time(now, None));
+        assert!(out_of_time(ago(3), None));
+        assert!(out_of_time(ago(3), Some(now + Duration::from_secs(10))));
+        // A deadline that comes first ends them, however recently they began.
+        assert!(out_of_time(now, Some(ago(1))));
     }
 
     #[test]
