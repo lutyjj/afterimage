@@ -103,11 +103,12 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
   const remove = useMutation({
     mutationFn: () =>
       within(ACT_SECONDS, (options) => client.deletePlaylist({ playlistId: playlist?.id ?? 0 }, options)),
-    onSuccess: async () => {
+    onSuccess: () => {
       // The playlist is gone, so its own query is dropped rather than asked again.
       if (playlist) queryClient.removeQueries({ queryKey: playlistQuery(playlist.id).queryKey });
-      await queryClient.invalidateQueries({ queryKey: playlistsQuery.queryKey });
-      await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
+      // The dialog waits on the delete alone; the lists refresh behind it.
+      void queryClient.invalidateQueries({ queryKey: playlistsQuery.queryKey });
+      void queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
       toast.show({ text: `${playlist?.name ?? "The playlist"} deleted` });
       void navigate("/playlists");
     },

@@ -70,7 +70,15 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
     <Card>
       <CardHead title="Firmware" description={lead(device)}>
         {offered && (
-          <Button variant="primary" disabled={install.isPending} onClick={() => setConfirming(true)}>
+          <Button
+            variant="primary"
+            disabled={install.isPending}
+            onClick={() => {
+              // The dialog opens without the last attempt's failure.
+              install.reset();
+              setConfirming(true);
+            }}
+          >
             {install.isPending ? `Fetching ${latest} from TRMNL` : `Install ${latest}`}
           </Button>
         )}

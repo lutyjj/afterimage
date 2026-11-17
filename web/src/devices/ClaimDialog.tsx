@@ -20,8 +20,9 @@ export function ClaimDialog({ open, onOpenChange }: { open: boolean; onOpenChang
   const claim = useMutation({
     mutationFn: () =>
       within(ACT_SECONDS, (options) => client.claimDevice({ code, name: name.trim() || undefined }, options)),
-    onSuccess: async ({ device, replaced }) => {
-      await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
+    onSuccess: ({ device, replaced }) => {
+      // The dialog waits on the claim alone; the list refreshes behind it.
+      void queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
       change(false);
       toast.show({
         text: replaced

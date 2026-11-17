@@ -20,9 +20,10 @@ export function RemoveDevice({ device }: { device: Device }) {
   const remove = useMutation({
     mutationFn: (reset: boolean) =>
       within(ACT_SECONDS, (options) => client.deleteDevice({ deviceId: device.id, reset }, options)),
-    onSuccess: async (_, reset) => {
+    onSuccess: (_, reset) => {
       queryClient.removeQueries({ queryKey: deviceQuery(device.id).queryKey });
-      await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
+      // The dialog waits on the removal alone; the list refreshes behind it.
+      void queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
       toast.show({
         text: reset
           ? `${device.name} removed. It erases its setup at its next check-in.`

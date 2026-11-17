@@ -118,7 +118,10 @@ function NewToken({ open, onOpenChange }: { open: boolean; onOpenChange: (open: 
   const [readOnly, setReadOnly] = useState(false);
   const [created, setCreated] = useState<Created>();
   const create = useMutation({
-    mutationFn: () => client.createAccessToken({ name: name.trim(), scope: readOnly ? "read_only" : undefined }),
+    mutationFn: () =>
+      within(ACT_SECONDS, (options) =>
+        client.createAccessToken({ name: name.trim(), scope: readOnly ? "read_only" : undefined }, options),
+      ),
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: tokensQuery.queryKey });
       setCreated(result);

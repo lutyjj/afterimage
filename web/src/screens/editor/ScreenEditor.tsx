@@ -131,13 +131,14 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const remove = useMutation({
     mutationFn: () => within(ACT_SECONDS, (options) => client.deleteScreen({ screenId: screen?.id ?? 0 }, options)),
-    onSuccess: async () => {
+    onSuccess: () => {
       setBaseline({ text, name: name.trim() });
       // The screen is gone, so its own query is dropped rather than asked again.
       if (screen) queryClient.removeQueries({ queryKey: screenQuery(screen.id).queryKey });
-      await queryClient.invalidateQueries({ queryKey: screensQuery.queryKey });
-      await queryClient.invalidateQueries({ queryKey: playlistsQuery.queryKey });
-      await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
+      // The dialog waits on the delete alone; the lists refresh behind it.
+      void queryClient.invalidateQueries({ queryKey: screensQuery.queryKey });
+      void queryClient.invalidateQueries({ queryKey: playlistsQuery.queryKey });
+      void queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
       toast.show({ text: `${screen?.name ?? "The screen"} deleted` });
       void navigate("/screens");
     },
