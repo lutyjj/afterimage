@@ -233,10 +233,10 @@ function TokenRow({ token, timeZone }: { token: AccessToken; timeZone: string | 
         open={confirming}
         onOpenChange={setConfirming}
         title={`Revoke ${token.name}?`}
-        detail="Whatever uses it stops working at once. This cannot be undone."
+        description="Whatever uses it stops working at once. This cannot be undone."
         confirmLabel="Revoke"
         destructive
-        onConfirm={() => revoke.mutate()}
+        onConfirm={() => revoke.mutateAsync().finally(() => setConfirming(false))}
       />
     </SettingRow>
   );

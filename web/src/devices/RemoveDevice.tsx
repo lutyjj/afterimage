@@ -52,27 +52,27 @@ export function RemoveDevice({ device }: { device: Device }) {
         open={open}
         onOpenChange={setOpen}
         title={`Remove ${device.name}?`}
-        detail="Its schedule and settings go either way. Playlists and screens stay."
+        description="Its schedule and settings go either way. Playlists and screens stay."
         confirmLabel={choice === "reset" ? "Remove and reset" : "Remove"}
         destructive
         width="34rem"
-        onConfirm={() => remove.mutate(choice === "reset")}
+        onConfirm={() => remove.mutateAsync(choice === "reset").finally(() => setOpen(false))}
       >
         <OptionCards
           label={`How to remove ${device.name}`}
           value={choice}
-          onChoose={setChoice}
+          onValueChange={setChoice}
           options={[
             {
               value: "release",
               label: "Remove",
-              detail:
+              description:
                 "At its next check-in it shows a claim code again. It keeps its Wi-Fi and this server, so anyone signed in here can claim it.",
             },
             {
               value: "reset",
               label: "Remove and reset",
-              detail:
+              description:
                 "At its next check-in it erases its Wi-Fi networks and settings and starts over at its setup portal. Someone has to set it up again at the device.",
             },
           ]}

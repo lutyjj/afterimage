@@ -44,9 +44,9 @@ export function ClaimDialog({ open, onOpenChange }: { open: boolean; onOpenChang
       onOpenChange={change}
       title="Claim a display"
       description={<span id={hintId}>Enter the six characters the display shows.</span>}
-      submitLabel={claim.isPending ? "Claiming" : "Claim display"}
+      confirmLabel={claim.isPending ? "Claiming" : "Claim display"}
       disabled={code.length < CODE_LENGTH || claim.isPending}
-      onSubmit={() => claim.mutate()}
+      onConfirm={() => claim.mutate()}
       width="26rem"
     >
       <div className="mb-4">

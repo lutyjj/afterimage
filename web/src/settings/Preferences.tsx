@@ -16,7 +16,7 @@ export function Preferences() {
       <Card>
         <CardHead title="Appearance" />
         <SettingRow title="Theme" description="Auto follows this device's setting. Kept in this browser.">
-          <SegmentedControl label="Theme" value={preference} options={THEME_OPTIONS} onChange={setPreference} />
+          <SegmentedControl label="Theme" value={preference} options={THEME_OPTIONS} onValueChange={setPreference} />
         </SettingRow>
       </Card>
       <Card>

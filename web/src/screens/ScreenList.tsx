@@ -32,7 +32,7 @@ export function ScreenList() {
         {screens.data?.length === 0 && (
           <EmptyState
             title="No screens yet"
-            detail="A screen is a document: the data it reads, such as a Home Assistant sensor or any JSON over HTTP, and the components that show it in TRMNL's design. Start from an example and watch the preview update as you write."
+            description="A screen is a document: the data it reads, such as a Home Assistant sensor or any JSON over HTTP, and the components that show it in TRMNL's design. Start from an example and watch the preview update as you write."
           >
             <Link to="/screens/new" className={buttonClass("primary")}>
               Write the first screen
@@ -63,7 +63,7 @@ export function ScreenList() {
                     return (
                       <tr
                         key={screen.id}
-                        className="relative h-(--height-row) border-b border-border last:border-b-0 hover:bg-sunken"
+                        className="relative h-11 border-b border-border last:border-b-0 hover:bg-sunken"
                       >
                         <th scope="row" className="px-gutter text-left font-medium">
                           {/* The whole row answers the pointer; the name is the link. */}

@@ -10,7 +10,7 @@ export function RouteError() {
   const message = isRouteErrorResponse(error) ? `${error.status} ${error.statusText}` : messageOf(error);
   return (
     <Content>
-      <EmptyState title="This page could not load" detail={message}>
+      <EmptyState title="This page could not load" description={message}>
         <a href="/devices" className="text-sm font-medium text-accent">
           Back to devices
         </a>
@@ -24,7 +24,10 @@ export function NotFoundPage() {
     <>
       <TopBar title="Not found" />
       <Content>
-        <EmptyState title="Nothing lives at this address" detail="The page may have moved, or the link may be wrong.">
+        <EmptyState
+          title="Nothing lives at this address"
+          description="The page may have moved, or the link may be wrong."
+        >
           <Link to="/devices" className="text-sm font-medium text-accent">
             Back to devices
           </Link>

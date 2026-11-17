@@ -1,7 +1,7 @@
 import "./app/app.css";
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { LinenProvider } from "linen";
+import { LinenProvider, ToastProvider } from "linen";
 import { reactRouter } from "linen/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -19,7 +19,9 @@ createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <LinenProvider navigation={reactRouter}>
-        <RouterProvider router={router} />
+        <ToastProvider>
+          <RouterProvider router={router} />
+        </ToastProvider>
       </LinenProvider>
     </QueryClientProvider>
   </StrictMode>,

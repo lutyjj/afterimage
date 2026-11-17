@@ -1,3 +1,4 @@
+import { Field } from "@base-ui/react/field";
 import type { Device, Playlist, ScheduleSlot, ScreenSummary, Shows, Weekday } from "@afterimage/management-client";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -261,14 +262,16 @@ function SlotRow({
         {index + 1}
       </span>
       <div className="grid items-start gap-3 lg:grid-cols-[minmax(10rem,16rem)_minmax(0,1fr)] 2xl:grid-cols-[minmax(10rem,14rem)_auto_minmax(0,1fr)]">
-        <CellSelect
-          aria-label={`Playlist of time ${index + 1}`}
-          className="w-full font-medium"
-          invalid={!known}
-          choices={[...(known ? [] : [{ value: String(slot.playlistId), label: "A deleted playlist" }]), ...choices]}
-          value={String(slot.playlistId)}
-          onValueChange={(value) => onChange({ playlistId: Number(value) })}
-        />
+        {/* The field marks its picker invalid while it holds a deleted playlist. */}
+        <Field.Root invalid={!known} className="min-w-0">
+          <CellSelect
+            aria-label={`Playlist of time ${index + 1}`}
+            className="w-full font-medium"
+            choices={[...(known ? [] : [{ value: String(slot.playlistId), label: "A deleted playlist" }]), ...choices]}
+            value={String(slot.playlistId)}
+            onValueChange={(value) => onChange({ playlistId: Number(value) })}
+          />
+        </Field.Root>
         <HoursFields hours={slot} timed={DAYTIME} className="lg:col-span-2 2xl:col-span-1" onChange={onChange} />
       </div>
       <IconButton aria-label={`Remove time ${index + 1}`} title="Remove" onClick={onRemove}>

@@ -35,7 +35,7 @@ export function DeviceDetail() {
       <>
         <TopBar trail={TRAIL} title="Display" />
         <Content>
-          <EmptyState title="This display could not load" detail={messageOf(device.error)}>
+          <EmptyState title="This display could not load" description={messageOf(device.error)}>
             <Link to="/devices" className={buttonClass()}>
               Back to devices
             </Link>

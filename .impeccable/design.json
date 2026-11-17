@@ -250,11 +250,11 @@
     },
     {
       "name": "State badge",
-      "kind": "chip",
-      "refersTo": "chip",
-      "description": "A device state that wants the person, beside its name.",
-      "html": "<span class=\"ds-badge\"><span class=\"ds-dot\"></span>Not seen lately</span>",
-      "css": ".ds-badge{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px;border:1px solid var(--color-warn);border-radius:6px;color:var(--color-warn);font:500 12px/16px var(--font-sans)}.ds-dot{width:6px;height:6px;border-radius:50%;background:var(--color-warn)}"
+      "kind": "custom",
+      "refersTo": "status",
+      "description": "A device state that wants the person, beside its name: linen's Status, a dot and its words in warn.",
+      "html": "<span class=\"ds-status\"><span class=\"ds-dot\"></span>Not seen lately</span>",
+      "css": ".ds-status{display:inline-flex;align-items:center;gap:6px;color:var(--color-warn);font:500 14px/22px var(--font-sans)}.ds-dot{width:8px;height:8px;border-radius:50%;background:currentColor}"
     },
     {
       "name": "Setting row",

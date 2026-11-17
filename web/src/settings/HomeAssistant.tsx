@@ -12,14 +12,13 @@ import {
   CardBody,
   CardHead,
   Checkbox,
-  Chip,
   ConfirmDialog,
   Nothing,
   SettingNote,
   SettingRow,
+  Status,
   TextField,
   useToast,
-  WarnDot,
   useUnsavedChanges,
 } from "linen";
 import { type FormEvent, useState } from "react";
@@ -82,9 +81,7 @@ function Connection({ settings }: { settings: MqttSettings }) {
   if (settings.connection === "off") {
     return (
       <SettingRow title="Broker" description="Save a broker below to publish the displays.">
-        <Chip size="row" tone="muted">
-          Not publishing
-        </Chip>
+        <Status>Not publishing</Status>
       </SettingRow>
     );
   }
@@ -100,17 +97,7 @@ function Connection({ settings }: { settings: MqttSettings }) {
           </span>
         }
       >
-        {settings.connection === "connected" ? (
-          <Chip size="row">
-            <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-positive" />
-            {state.label}
-          </Chip>
-        ) : (
-          <Chip size="row" tone="warn">
-            <WarnDot />
-            {state.label}
-          </Chip>
-        )}
+        <Status tone={settings.connection === "connected" ? "positive" : "warn"}>{state.label}</Status>
       </SettingRow>
     </div>
   );
@@ -290,10 +277,10 @@ function StopPublishing({ save }: { save: Save }) {
         open={confirming}
         onOpenChange={setConfirming}
         title="Stop publishing to Home Assistant?"
-        detail="Every display leaves Home Assistant, with its entities and their history there, until a broker is saved again."
+        description="Every display leaves Home Assistant, with its entities and their history there, until a broker is saved again."
         confirmLabel="Stop publishing"
         destructive
-        onConfirm={() => save.mutate({})}
+        onConfirm={() => save.mutateAsync({}).finally(() => setConfirming(false))}
       />
     </SettingRow>
   );

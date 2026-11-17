@@ -48,7 +48,7 @@ export function ScreenEditor() {
       <>
         <TopBar trail={TRAIL} title="Screen" wide />
         <Content>
-          <EmptyState title="This screen could not load" detail={messageOf(screen.error)}>
+          <EmptyState title="This screen could not load" description={messageOf(screen.error)}>
             <Link to="/screens" className={buttonClass()}>
               Back to screens
             </Link>
@@ -364,10 +364,10 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
           open={confirmDelete}
           onOpenChange={setConfirmDelete}
           title={`Delete ${screen.name}?`}
-          detail={screenDeletion(screen.id, playlists, devices)}
+          description={screenDeletion(screen.id, playlists, devices)}
           confirmLabel="Delete screen"
           destructive
-          onConfirm={() => remove.mutate()}
+          onConfirm={() => remove.mutateAsync().finally(() => setConfirmDelete(false))}
         />
       )}
     </div>

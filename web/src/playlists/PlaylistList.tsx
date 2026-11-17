@@ -33,7 +33,7 @@ export function PlaylistList() {
         {playlists.data?.length === 0 && (
           <EmptyState
             title="No playlists yet"
-            detail="A playlist is screens a display shows in turn, one at each check-in. Any number of displays can show one: as the playlist they usually show, or on the days and hours their schedule gives it."
+            description="A playlist is screens a display shows in turn, one at each check-in. Any number of displays can show one: as the playlist they usually show, or on the days and hours their schedule gives it."
           >
             <Link to="/playlists/new" className={buttonClass("primary")}>
               Make the first playlist
@@ -62,7 +62,7 @@ export function PlaylistList() {
                   return (
                     <tr
                       key={playlist.id}
-                      className="relative h-(--height-row) border-b border-border last:border-b-0 hover:bg-sunken"
+                      className="relative h-11 border-b border-border last:border-b-0 hover:bg-sunken"
                     >
                       <th scope="row" className="px-gutter text-left font-medium">
                         {/* The whole row answers the pointer; the name is the link. */}

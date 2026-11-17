@@ -135,7 +135,7 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
           open={confirming}
           onOpenChange={setConfirming}
           title={`Install ${latest} on ${device.name}?`}
-          detail={
+          description={
             <>
               At its next check-in{due ? `, by about ${due},` : ""} the display downloads {latest} from this server,
               shows that it is updating and installs it. It keeps its Wi-Fi, its settings and its playlist. Afterimage
@@ -143,7 +143,7 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
             </>
           }
           confirmLabel={`Install ${latest}`}
-          onConfirm={() => install.mutate(latest)}
+          onConfirm={() => install.mutateAsync(latest).finally(() => setConfirming(false))}
         />
       )}
     </Card>

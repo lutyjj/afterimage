@@ -155,7 +155,7 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 | Day track | A day from midnight to midnight on `sunken`, each stretch as long as it lasts and named where it fits: a playlist or pinned screen lit as paper (`surface` with a `border-strong` hairline), sleep as the bare track, nothing scheduled in dashed `warn`; a line at now in `text`. A display's week is seven tracks, today's day in `text`. It reports; it never takes the ink. |
 | Claim code | Six 5:6 cells over one real input that takes typing and paste; the active cell takes the ink border and a 3px halo, an invalid code turns every cell red. |
 | Firmware legs | Requested, sent, installed as columns under 3px rules: done in ink, current dashed, waiting in `border`, failed in `danger`. |
-| State badge | A row chip in `warn` with a dot. A state that ends while the page is open stays, struck through at 55% opacity. |
+| State badge | linen's `Status` in `warn`: a dot and its words in the tone. A state that ends while the page is open stays, neutral and struck through at 55% opacity. |
 | Wordmark | The lowercase name at 16px after the 20px icon; the icon alone heads the folded rail. Either leads to the first screen. |
 | Save button | The editor's one primary act. While there is something to save it is in ink and reads "Save"; once saved it turns quiet and reads "Saved", keeping its width. Delete stands beside it as a trash icon. |
 

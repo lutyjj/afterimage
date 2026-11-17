@@ -59,7 +59,9 @@ export function Shell() {
   );
 }
 
-/** Who is signed in, the theme of this browser, and the way out. */
+/** Who is signed in, the theme of this browser, and the way out, at the foot of
+ * the rail. A phone's bar holds only the places, so Preferences in Settings
+ * offers the same. */
 function Account() {
   const account = useQuery(accountQuery).data;
   const { preference, setPreference } = useTheme();
@@ -82,7 +84,7 @@ function Account() {
       }
     >
       <MenuChoice label="Theme">
-        <SegmentedControl label="Theme" value={preference} options={THEME_OPTIONS} onChange={setPreference} />
+        <SegmentedControl label="Theme" value={preference} options={THEME_OPTIONS} onValueChange={setPreference} />
       </MenuChoice>
     </AccountMenu>
   );

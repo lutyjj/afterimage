@@ -1,4 +1,4 @@
-import { Chip, classes, WarnDot } from "linen";
+import { classes, Status } from "linen";
 
 export interface StateBadgeProps {
   children: string;
@@ -15,11 +15,10 @@ export function StateBadge({ children, ended = false, title }: StateBadgeProps) 
       title={title}
       className={classes("inline-flex [transition:opacity_var(--motion-state)]", ended && "line-through opacity-55")}
     >
-      <Chip size="row" tone={ended ? "neutral" : "warn"}>
-        {!ended && <WarnDot />}
+      <Status tone={ended ? "neutral" : "warn"}>
         {children}
         {ended && <span className="sr-only"> (no longer)</span>}
-      </Chip>
+      </Status>
     </span>
   );
 }

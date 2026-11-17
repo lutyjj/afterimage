@@ -61,7 +61,7 @@ export function PlaylistEditor() {
       <>
         <TopBar trail={TRAIL} title="Playlist" />
         <Content>
-          <EmptyState title="This playlist could not load" detail={messageOf(playlist.error)}>
+          <EmptyState title="This playlist could not load" description={messageOf(playlist.error)}>
             <Link to="/playlists" className={buttonClass()}>
               Back to playlists
             </Link>
@@ -237,10 +237,10 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
           open={confirmDelete}
           onOpenChange={setConfirmDelete}
           title={`Delete ${playlist.name}?`}
-          detail={playlistDeletion(uses)}
+          description={playlistDeletion(uses)}
           confirmLabel="Delete playlist"
           destructive
-          onConfirm={() => remove.mutate()}
+          onConfirm={() => remove.mutateAsync().finally(() => setConfirmDelete(false))}
         />
       )}
     </>
