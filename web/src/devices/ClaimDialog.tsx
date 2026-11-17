@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { client, messageOf, queryClient } from "../app/client";
+import { ACT_SECONDS, within } from "../app/deadline";
 import { CODE_LENGTH, CodeField } from "./CodeField";
 import { devicesQuery } from "./queries";
 
@@ -17,7 +18,8 @@ export function ClaimDialog({ open, onOpenChange }: { open: boolean; onOpenChang
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const claim = useMutation({
-    mutationFn: () => client.claimDevice({ code, name: name.trim() || undefined }),
+    mutationFn: () =>
+      within(ACT_SECONDS, (options) => client.claimDevice({ code, name: name.trim() || undefined }, options)),
     onSuccess: async ({ device, replaced }) => {
       await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
       change(false);
@@ -44,9 +46,9 @@ export function ClaimDialog({ open, onOpenChange }: { open: boolean; onOpenChang
       onOpenChange={change}
       title="Claim a display"
       description={<span id={hintId}>Enter the six characters the display shows.</span>}
-      confirmLabel={claim.isPending ? "Claiming" : "Claim display"}
-      disabled={code.length < CODE_LENGTH || claim.isPending}
-      onConfirm={() => claim.mutate()}
+      confirmLabel="Claim display"
+      disabled={code.length < CODE_LENGTH}
+      onConfirm={() => claim.mutateAsync()}
       width="26rem"
     >
       <div className="mb-4">

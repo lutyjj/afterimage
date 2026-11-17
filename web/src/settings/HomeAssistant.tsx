@@ -14,6 +14,7 @@ import {
   Checkbox,
   ConfirmDialog,
   Nothing,
+  Notice,
   SettingNote,
   SettingRow,
   Status,
@@ -24,6 +25,7 @@ import {
 import { type FormEvent, useState } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
+import { ACT_SECONDS, within } from "../app/deadline";
 import { mqttQuery } from "./queries";
 
 type Save = UseMutationResult<UpdateMqttSettingsOutput, Error, UpdateMqttSettingsInput>;
@@ -35,7 +37,8 @@ export function HomeAssistant() {
   const toast = useToast();
   // Kept here, since the form starts afresh from what the server saved.
   const save = useMutation({
-    mutationFn: (request: UpdateMqttSettingsInput) => client.updateMqttSettings(request),
+    mutationFn: (request: UpdateMqttSettingsInput) =>
+      within(ACT_SECONDS, (options) => client.updateMqttSettings(request, options)),
     onSuccess: ({ settings }) => {
       queryClient.setQueryData(mqttQuery.queryKey, settings);
       toast.show({ text: settings.url ? "Broker saved" : "Stopped publishing to Home Assistant" });
@@ -265,12 +268,21 @@ function BrokerForm({ settings, save }: { settings: MqttSettings; save: Save }) 
 /** Taking every display out of Home Assistant, said before it happens. */
 function StopPublishing({ save }: { save: Save }) {
   const [confirming, setConfirming] = useState(false);
+  // Said in the dialog, which stands over the form where the save's failures show.
+  const [failure, setFailure] = useState<string>();
   return (
     <SettingRow
       title="Stop publishing"
       description="Every display leaves Home Assistant, with its entities and their history there, until a broker is saved again."
     >
-      <Button variant="destructive" disabled={save.isPending} onClick={() => setConfirming(true)}>
+      <Button
+        variant="destructive"
+        disabled={save.isPending}
+        onClick={() => {
+          setFailure(undefined);
+          setConfirming(true);
+        }}
+      >
         Stop publishing
       </Button>
       <ConfirmDialog
@@ -280,8 +292,15 @@ function StopPublishing({ save }: { save: Save }) {
         description="Every display leaves Home Assistant, with its entities and their history there, until a broker is saved again."
         confirmLabel="Stop publishing"
         destructive
-        onConfirm={() => save.mutateAsync({}).finally(() => setConfirming(false))}
-      />
+        onConfirm={() =>
+          save.mutateAsync({}).then(
+            () => setConfirming(false),
+            (error: unknown) => setFailure(messageOf(error)),
+          )
+        }
+      >
+        {failure !== undefined && <Notice tone="danger" title={failure} />}
+      </ConfirmDialog>
     </SettingRow>
   );
 }

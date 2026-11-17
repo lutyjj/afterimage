@@ -9,6 +9,7 @@ import {
   classes,
   ConfirmDialog,
   FieldRow,
+  Notice,
   Select,
   useToast,
   useUnsavedChanges,
@@ -16,9 +17,14 @@ import {
 import { useEffect, useState, type FormEvent } from "react";
 
 import { client, messageOf, queryClient } from "../app/client";
+import { within } from "../app/deadline";
 import { moment } from "../app/format";
 import { nextCheckIn, updateSteps, type Step } from "./firmwareSteps";
 import { deviceQuery, devicesQuery, firmwareBoardsQuery } from "./queries";
+
+/** How long an install gives the server, which first fetches TRMNL's list of
+ * releases (up to 15 seconds) and the flash image (up to 120). */
+const INSTALL_SECONDS = 180;
 
 /** The board a display is built on, TRMNL's newest release for it, and an
  * install request followed from the request to the check-in that tells whether
@@ -41,7 +47,8 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
   };
   const toast = useToast();
   const install = useMutation({
-    mutationFn: (version: string) => client.installFirmware({ deviceId: device.id, version }),
+    mutationFn: (version: string) =>
+      within(INSTALL_SECONDS, (options) => client.installFirmware({ deviceId: device.id, version }, options)),
     onSuccess: ({ device: updated }, version) => {
       stored(updated);
       toast.show({ text: `${device.name} installs ${version} at its next check-in.` });
@@ -143,8 +150,11 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
             </>
           }
           confirmLabel={`Install ${latest}`}
-          onConfirm={() => install.mutateAsync(latest).finally(() => setConfirming(false))}
-        />
+          onConfirm={() => install.mutateAsync(latest).then(() => setConfirming(false))}
+        >
+          {/* The card's own report of it stands behind the dialog. */}
+          {install.isError && <Notice tone="danger" title={messageOf(install.error)} />}
+        </ConfirmDialog>
       )}
     </Card>
   );

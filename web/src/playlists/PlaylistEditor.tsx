@@ -25,6 +25,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { client, messageOf, queryClient } from "../app/client";
+import { ACT_SECONDS, within } from "../app/deadline";
 import { SaveButton } from "../app/editing/SaveButton";
 import { saveState } from "../app/editing/saveState";
 import { useSaveShortcut } from "../app/editing/useSaveShortcut";
@@ -100,7 +101,8 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
     },
   });
   const remove = useMutation({
-    mutationFn: () => client.deletePlaylist({ playlistId: playlist?.id ?? 0 }),
+    mutationFn: () =>
+      within(ACT_SECONDS, (options) => client.deletePlaylist({ playlistId: playlist?.id ?? 0 }, options)),
     onSuccess: async () => {
       // The playlist is gone, so its own query is dropped rather than asked again.
       if (playlist) queryClient.removeQueries({ queryKey: playlistQuery(playlist.id).queryKey });
@@ -240,7 +242,7 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
           description={playlistDeletion(uses)}
           confirmLabel="Delete playlist"
           destructive
-          onConfirm={() => remove.mutateAsync().finally(() => setConfirmDelete(false))}
+          onConfirm={() => remove.mutateAsync().then(() => setConfirmDelete(false))}
         />
       )}
     </>

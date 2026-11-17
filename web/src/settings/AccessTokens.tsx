@@ -28,6 +28,7 @@ import { Plus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
 import { client, messageOf, queryClient, serverQuery } from "../app/client";
+import { ACT_SECONDS, within } from "../app/deadline";
 import { ago, moment } from "../app/format";
 import { tokensQuery } from "./queries";
 
@@ -203,7 +204,7 @@ function TokenRow({ token, timeZone }: { token: AccessToken; timeZone: string | 
   const toast = useToast();
   const [confirming, setConfirming] = useState(false);
   const revoke = useMutation({
-    mutationFn: () => client.revokeAccessToken({ tokenId: token.id }),
+    mutationFn: () => within(ACT_SECONDS, (options) => client.revokeAccessToken({ tokenId: token.id }, options)),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tokensQuery.queryKey });
       toast.show({ text: `${token.name} revoked` });
@@ -236,7 +237,7 @@ function TokenRow({ token, timeZone }: { token: AccessToken; timeZone: string | 
         description="Whatever uses it stops working at once. This cannot be undone."
         confirmLabel="Revoke"
         destructive
-        onConfirm={() => revoke.mutateAsync().finally(() => setConfirming(false))}
+        onConfirm={() => revoke.mutateAsync().then(() => setConfirming(false))}
       />
     </SettingRow>
   );

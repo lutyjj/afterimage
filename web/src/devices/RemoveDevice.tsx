@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { client, messageOf, queryClient } from "../app/client";
+import { ACT_SECONDS, within } from "../app/deadline";
 import { deviceQuery, devicesQuery } from "./queries";
 
 type Choice = "release" | "reset";
@@ -17,7 +18,8 @@ export function RemoveDevice({ device }: { device: Device }) {
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState<Choice>("release");
   const remove = useMutation({
-    mutationFn: (reset: boolean) => client.deleteDevice({ deviceId: device.id, reset }),
+    mutationFn: (reset: boolean) =>
+      within(ACT_SECONDS, (options) => client.deleteDevice({ deviceId: device.id, reset }, options)),
     onSuccess: async (_, reset) => {
       queryClient.removeQueries({ queryKey: deviceQuery(device.id).queryKey });
       await queryClient.invalidateQueries({ queryKey: devicesQuery.queryKey });
@@ -56,7 +58,7 @@ export function RemoveDevice({ device }: { device: Device }) {
         confirmLabel={choice === "reset" ? "Remove and reset" : "Remove"}
         destructive
         width="34rem"
-        onConfirm={() => remove.mutateAsync(choice === "reset").finally(() => setOpen(false))}
+        onConfirm={() => remove.mutateAsync(choice === "reset").then(() => setOpen(false))}
       >
         <OptionCards
           label={`How to remove ${device.name}`}

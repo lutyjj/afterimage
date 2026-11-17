@@ -19,6 +19,7 @@ import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { client, displayModelsQuery, messageOf, queryClient, serverQuery } from "../../app/client";
+import { ACT_SECONDS, within } from "../../app/deadline";
 import { SaveButton } from "../../app/editing/SaveButton";
 import { saveState } from "../../app/editing/saveState";
 import { useSaveShortcut } from "../../app/editing/useSaveShortcut";
@@ -129,7 +130,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
   const toast = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const remove = useMutation({
-    mutationFn: () => client.deleteScreen({ screenId: screen?.id ?? 0 }),
+    mutationFn: () => within(ACT_SECONDS, (options) => client.deleteScreen({ screenId: screen?.id ?? 0 }, options)),
     onSuccess: async () => {
       setBaseline({ text, name: name.trim() });
       // The screen is gone, so its own query is dropped rather than asked again.
@@ -367,7 +368,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
           description={screenDeletion(screen.id, playlists, devices)}
           confirmLabel="Delete screen"
           destructive
-          onConfirm={() => remove.mutateAsync().finally(() => setConfirmDelete(false))}
+          onConfirm={() => remove.mutateAsync().then(() => setConfirmDelete(false))}
         />
       )}
     </div>
