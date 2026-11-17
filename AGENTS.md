@@ -72,6 +72,9 @@ The flake owns the toolchains; do not install unmanaged versions on the host.
   when they are part of the contract; avoid incidental implementation details.
 - Tests must own their fixtures and control time-dependent inputs.
 - Visually verify UI and rendered screens, in the running app or on a device.
+  Check the web UI on each screen linen's
+  [`LANGUAGE.md`](https://github.com/lutyjj/linen/blob/main/LANGUAGE.md#layout)
+  names, at its check sizes: a phone, a foldable folded and open, and a desk.
 
 ## Collaboration
 
