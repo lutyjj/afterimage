@@ -245,7 +245,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
 
           <aside
             aria-label="Preview"
-            className="grid min-h-0 min-w-0 content-start gap-4 max-lg:w-[min(100%,var(--display-width,100%))] max-lg:justify-self-center lg:overflow-y-auto lg:pr-2"
+            className="grid min-h-0 min-w-0 content-start gap-4 max-lg:w-[min(100%,var(--display-width,100%))] max-lg:justify-self-center lg:overflow-y-auto lg:pr-2 lg:**:scroll-mt-0"
           >
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-text-secondary">Preview on</span>

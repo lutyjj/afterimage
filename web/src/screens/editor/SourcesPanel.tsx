@@ -46,7 +46,7 @@ export function SourcesPanel({
           {result.error !== undefined ? (
             <p className="pb-2 text-sm text-danger">{result.error}</p>
           ) : (
-            <div className="mb-2 max-h-88 overflow-auto rounded-button border border-border bg-surface px-3 py-2 font-mono text-xs/[1.6]">
+            <div className="mb-2 max-h-88 overflow-auto rounded-button border border-border bg-surface px-3 py-2 font-mono text-xs/[1.6] **:scroll-mt-0">
               <Node value={result.data} path={name} depth={0} onCopy={copy} />
             </div>
           )}
