@@ -34,6 +34,9 @@ import { tokensQuery } from "./queries";
 
 type Created = { token: AccessToken; secret: string };
 
+/** What a read-only token may do, said as it is chosen and with its secret. */
+const READ_ONLY = "It can read devices, screens and playlists, and change nothing.";
+
 /** The personal access tokens scripts and agents act with, and how an agent
  * connects over MCP with one. */
 export function AccessTokens() {
@@ -112,7 +115,9 @@ function Agents() {
 }
 
 /** Making a token: its name and reach, then its secret, which the server shows
- * this once. The dialog turns from the one to the other in place. */
+ * this once. The dialog keeps its layout and steps from the one to the other in
+ * its body, so nothing outside the body changes height; each step says what
+ * the token may do in its own words. */
 function NewToken({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [name, setName] = useState("");
   const [readOnly, setReadOnly] = useState(false);
@@ -147,57 +152,57 @@ function NewToken({ open, onOpenChange }: { open: boolean; onOpenChange: (open: 
   return (
     <DialogRoot open={open} onOpenChange={change}>
       <DialogShell open={open} width="30rem">
-        <Swap view={created ? "secret" : "form"}>
-          {created ? (
-            <DialogLayout
-              title={`${created.token.name} is ready`}
-              actions={<Dialog.Close render={<Button variant="primary">Done</Button>} />}
-            >
-              <ShownOnce what="Token" label="Access token" secret={created.secret} copyLabel="Copy token">
-                Give it to the script or agent that will use it.
-              </ShownOnce>
-            </DialogLayout>
-          ) : (
-            <form onSubmit={submit}>
-              <DialogLayout
-                title="New access token"
-                description="It acts as you until you revoke it."
-                actions={
-                  <>
-                    <DialogCancel />
-                    <Button type="submit" variant="primary" disabled={!name.trim() || create.isPending}>
-                      {create.isPending ? "Creating" : "Create token"}
-                    </Button>
-                  </>
-                }
-              >
-                <TextField
-                  label="Name"
-                  hint="What will hold it, so you know which to revoke."
-                  value={name}
-                  required
-                  maxLength={64}
-                  autoFocus
-                  placeholder="Backup script"
-                  onChange={(event) => setName(event.target.value)}
-                />
-                <Checkbox checked={readOnly} onCheckedChange={setReadOnly}>
-                  <span className="grid">
-                    Read only
-                    <span className="text-xs text-text-secondary">
-                      It can read devices, screens and playlists, and change nothing.
+        <form onSubmit={submit}>
+          <DialogLayout
+            title={created ? `${created.token.name} is ready` : "New access token"}
+            description="It works until you revoke it."
+            actions={
+              created ? (
+                <Dialog.Close render={<Button variant="primary">Done</Button>} />
+              ) : (
+                <>
+                  <DialogCancel />
+                  <Button type="submit" variant="primary" disabled={!name.trim() || create.isPending}>
+                    {create.isPending ? "Creating" : "Create token"}
+                  </Button>
+                </>
+              )
+            }
+          >
+            <Swap view={created ? "secret" : "form"} stepped>
+              {created ? (
+                <ShownOnce what="Token" label="Access token" secret={created.secret} copyLabel="Copy token">
+                  Give it to the script or agent that will use it.{" "}
+                  {created.token.scope === "read_only" ? READ_ONLY : "It acts as you."}
+                </ShownOnce>
+              ) : (
+                <>
+                  <TextField
+                    label="Name"
+                    hint="What will hold it, so you know which to revoke."
+                    value={name}
+                    required
+                    maxLength={64}
+                    autoFocus
+                    placeholder="Backup script"
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                  <Checkbox checked={readOnly} onCheckedChange={setReadOnly}>
+                    <span className="grid">
+                      Read only
+                      <span className="text-xs text-text-secondary">{READ_ONLY}</span>
                     </span>
-                  </span>
-                </Checkbox>
-                {create.isError && (
-                  <p role="alert" className="mt-3 text-sm text-danger">
-                    {messageOf(create.error)}
-                  </p>
-                )}
-              </DialogLayout>
-            </form>
-          )}
-        </Swap>
+                  </Checkbox>
+                  {create.isError && (
+                    <p role="alert" className="mt-3 text-sm text-danger">
+                      {messageOf(create.error)}
+                    </p>
+                  )}
+                </>
+              )}
+            </Swap>
+          </DialogLayout>
+        </form>
       </DialogShell>
     </DialogRoot>
   );
