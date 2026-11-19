@@ -120,7 +120,7 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
               </p>
             )}
             {(update.state === "requested" || (update.state === "not_installed" && !choosing)) && (
-              <Actions>
+              <Actions className="justify-end">
                 {update.state === "requested" && (
                   <Button disabled={cancel.isPending} onClick={() => cancel.mutate()}>
                     {cancel.isPending ? "Withdrawing" : "Withdraw the request"}

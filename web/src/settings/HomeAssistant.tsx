@@ -263,15 +263,15 @@ function BrokerForm({ settings, save }: { settings: MqttSettings; save: Save }) 
             a new device.
           </p>
         )}
-        <Actions>
-          <Button type="submit" variant="primary" disabled={save.isPending}>
-            {save.isPending ? "Saving" : publishing ? "Save" : "Save and connect"}
-          </Button>
+        <Actions className="justify-end">
           {save.isError && (
             <span role="alert" className="text-sm text-danger">
               {messageOf(save.error)}
             </span>
           )}
+          <Button type="submit" variant="primary" disabled={save.isPending}>
+            {save.isPending ? "Saving" : publishing ? "Save" : "Save and connect"}
+          </Button>
         </Actions>
       </form>
     </CardBody>
