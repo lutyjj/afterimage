@@ -21,11 +21,8 @@ export function SignIn() {
 
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-8">
-      <m.div
-        {...arrive()}
-        className="grid w-full max-w-sm gap-8 rounded-dialog border border-border bg-surface p-6 sm:p-8"
-      >
-        <header className="grid gap-2">
+      <m.div {...arrive()} className="grid w-full max-w-sm gap-4 rounded-dialog border border-border bg-surface p-5">
+        <header>
           <h1 className="text-lg">
             <Wordmark />
           </h1>
@@ -34,13 +31,13 @@ export function SignIn() {
         {options.isPending && <p className="text-sm text-text-muted">Reading the server</p>}
         {options.isError && <Notice tone="danger" title={messageOf(options.error)} />}
         {options.data && (
-          <div className="grid gap-6">
+          <div className="grid gap-4">
             {providerError && (
               <Notice tone="danger" title={providerErrors[providerError] ?? "Signing in did not finish. Try again."} />
             )}
             {options.data.password && (options.data.firstAccount ? <FirstAccountForm /> : <PasswordForm />)}
             {options.data.oidc && (
-              <div className="grid gap-3">
+              <div className="grid gap-2">
                 {options.data.password && (
                   <span className="flex items-center gap-3 text-sm text-text-muted before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
                     or
