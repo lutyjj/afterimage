@@ -96,8 +96,8 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
         {boards.isError && <Notice tone="danger" title={messageOf(boards.error)} />}
 
         {update && (
-          <div className="flex max-w-2xl flex-col gap-4">
-            <div className="grid gap-2">
+          <div className="flex flex-col gap-4">
+            <div className="grid max-w-2xl gap-2">
               <p className="text-sm font-medium">Update to {update.version}</p>
               <ol className="grid grid-cols-3 gap-2">
                 {updateSteps(update, device).map((step) => (
@@ -106,13 +106,13 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
               </ol>
             </div>
             {update.state === "sent" && (
-              <p className="text-sm text-text-secondary">
+              <p className="max-w-prose text-sm text-text-secondary">
                 The display has the request and installs {update.version}. Its next check-in shows whether it runs the
                 new release.
               </p>
             )}
             {update.state === "not_installed" && (
-              <p className="text-sm text-text-secondary">
+              <p className="max-w-prose text-sm text-text-secondary">
                 The display checked in on {installed ?? "another release"} after it had the request. Firmware 1.8 waits
                 a day after a failed update before it tries again, and its log on the server says why it failed.
               </p>
