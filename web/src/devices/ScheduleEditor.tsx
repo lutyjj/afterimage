@@ -307,7 +307,7 @@ function Week({ plan, names, timeZone }: { plan: Plan; names: Names; timeZone: s
   const days = useMemo(() => WEEK.map((day) => [day, dayOf(plan, day)] as const), [plan]);
   return (
     <div role="group" aria-label="Each week" className="grid gap-2">
-      <span aria-hidden="true" className="text-sm font-medium text-text-secondary">
+      <span aria-hidden="true" className="text-sm font-medium">
         Each week
       </span>
       <div className="grid grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5">

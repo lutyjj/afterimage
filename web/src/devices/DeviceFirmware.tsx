@@ -100,13 +100,15 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
         )}
 
         {update && (
-          <div className="grid max-w-2xl gap-3">
-            <p className="text-sm font-semibold">Update to {update.version}</p>
-            <ol className="grid grid-cols-3 gap-2">
-              {updateSteps(update, device).map((step) => (
-                <StepItem key={step.label} step={step} timeZone={timeZone} />
-              ))}
-            </ol>
+          <div className="flex max-w-2xl flex-col gap-4">
+            <div className="grid gap-2">
+              <p className="text-sm font-medium">Update to {update.version}</p>
+              <ol className="grid grid-cols-3 gap-2">
+                {updateSteps(update, device).map((step) => (
+                  <StepItem key={step.label} step={step} timeZone={timeZone} />
+                ))}
+              </ol>
+            </div>
             {update.state === "sent" && (
               <p className="text-sm text-text-secondary">
                 The display has the request and installs {update.version}. Its next check-in shows whether it runs the

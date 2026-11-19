@@ -119,7 +119,7 @@ function DeviceCard({
             </DeviceFacts>
             {now && timeZone && (
               <div className="grid gap-1">
-                <h3 className="text-sm font-medium text-text-secondary">
+                <h3 className="text-sm font-medium">
                   Today <span className="font-normal text-text-muted">in {timeZone}</span>
                 </h3>
                 <div className="grid gap-1">

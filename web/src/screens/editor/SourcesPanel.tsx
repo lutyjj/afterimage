@@ -24,7 +24,7 @@ export function SourcesPanel({
 
   return (
     <section className="grid min-w-0 gap-2" aria-labelledby="sources-title">
-      <h3 id="sources-title" className="text-sm font-medium text-text-secondary">
+      <h3 id="sources-title" className="text-sm font-medium">
         Data sources
       </h3>
       {entries.length === 0 && (
@@ -63,7 +63,7 @@ export function SourcesPanel({
       )}
       {secretNames.length > 0 && (
         <div className="grid gap-1 border-t border-border pt-2">
-          <span className="text-sm font-medium text-text-secondary">Secrets</span>
+          <span className="text-sm font-medium">Secrets</span>
           <p className="text-sm text-text-secondary">
             Data source requests read them; screens never show them.{" "}
             {secretNames.map((name) => (

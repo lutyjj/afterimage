@@ -212,7 +212,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
 
         {!screen && !touched && (
           <section aria-labelledby="starters-title" className="grid gap-2">
-            <h2 id="starters-title" className="text-sm font-medium text-text-secondary">
+            <h2 id="starters-title" className="text-sm font-medium">
               Start from an example
             </h2>
             <ul className="flex gap-2 overflow-x-auto pb-1">
@@ -338,7 +338,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
 
             {(preview.failure || parsed.errors.length > 0 || located.length > 0) && (
               <section aria-labelledby="problems-title" className="grid gap-2">
-                <h3 id="problems-title" className="text-sm font-semibold text-danger">
+                <h3 id="problems-title" className="text-sm font-medium text-danger">
                   Problems
                 </h3>
                 <ul className="overflow-hidden rounded-button border border-[color-mix(in_oklab,var(--color-danger)_30%,var(--color-border))] bg-surface text-sm">
