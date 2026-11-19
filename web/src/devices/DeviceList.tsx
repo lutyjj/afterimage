@@ -150,10 +150,10 @@ function DeviceCard({
  * and the code it then shows claims it. */
 function FirstDisplay({ onClaim }: { onClaim: () => void }) {
   return (
-    <Card className="max-w-2xl">
+    <Card>
       <CardHead title="Set up your first display" />
       <CardBody>
-        <ol className="grid gap-3 text-sm text-text-secondary [counter-reset:step]">
+        <ol className="grid max-w-prose gap-4 text-sm text-text-secondary [counter-reset:step]">
           <Step>
             Start the display's Wi-Fi setup. In its setup portal, set the server to{" "}
             <code className="rounded-input bg-sunken px-1.5 py-0.5 font-mono text-xs text-text [overflow-wrap:anywhere]">
@@ -163,7 +163,7 @@ function FirstDisplay({ onClaim }: { onClaim: () => void }) {
           </Step>
           <Step>The display joins and shows a six-character code.</Step>
           <Step>
-            <span className="grid justify-items-start gap-3">
+            <span className="grid justify-items-start gap-2">
               Claim it with that code.
               <Button variant="primary" onClick={onClaim}>
                 <Plus aria-hidden="true" className="size-4" />
