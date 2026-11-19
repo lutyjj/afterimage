@@ -1,7 +1,9 @@
 import type { Weekday } from "@afterimage/management-client";
+import { Toggle } from "@base-ui/react/toggle";
+import { ToggleGroup } from "@base-ui/react/toggle-group";
 import { CellInput, Checkbox, classes } from "linen";
 
-import { daysLabel, type Hours, isAllDay, shortDay, WEEK } from "./schedule";
+import { DAY_NAMES, daysLabel, type Hours, isAllDay, shortDay, WEEK } from "./schedule";
 
 type Change = Partial<Hours & { allDay: boolean }>;
 
@@ -11,60 +13,68 @@ type Change = Partial<Hours & { allDay: boolean }>;
 export function HoursFields({
   hours,
   timed,
-  className,
+  daysClassName,
+  timesClassName,
   onChange,
 }: {
   hours: Hours & { allDay: boolean };
   timed: { from: string; until: string };
-  /** For the times' line, which the row places. */
-  className?: string;
+  /** For the days and for the times, which the row places. */
+  daysClassName?: string;
+  timesClassName?: string;
   onChange: (change: Change) => void;
 }) {
   const days = hours.days ?? [...WEEK];
-  const toggle = (day: Weekday) => {
-    const next = days.includes(day) ? days.filter((d) => d !== day) : WEEK.filter((d) => d === day || days.includes(d));
-    onChange({ days: next.length === 7 ? undefined : next });
-  };
   const { allDay } = hours;
 
   return (
     <>
-      <fieldset className="m-0 inline-flex h-(--height-control) w-fit items-stretch gap-0.5 rounded-button border border-border-strong bg-surface p-0.5">
-        <legend className="sr-only">Days: {daysLabel(hours.days)}</legend>
-        {WEEK.map((day) => {
-          const on = days.includes(day);
-          return (
-            <button
-              key={day}
-              type="button"
-              aria-pressed={on}
-              onClick={() => toggle(day)}
-              title={day}
-              className={classes(
-                "w-8 cursor-pointer rounded-input text-xs",
-                on ? "bg-accent-weak font-semibold text-accent" : "text-text-secondary hover:text-text",
-              )}
-            >
-              {shortDay(day).slice(0, 2)}
-            </button>
-          );
-        })}
-      </fieldset>
-      <div className={classes("flex flex-wrap items-center gap-2", className)}>
+      {/* Any number of days at once, which linen's segmented control, one
+          answer of a few, does not take: Base UI's toggle group, one stop on
+          the Tab key with the arrows between days, in that control's frame,
+          type and chosen tint. Its days share the line it is given, down to a
+          phone's. */}
+      <ToggleGroup
+        multiple
+        aria-label={`Days: ${daysLabel(hours.days)}`}
+        value={days}
+        onValueChange={(next) => {
+          const chosen = WEEK.filter((day) => next.includes(day));
+          onChange({ days: chosen.length === 7 ? undefined : chosen });
+        }}
+        className={classes(
+          "flex h-(--height-control) min-w-0 items-stretch rounded-button border border-border-strong bg-surface p-0.5",
+          daysClassName,
+        )}
+      >
+        {WEEK.map((day) => (
+          <Toggle
+            key={day}
+            value={day}
+            aria-label={DAY_NAMES[day]}
+            className="min-w-0 flex-1 cursor-pointer rounded-input px-2 text-sm text-text-secondary hover:text-text data-pressed:bg-accent-weak data-pressed:font-medium data-pressed:text-accent"
+          >
+            {shortDay(day).slice(0, 2)}
+          </Toggle>
+        ))}
+      </ToggleGroup>
+      <div className={classes("flex min-w-0 flex-wrap items-center gap-2", timesClassName)}>
         <Checkbox
           checked={allDay}
           onCheckedChange={(checked) =>
             onChange(checked ? { allDay: true } : { allDay: false, ...(isAllDay(hours) ? timed : {}) })
           }
-          className="w-auto pr-2"
+          className="w-auto"
         >
           All day
         </Checkbox>
         {!allDay && (
-          <span className="inline-flex flex-wrap items-center gap-2">
+          // The two times keep one line, giving way together on a narrow one,
+          // so "to" never stands alone.
+          <span className="flex min-w-0 items-center gap-2">
             <CellInput
               aria-label="From"
-              className="w-32"
+              className="w-32 min-w-0 shrink"
               type="time"
               step={60}
               value={hours.from ?? "00:00"}
@@ -75,7 +85,7 @@ export function HoursFields({
             </span>
             <CellInput
               aria-label="Until"
-              className="w-32"
+              className="w-32 min-w-0 shrink"
               type="time"
               step={60}
               value={hours.until ?? "00:00"}

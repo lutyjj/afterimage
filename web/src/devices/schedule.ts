@@ -14,6 +14,17 @@ export type Hours = Pick<ScheduleSlot, "days" | "from" | "until">;
 
 export const WEEK: readonly Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
+/** Each day's name in full. */
+export const DAY_NAMES: Record<Weekday, string> = {
+  monday: "Monday",
+  tuesday: "Tuesday",
+  wednesday: "Wednesday",
+  thursday: "Thursday",
+  friday: "Friday",
+  saturday: "Saturday",
+  sunday: "Sunday",
+};
+
 export const DAY_MINUTES = 24 * 60;
 
 function minuteOf(time: string | undefined): number | undefined {

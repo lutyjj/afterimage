@@ -172,17 +172,28 @@ function WindowRow({
 }) {
   const saved = entryOf(window);
   return (
-    <SettlingItem
-      role="listitem"
-      className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 border-t border-border bg-surface p-3 first:border-t-0"
-    >
-      <div className="flex flex-wrap items-start gap-3">
-        <HoursFields hours={window} timed={NIGHT} onChange={onChange} />
+    <SettlingItem role="listitem" className="grid gap-y-2 border-t border-border bg-surface p-3 first:border-t-0">
+      {/* On a phone the days and the remove button share the first line and
+          the hours take the next; wider, all of them share the line while it
+          holds them and the remove button ends it. */}
+      <div className="flex min-w-0 flex-wrap items-start gap-2">
+        <HoursFields
+          hours={window}
+          timed={NIGHT}
+          daysClassName="max-w-fit flex-1 lg:flex-none"
+          timesClassName="order-2 basis-full lg:order-none lg:basis-auto"
+          onChange={onChange}
+        />
+        <IconButton
+          aria-label="Remove sleep window"
+          title="Remove sleep window"
+          className="order-1 ml-auto lg:order-last"
+          onClick={onRemove}
+        >
+          <X aria-hidden="true" className="size-4" />
+        </IconButton>
       </div>
-      <IconButton aria-label="Remove sleep window" title="Remove sleep window" onClick={onRemove}>
-        <X aria-hidden="true" className="size-4" />
-      </IconButton>
-      <div className="col-span-2 grid gap-1">
+      <div className="grid gap-1">
         {/* The window alone, on any one of its days. */}
         <DayTrack
           marks={spansOn({ ...saved, days: undefined }, "monday").map(([start, end]) => ({

@@ -29,7 +29,7 @@ import { DayTrack, HourAxis, marksOf, type Names, namesOf } from "./DayTrack";
 import { HoursFields } from "./HoursFields";
 import { pinOf, pinValue } from "./pin";
 import { deviceQuery, devicesQuery } from "./queries";
-import { dayOf, nowIn, overlapOf, type Plan, shortDay, WEEK } from "./schedule";
+import { DAY_NAMES, dayOf, nowIn, overlapOf, type Plan, shortDay, WEEK } from "./schedule";
 import { type Draft, draftOf, entryOf, newKey, sameAs } from "./scheduleDraft";
 
 /** The window a slot takes when it stops being all day, as a start to edit. */
@@ -37,16 +37,6 @@ const DAYTIME = { from: "08:00", until: "20:00" };
 
 /** As many slots as the server keeps. */
 const MOST_SLOTS = 32;
-
-const DAY_NAMES: Record<Weekday, string> = {
-  monday: "Monday",
-  tuesday: "Tuesday",
-  wednesday: "Wednesday",
-  thursday: "Thursday",
-  friday: "Friday",
-  saturday: "Saturday",
-  sunday: "Sunday",
-};
 
 /** Which playlist the display shows when it is awake: the one it usually
  * shows, and the days and hours another takes its place, which never overlap.
@@ -250,7 +240,7 @@ function SlotRow({
     <SettlingItem
       role="listitem"
       aria-describedby={overlaps ? problem : undefined}
-      className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 border-t border-border bg-surface p-3 first:border-t-0 sm:grid-cols-[1.5rem_minmax(0,1fr)_auto]"
+      className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 border-t border-border bg-surface p-3 first:border-t-0 sm:grid-cols-[1.5rem_minmax(0,1fr)]"
     >
       <span
         aria-hidden="true"
@@ -261,9 +251,13 @@ function SlotRow({
       >
         {index + 1}
       </span>
-      <div className="grid items-start gap-3 lg:grid-cols-[minmax(10rem,16rem)_minmax(0,1fr)] 2xl:grid-cols-[minmax(10rem,14rem)_auto_minmax(0,1fr)]">
+      {/* On a phone the playlist and the remove button share the first line
+          and the days and hours each take a line of their own; wider, all of
+          them share the line while it holds them and the remove button ends
+          it. */}
+      <div className="flex min-w-0 flex-wrap items-start gap-2">
         {/* The field marks its picker invalid while it holds a deleted playlist. */}
-        <Field.Root invalid={!known} className="min-w-0">
+        <Field.Root invalid={!known} className="min-w-0 grow basis-[calc(100%-2.5rem)] lg:w-64 lg:grow-0 lg:basis-auto">
           <CellSelect
             aria-label={`Playlist of time ${index + 1}`}
             className="w-full font-medium"
@@ -272,13 +266,24 @@ function SlotRow({
             onValueChange={(value) => onChange({ playlistId: Number(value) })}
           />
         </Field.Root>
-        <HoursFields hours={slot} timed={DAYTIME} className="lg:col-span-2 2xl:col-span-1" onChange={onChange} />
+        <HoursFields
+          hours={slot}
+          timed={DAYTIME}
+          daysClassName="order-2 w-full max-w-fit lg:order-none lg:w-auto"
+          timesClassName="order-2 basis-full lg:order-none lg:basis-auto"
+          onChange={onChange}
+        />
+        <IconButton
+          aria-label={`Remove time ${index + 1}`}
+          title="Remove"
+          className="order-1 lg:order-last lg:ml-auto"
+          onClick={onRemove}
+        >
+          <X aria-hidden="true" className="size-4" />
+        </IconButton>
       </div>
-      <IconButton aria-label={`Remove time ${index + 1}`} title="Remove" onClick={onRemove}>
-        <X aria-hidden="true" className="size-4" />
-      </IconButton>
       {overlaps && (
-        <p id={problem} className="col-[2/-1] text-sm text-danger">
+        <p id={problem} className="col-start-2 text-sm text-danger">
           {overlaps}
         </p>
       )}
