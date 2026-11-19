@@ -50,7 +50,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     postPatch = withContract;
     inherit pnpm;
     fetcherVersion = 5;
-    hash = "sha256-XEv4ptS5rlix9NENNjrroRRRoigJjpQppJWEm8+PFdE=";
+    hash = "sha256-3J7WNn+yhwDdwAVuMoD0prxjxZCwkoHmL681yD0Bj5k=";
   };
 
   buildPhase = ''
