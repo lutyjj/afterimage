@@ -13,7 +13,6 @@ import {
   IconButton,
   LINK_CLASS,
   Nothing,
-  Select,
   SettingRow,
   SettlingItem,
   SettlingRows,
@@ -25,6 +24,7 @@ import { Plus, X } from "lucide-react";
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
+import { FIELD_WIDTH } from "../app/fieldWidth";
 import { client, messageOf, queryClient } from "../app/client";
 import { timeOfDay } from "../app/format";
 import { DayTrack, HourAxis, marksOf, type Names, namesOf } from "./DayTrack";
@@ -134,22 +134,22 @@ export function ScheduleEditor({
         <>
           <CardBody>
             <Week plan={plan} names={names} timeZone={timeZone} />
-            <div className="max-w-md">
-              <Select
-                label="Usually shows"
-                hint="Whenever no time below is current."
-                placeholder="Nothing"
-                choices={[
-                  ...(usual === undefined || playlists === undefined || playlists.some((p) => p.id === usual)
-                    ? []
-                    : [{ value: String(usual), label: "A deleted playlist" }]),
-                  ...playlistChoices,
-                ]}
-                value={usual === undefined ? "" : String(usual)}
-                onValueChange={(value) => setUsual(value === "" ? undefined : Number(value))}
-              />
-            </div>
           </CardBody>
+          <SettingRow title="Usually shows" description="Whenever no time below is current.">
+            <CellSelect
+              aria-label="Usually shows"
+              width={FIELD_WIDTH}
+              placeholder="Nothing"
+              choices={[
+                ...(usual === undefined || playlists === undefined || playlists.some((p) => p.id === usual)
+                  ? []
+                  : [{ value: String(usual), label: "A deleted playlist" }]),
+                ...playlistChoices,
+              ]}
+              value={usual === undefined ? "" : String(usual)}
+              onValueChange={(value) => setUsual(value === "" ? undefined : Number(value))}
+            />
+          </SettingRow>
           {/* The rows' name heads them in a band of its own, with no hairline
               between it and what it names. */}
           <h3 id={`slots-${device.id}`} className={classes(BAND_CLASS, "pb-0 text-sm font-medium")}>
@@ -265,7 +265,7 @@ function SlotRow({
           it. */}
       <div className="flex min-w-0 flex-wrap items-start gap-2">
         {/* The field marks its picker invalid while it holds a deleted playlist. */}
-        <Field.Root invalid={!known} className="min-w-0 grow basis-[calc(100%-2.5rem)] lg:w-64 lg:grow-0 lg:basis-auto">
+        <Field.Root invalid={!known} className="min-w-0 grow basis-[calc(100%-2.5rem)] lg:w-80 lg:grow-0 lg:basis-auto">
           <CellSelect
             aria-label={`Playlist of time ${index + 1}`}
             className="w-full font-medium"
@@ -387,7 +387,7 @@ function PinRow({
     >
       <CellSelect
         aria-label="Showing"
-        className="w-64 max-w-full"
+        className="w-full md:w-80"
         placeholder="Its schedule"
         disabled={pin.isPending}
         choices={[

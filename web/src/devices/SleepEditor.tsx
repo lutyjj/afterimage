@@ -7,10 +7,11 @@ import {
   Card,
   CardBody,
   CardHead,
+  CellSelect,
   classes,
   IconButton,
   Nothing,
-  Select,
+  SettingRow,
   SettingToggle,
   SettlingItem,
   SettlingRows,
@@ -20,6 +21,7 @@ import {
 import { Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { FIELD_WIDTH } from "../app/fieldWidth";
 import { client, messageOf, queryClient } from "../app/client";
 import { DayTrack, HourAxis } from "./DayTrack";
 import { HoursFields } from "./HoursFields";
@@ -97,21 +99,22 @@ export function SleepEditor({
         </Button>
       </CardHead>
       <HoldToggle device={device} />
-      <CardBody>
-        <div className="max-w-md">
-          <Select
-            label="While asleep, it shows"
-            hint="The server's own says when it wakes. A screen that cannot be drawn gives way to it."
-            placeholder="The time it wakes"
-            choices={[
-              ...(known ? [] : [{ value: String(screenId), label: "A deleted screen" }]),
-              ...(screens ?? []).map((screen) => ({ value: String(screen.id), label: screen.name })),
-            ]}
-            value={screenId === undefined ? "" : String(screenId)}
-            onValueChange={(value) => setScreenId(value === "" ? undefined : Number(value))}
-          />
-        </div>
-      </CardBody>
+      <SettingRow
+        title="While asleep, it shows"
+        description="The server's own says when it wakes. A screen that cannot be drawn gives way to it."
+      >
+        <CellSelect
+          aria-label="While asleep, it shows"
+          width={FIELD_WIDTH}
+          placeholder="The time it wakes"
+          choices={[
+            ...(known ? [] : [{ value: String(screenId), label: "A deleted screen" }]),
+            ...(screens ?? []).map((screen) => ({ value: String(screen.id), label: screen.name })),
+          ]}
+          value={screenId === undefined ? "" : String(screenId)}
+          onValueChange={(value) => setScreenId(value === "" ? undefined : Number(value))}
+        />
+      </SettingRow>
       {windows.length === 0 && <Nothing>No sleep windows: awake around the clock.</Nothing>}
       {/* The list stays on the page while it is empty, only hidden, so the
           first window added to it arrives into the same list. */}

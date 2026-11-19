@@ -16,6 +16,7 @@ import {
 } from "linen";
 import { useEffect, useState, type FormEvent } from "react";
 
+import { FIELD_WIDTH } from "../app/fieldWidth";
 import { client, messageOf, queryClient } from "../app/client";
 import { within } from "../app/deadline";
 import { moment } from "../app/format";
@@ -270,11 +271,12 @@ function BoardChoice({
   ];
 
   return (
-    <form onSubmit={submit} className="grid max-w-2xl gap-2">
-      <FieldRow>
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <FieldRow className="max-w-2xl">
         <Select
           label="Board"
-          width={104}
+          width={FIELD_WIDTH}
+          hint={boardHint(device, board === "" || changed)}
           placeholder={board === "" ? (boards ? "Choose a board" : "Reading TRMNL's list") : undefined}
           choices={choices}
           value={board}
@@ -287,7 +289,6 @@ function BoardChoice({
           </Button>
         )}
       </FieldRow>
-      <p className="text-xs text-text-secondary">{boardHint(device, board === "" || changed)}</p>
       {save.isError && (
         <p role="alert" className="text-sm text-danger">
           {messageOf(save.error)}

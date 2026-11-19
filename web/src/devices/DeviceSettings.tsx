@@ -1,8 +1,20 @@
 import type { Device, DisplayModel } from "@afterimage/management-client";
 import { useMutation } from "@tanstack/react-query";
-import { Actions, Button, Card, CardBody, CardHead, Select, TextField, useToast, useUnsavedChanges } from "linen";
+import {
+  Actions,
+  Button,
+  Card,
+  CardBody,
+  CardHead,
+  FieldRow,
+  Select,
+  TextField,
+  useToast,
+  useUnsavedChanges,
+} from "linen";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { FIELD_WIDTH } from "../app/fieldWidth";
 import { client, messageOf, queryClient } from "../app/client";
 import { minutesLabel } from "../app/format";
 import { deviceQuery, devicesQuery } from "./queries";
@@ -81,34 +93,45 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
     <Card>
       <CardHead title="Name and display" />
       <CardBody>
-        <form onSubmit={submit} className="grid max-w-2xl gap-4 sm:grid-cols-2">
-          <TextField
-            label="Name"
-            value={name}
-            required
-            maxLength={64}
-            onChange={(event) => setName(event.target.value)}
-          />
-          <Select
-            label="Display"
-            choices={modelChoices}
-            value={model}
-            onValueChange={(value) => {
-              const next = sorted.find((candidate) => candidate.name === value);
-              setModel(value);
-              if (next && !next.palettes.some((candidate) => candidate.id === palette)) {
-                setPalette(next.palettes[0]?.id ?? palette);
-              }
-            }}
-          />
-          <Select label="Colors" choices={paletteChoices} value={palette} onValueChange={setPalette} />
-          <Select
-            label="Wakes at least every"
-            hint="Sooner when its schedule calls for another playlist. Waking more often drains the battery faster."
-            choices={refreshChoices.map((minutes) => ({ value: String(minutes), label: minutesLabel(minutes) }))}
-            value={String(refresh)}
-            onValueChange={(value) => setRefresh(Number(value))}
-          />
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <FieldRow className="max-w-2xl">
+            <TextField
+              label="Name"
+              width={FIELD_WIDTH}
+              value={name}
+              required
+              maxLength={64}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <Select
+              label="Display"
+              width={FIELD_WIDTH}
+              choices={modelChoices}
+              value={model}
+              onValueChange={(value) => {
+                const next = sorted.find((candidate) => candidate.name === value);
+                setModel(value);
+                if (next && !next.palettes.some((candidate) => candidate.id === palette)) {
+                  setPalette(next.palettes[0]?.id ?? palette);
+                }
+              }}
+            />
+            <Select
+              label="Colors"
+              width={FIELD_WIDTH}
+              choices={paletteChoices}
+              value={palette}
+              onValueChange={setPalette}
+            />
+            <Select
+              label="Wakes at least every"
+              width={FIELD_WIDTH}
+              hint="Sooner when its schedule calls for another playlist. Waking more often drains the battery faster."
+              choices={refreshChoices.map((minutes) => ({ value: String(minutes), label: minutesLabel(minutes) }))}
+              value={String(refresh)}
+              onValueChange={(value) => setRefresh(Number(value))}
+            />
+          </FieldRow>
           <Actions className="sm:col-span-2">
             <Button type="submit" variant="primary" disabled={!changed || save.isPending}>
               {save.isPending ? "Saving" : "Save"}

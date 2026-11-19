@@ -13,6 +13,7 @@ import {
   CardHead,
   Checkbox,
   ConfirmDialog,
+  FieldRow,
   Nothing,
   Notice,
   SettingNote,
@@ -24,6 +25,7 @@ import {
 } from "linen";
 import { type FormEvent, useState } from "react";
 
+import { FIELD_WIDTH, PAIR_WIDTH } from "../app/fieldWidth";
 import { client, messageOf, queryClient } from "../app/client";
 import { ACT_SECONDS, within } from "../app/deadline";
 import { mqttQuery } from "./queries";
@@ -181,10 +183,11 @@ function BrokerForm({ settings, save }: { settings: MqttSettings; save: Save }) 
 
   return (
     <CardBody>
-      <form onSubmit={submit} className="grid max-w-2xl gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <FieldRow className="max-w-2xl">
           <TextField
             label="Broker"
+            width={PAIR_WIDTH}
             hint={
               <>
                 <code className="font-mono">mqtt://</code>, or <code className="font-mono">mqtts://</code> for TLS, then
@@ -199,58 +202,64 @@ function BrokerForm({ settings, save }: { settings: MqttSettings; save: Save }) 
             placeholder="mqtt://broker.example:1883"
             onChange={(event) => setUrl(event.target.value)}
           />
-        </div>
-        <TextField
-          label="Username"
-          value={username}
-          autoComplete="off"
-          spellCheck={false}
-          onChange={(event) => setUsername(event.target.value)}
-        />
-        <TextField
-          label="Password"
-          hint={needsPassword ? "Another broker or username needs the password again." : undefined}
-          type="password"
-          value={password}
-          disabled={removePassword}
-          autoComplete="new-password"
-          placeholder={settings.passwordSet ? "Saved; type to replace it" : ""}
-          aria-invalid={needsPassword || undefined}
-          onChange={(event) => setPassword(event.target.value)}
-        />
+        </FieldRow>
+        <FieldRow className="max-w-2xl">
+          <TextField
+            label="Username"
+            width={FIELD_WIDTH}
+            value={username}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(event) => setUsername(event.target.value)}
+          />
+          <TextField
+            label="Password"
+            width={FIELD_WIDTH}
+            hint={needsPassword ? "Another broker or username needs the password again." : undefined}
+            type="password"
+            value={password}
+            disabled={removePassword}
+            autoComplete="new-password"
+            placeholder={settings.passwordSet ? "Saved; type to replace it" : ""}
+            aria-invalid={needsPassword || undefined}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </FieldRow>
         {settings.passwordSet && (
-          <div className="sm:col-span-2">
-            <Checkbox checked={removePassword} onCheckedChange={setRemovePassword}>
-              Remove the saved password
-            </Checkbox>
-          </div>
+          <Checkbox checked={removePassword} onCheckedChange={setRemovePassword}>
+            Remove the saved password
+          </Checkbox>
         )}
-        <TextField
-          label="Topic"
-          hint="Names the server at the broker and starts every display's topics."
-          value={topic}
-          required
-          maxLength={64}
-          pattern="[A-Za-z0-9_\-]+"
-          spellCheck={false}
-          onChange={(event) => setTopic(event.target.value)}
-        />
-        <TextField
-          label="Discovery prefix"
-          hint="Where Home Assistant listens for new devices."
-          value={prefix}
-          required
-          maxLength={128}
-          spellCheck={false}
-          onChange={(event) => setPrefix(event.target.value)}
-        />
+        <FieldRow className="max-w-2xl">
+          <TextField
+            label="Topic"
+            width={FIELD_WIDTH}
+            hint="Names the server at the broker and starts every display's topics."
+            value={topic}
+            required
+            maxLength={64}
+            pattern="[A-Za-z0-9_\-]+"
+            spellCheck={false}
+            onChange={(event) => setTopic(event.target.value)}
+          />
+          <TextField
+            label="Discovery prefix"
+            width={FIELD_WIDTH}
+            hint="Where Home Assistant listens for new devices."
+            value={prefix}
+            required
+            maxLength={128}
+            spellCheck={false}
+            onChange={(event) => setPrefix(event.target.value)}
+          />
+        </FieldRow>
         {movesDevices && (
-          <p className="rounded-button bg-sunken px-3 py-2 text-sm text-text-secondary sm:col-span-2">
+          <p className="rounded-button bg-sunken px-3 py-2 text-sm text-text-secondary">
             Saving takes every display out of Home Assistant under the old topic and adds it again under the new one, as
             a new device.
           </p>
         )}
-        <Actions className="sm:col-span-2">
+        <Actions>
           <Button type="submit" variant="primary" disabled={save.isPending}>
             {save.isPending ? "Saving" : publishing ? "Save" : "Save and connect"}
           </Button>
