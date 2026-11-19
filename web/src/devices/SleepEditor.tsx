@@ -2,11 +2,14 @@ import type { Device, ScreenSummary, SleepWindow } from "@afterimage/management-
 import { useMutation } from "@tanstack/react-query";
 import {
   Actions,
+  BAND_CLASS,
   Button,
   Card,
   CardBody,
   CardHead,
+  classes,
   IconButton,
+  Nothing,
   Select,
   SettingToggle,
   SettlingItem,
@@ -88,7 +91,11 @@ export function SleepEditor({
             {timeZone && <> Times are in {timeZone}.</>}
           </>
         }
-      />
+      >
+        <Button onClick={add} disabled={windows.length >= MOST_WINDOWS}>
+          <Plus aria-hidden="true" className="size-4" /> Add a sleep window
+        </Button>
+      </CardHead>
       <HoldToggle device={device} />
       <CardBody>
         <div className="max-w-md">
@@ -104,31 +111,34 @@ export function SleepEditor({
             onValueChange={(value) => setScreenId(value === "" ? undefined : Number(value))}
           />
         </div>
-        {windows.length === 0 && <p className="max-w-2xl text-sm text-text-secondary">Awake around the clock.</p>}
-        {/* The list stays on the page while it is empty, only hidden, so the
-            first window added to it arrives into the same list. */}
-        <div
-          role="list"
-          hidden={windows.length === 0}
-          className="grid overflow-hidden rounded-button border border-border"
-        >
-          <SettlingRows scope={`sleep-${device.id}`} marksArrivals>
-            {windows.map((window, index) => (
-              <WindowRow
-                key={window.key}
-                window={window}
-                last={index === windows.length - 1}
-                onChange={(change) => update(window.key, change)}
-                onRemove={() => remove(window.key)}
-              />
-            ))}
-          </SettlingRows>
-        </div>
-        <Actions>
-          <Button onClick={add} disabled={windows.length >= MOST_WINDOWS}>
-            <Plus aria-hidden="true" className="size-4" /> Add a sleep window
-          </Button>
-          <span className="flex-1" />
+      </CardBody>
+      {windows.length === 0 && <Nothing>No sleep windows: awake around the clock.</Nothing>}
+      {/* The list stays on the page while it is empty, only hidden, so the
+          first window added to it arrives into the same list. */}
+      <div role="list" aria-label="Sleep windows" hidden={windows.length === 0}>
+        <SettlingRows scope={`sleep-${device.id}`} marksArrivals>
+          {windows.map((window) => (
+            <WindowRow
+              key={window.key}
+              window={window}
+              onChange={(change) => update(window.key, change)}
+              onRemove={() => remove(window.key)}
+            />
+          ))}
+        </SettlingRows>
+      </div>
+      <CardBody>
+        {noDays && (
+          <p role="alert" className="text-sm text-danger">
+            Every sleep window needs at least one day.
+          </p>
+        )}
+        {save.isError && (
+          <p role="alert" className="text-sm text-danger">
+            {messageOf(save.error)}
+          </p>
+        )}
+        <Actions className="justify-end">
           {dirty && (
             <Button
               onClick={() => {
@@ -144,16 +154,6 @@ export function SleepEditor({
             {save.isPending ? "Saving" : "Save sleep"}
           </Button>
         </Actions>
-        {noDays && (
-          <p role="alert" className="text-sm text-danger">
-            Every sleep window needs at least one day.
-          </p>
-        )}
-        {save.isError && (
-          <p role="alert" className="text-sm text-danger">
-            {messageOf(save.error)}
-          </p>
-        )}
       </CardBody>
     </Card>
   );
@@ -161,18 +161,16 @@ export function SleepEditor({
 
 function WindowRow({
   window,
-  last,
   onChange,
   onRemove,
 }: {
   window: Draft<SleepWindow>;
-  last: boolean;
   onChange: (change: Partial<Draft<SleepWindow>>) => void;
   onRemove: () => void;
 }) {
   const saved = entryOf(window);
   return (
-    <SettlingItem role="listitem" className="grid gap-y-2 border-t border-border bg-surface p-3 first:border-t-0">
+    <SettlingItem role="listitem" className={classes(BAND_CLASS, "grid gap-y-2")}>
       {/* On a phone the days and the remove button share the first line and
           the hours take the next; wider, all of them share the line while it
           holds them and the remove button ends it. */}
@@ -204,7 +202,7 @@ function WindowRow({
           }))}
           label={hoursLabel(saved)}
         />
-        {last && <HourAxis />}
+        <HourAxis />
         <span className="text-xs text-text-muted">{hoursLabel(saved)}</span>
       </div>
     </SettlingItem>

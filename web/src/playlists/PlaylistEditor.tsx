@@ -1,18 +1,20 @@
 import type { Device, Playlist, ScreenSummary } from "@afterimage/management-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Actions,
+  BAND_CLASS,
   Button,
   buttonClass,
   Card,
   CardBody,
   CardHead,
   CellSelect,
+  classes,
   ConfirmDialog,
   Content,
   EmptyState,
   IconButton,
   LINK_CLASS,
+  Nothing,
   SettlingItem,
   SettlingRows,
   TitleField,
@@ -180,56 +182,50 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
           <CardHead
             title="Screens"
             description="A display shows them in this order, one at each check-in, and starts again at the first."
-          />
-          <CardBody>
-            {screens?.length === 0 ? (
-              <p className="max-w-2xl text-sm text-text-secondary">
-                No screens yet.{" "}
-                <Link to="/screens/new" className={LINK_CLASS}>
-                  Write the first screen
-                </Link>
-                , then come back to add it here.
-              </p>
-            ) : (
-              <>
-                {rows.length === 0 && (
-                  <p className="max-w-2xl text-sm text-text-secondary">
-                    Empty: a display on this playlist shows “Nothing to show”. Add a screen to give it something.
-                  </p>
-                )}
-                {/* The list stays on the page while it is empty, only hidden,
-                    so the first screen added arrives into the same list. */}
-                <div
-                  role="list"
-                  aria-label="Screens, in order"
-                  hidden={rows.length === 0}
-                  className="grid overflow-hidden rounded-button border border-border"
-                >
-                  <SettlingRows scope={`playlist-${playlist?.id ?? "new"}`} marksArrivals>
-                    {rows.map((row, index) => (
-                      <ScreenRow
-                        key={row.key}
-                        row={row}
-                        index={index}
-                        count={rows.length}
-                        screens={screens ?? []}
-                        onChange={(screenId) =>
-                          setRows((all) => all.map((each) => (each.key === row.key ? { ...each, screenId } : each)))
-                        }
-                        onMove={(by) => move(index, by)}
-                        onRemove={() => setRows((all) => all.filter((each) => each.key !== row.key))}
-                      />
-                    ))}
-                  </SettlingRows>
-                </div>
-                <Actions>
-                  <Button onClick={add} disabled={!screens?.length || rows.length >= MOST_SCREENS}>
-                    <Plus aria-hidden="true" className="size-4" /> Add a screen
-                  </Button>
-                </Actions>
-              </>
+          >
+            {screens?.length !== 0 && (
+              <Button onClick={add} disabled={!screens?.length || rows.length >= MOST_SCREENS}>
+                <Plus aria-hidden="true" className="size-4" /> Add a screen
+              </Button>
             )}
-          </CardBody>
+          </CardHead>
+          {screens?.length === 0 ? (
+            <Nothing>
+              No screens yet.{" "}
+              <Link to="/screens/new" className={LINK_CLASS}>
+                Write the first screen
+              </Link>
+              , then come back to add it here.
+            </Nothing>
+          ) : (
+            <>
+              {rows.length === 0 && (
+                <Nothing>
+                  Empty: a display on this playlist shows “Nothing to show”. Add a screen to give it something.
+                </Nothing>
+              )}
+              {/* The list stays on the page while it is empty, only hidden, so
+                  the first screen added arrives into the same list. */}
+              <div role="list" aria-label="Screens, in order" hidden={rows.length === 0}>
+                <SettlingRows scope={`playlist-${playlist?.id ?? "new"}`} marksArrivals>
+                  {rows.map((row, index) => (
+                    <ScreenRow
+                      key={row.key}
+                      row={row}
+                      index={index}
+                      count={rows.length}
+                      screens={screens ?? []}
+                      onChange={(screenId) =>
+                        setRows((all) => all.map((each) => (each.key === row.key ? { ...each, screenId } : each)))
+                      }
+                      onMove={(by) => move(index, by)}
+                      onRemove={() => setRows((all) => all.filter((each) => each.key !== row.key))}
+                    />
+                  ))}
+                </SettlingRows>
+              </div>
+            </>
+          )}
         </Card>
         {playlist && <ShownOn uses={uses} failure={displays.isError ? messageOf(displays.error) : undefined} />}
       </Content>
@@ -270,14 +266,17 @@ function ScreenRow({
   return (
     <SettlingItem
       role="listitem"
-      className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-3 border-t border-border bg-surface p-3 first:border-t-0"
+      className={classes(
+        BAND_CLASS,
+        "grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-x-3 sm:grid-cols-[1.5rem_minmax(0,1fr)_auto]",
+      )}
     >
-      <span aria-hidden="true" className="text-center text-sm font-semibold text-text-muted tabular-nums">
+      <span aria-hidden="true" className="grid place-items-center text-sm font-semibold text-text-muted tabular-nums">
         {index + 1}
       </span>
       <CellSelect
         aria-label={`Screen ${index + 1}`}
-        className="w-full max-w-sm font-medium"
+        className="w-full font-medium"
         choices={[
           ...(known ? [] : [{ value: String(row.screenId), label: "A deleted screen" }]),
           ...screens.map((screen) => ({ value: String(screen.id), label: screen.name })),
@@ -309,25 +308,23 @@ function ShownOn({ uses, failure }: { uses: readonly Use[] | undefined; failure:
         description="A display takes a playlist in its schedule: as the one it usually shows, or for some days and hours."
       />
       {uses === undefined ? (
-        <CardBody>
-          {failure === undefined ? (
-            <p className="text-sm text-text-muted">Reading displays</p>
-          ) : (
+        failure === undefined ? (
+          <Nothing>Reading displays</Nothing>
+        ) : (
+          <CardBody>
             <p role="alert" className="text-sm text-danger">
               The displays could not be read. {failure}
             </p>
-          )}
-        </CardBody>
+          </CardBody>
+        )
       ) : uses.length === 0 ? (
-        <CardBody>
-          <p className="text-sm text-text-secondary">
-            No display shows it yet. Choose it in a display's schedule on{" "}
-            <Link to="/devices" className={LINK_CLASS}>
-              Devices
-            </Link>
-            .
-          </p>
-        </CardBody>
+        <Nothing>
+          No display shows it yet. Choose it in a display's schedule on{" "}
+          <Link to="/devices" className={LINK_CLASS}>
+            Devices
+          </Link>
+          .
+        </Nothing>
       ) : (
         <ul>
           {uses.map(({ device, when }) => (
@@ -341,7 +338,7 @@ function ShownOn({ uses, failure }: { uses: readonly Use[] | undefined; failure:
 
 function UseRow({ device, when }: { device: Device; when: readonly string[] }) {
   return (
-    <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border px-gutter py-2.5 text-sm first:border-t-0">
+    <li className={classes(BAND_CLASS, "flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm")}>
       <Link to={`/devices/${device.id}`} className="font-medium hover:text-accent">
         {device.name}
       </Link>

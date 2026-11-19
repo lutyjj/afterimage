@@ -3,6 +3,7 @@ import type { Device, Playlist, ScheduleSlot, ScreenSummary, Shows, Weekday } fr
 import { useMutation } from "@tanstack/react-query";
 import {
   Actions,
+  BAND_CLASS,
   Button,
   Card,
   CardBody,
@@ -11,6 +12,7 @@ import {
   type Choice,
   IconButton,
   LINK_CLASS,
+  Nothing,
   Select,
   SettingRow,
   SettlingItem,
@@ -110,21 +112,27 @@ export function ScheduleEditor({
             {timeZone && <> Times are in {timeZone}.</>}
           </>
         }
-      />
+      >
+        {playlists?.length !== 0 && (
+          <Button onClick={add} disabled={!playlists?.length || slots.length >= MOST_SLOTS}>
+            <Plus aria-hidden="true" className="size-4" /> Add a time
+          </Button>
+        )}
+      </CardHead>
       {(playlists?.length ?? 0) > 0 || (screens?.length ?? 0) > 0 ? (
         <PinRow device={device} playlists={playlists ?? []} screens={screens ?? []} names={names} />
       ) : null}
-      <CardBody>
-        {playlists?.length === 0 ? (
-          <p className="max-w-2xl text-sm text-text-secondary">
-            No playlists yet.{" "}
-            <Link to="/playlists/new" className={LINK_CLASS}>
-              Make the first playlist
-            </Link>
-            , then come back to give it a place here.
-          </p>
-        ) : (
-          <>
+      {playlists?.length === 0 ? (
+        <Nothing>
+          No playlists yet.{" "}
+          <Link to="/playlists/new" className={LINK_CLASS}>
+            Make the first playlist
+          </Link>
+          , then come back to give it a place here.
+        </Nothing>
+      ) : (
+        <>
+          <CardBody>
             <Week plan={plan} names={names} timeZone={timeZone} />
             <div className="max-w-md">
               <Select
@@ -141,47 +149,54 @@ export function ScheduleEditor({
                 onValueChange={(value) => setUsual(value === "" ? undefined : Number(value))}
               />
             </div>
-            <section aria-labelledby={`slots-${device.id}`} className="grid gap-2">
-              <h3 id={`slots-${device.id}`} className="text-sm font-medium">
-                At these times instead
-              </h3>
-              {slots.length === 0 && (
-                <p className="max-w-2xl text-sm text-text-secondary">
-                  None: the display shows its usual playlist all week.
-                </p>
-              )}
-              {/* The list stays on the page while it is empty, only hidden, so
-                  the first slot added to it arrives into the same list. */}
-              <div
-                role="list"
-                hidden={slots.length === 0}
-                className="grid overflow-hidden rounded-button border border-border"
-              >
-                <SettlingRows scope={`schedule-${device.id}`} marksArrivals>
-                  {slots.map((slot, index) => (
-                    <SlotRow
-                      key={slot.key}
-                      slot={slot}
-                      index={index}
-                      choices={playlistChoices}
-                      known={playlists === undefined || playlists.some((p) => p.id === slot.playlistId)}
-                      overlaps={
-                        overlap && overlap.slots[1] === index
-                          ? `Overlaps time ${overlap.slots[0] + 1} on ${DAY_NAMES[overlap.day]} at ${timeOfDay(overlap.minute)}. A display shows one playlist at a time.`
-                          : undefined
-                      }
-                      onChange={(change) => update(slot.key, change)}
-                      onRemove={() => remove(slot.key)}
-                    />
-                  ))}
-                </SettlingRows>
-              </div>
-            </section>
-            <Actions>
-              <Button onClick={add} disabled={!playlists?.length || slots.length >= MOST_SLOTS}>
-                <Plus aria-hidden="true" className="size-4" /> Add a time
-              </Button>
-              <span className="flex-1" />
+          </CardBody>
+          {/* The rows' name heads them in a band of its own, with no hairline
+              between it and what it names. */}
+          <h3 id={`slots-${device.id}`} className={classes(BAND_CLASS, "pb-0 text-sm font-medium")}>
+            At these times instead
+          </h3>
+          {slots.length === 0 && (
+            <Nothing className="border-t-0">None: the display shows its usual playlist all week.</Nothing>
+          )}
+          {/* The list stays on the page while it is empty, only hidden, so the
+              first slot added to it arrives into the same list. */}
+          <div
+            role="list"
+            aria-labelledby={`slots-${device.id}`}
+            hidden={slots.length === 0}
+            className="[&>:first-child]:border-t-0"
+          >
+            <SettlingRows scope={`schedule-${device.id}`} marksArrivals>
+              {slots.map((slot, index) => (
+                <SlotRow
+                  key={slot.key}
+                  slot={slot}
+                  index={index}
+                  choices={playlistChoices}
+                  known={playlists === undefined || playlists.some((p) => p.id === slot.playlistId)}
+                  overlaps={
+                    overlap && overlap.slots[1] === index
+                      ? `Overlaps time ${overlap.slots[0] + 1} on ${DAY_NAMES[overlap.day]} at ${timeOfDay(overlap.minute)}. A display shows one playlist at a time.`
+                      : undefined
+                  }
+                  onChange={(change) => update(slot.key, change)}
+                  onRemove={() => remove(slot.key)}
+                />
+              ))}
+            </SettlingRows>
+          </div>
+          <CardBody>
+            {noDays && (
+              <p role="alert" className="text-sm text-danger">
+                Every time needs at least one day.
+              </p>
+            )}
+            {save.isError && (
+              <p role="alert" className="text-sm text-danger">
+                {messageOf(save.error)}
+              </p>
+            )}
+            <Actions className="justify-end">
               {dirty && (
                 <Button
                   onClick={() => {
@@ -201,19 +216,9 @@ export function ScheduleEditor({
                 {save.isPending ? "Saving" : "Save schedule"}
               </Button>
             </Actions>
-            {noDays && (
-              <p role="alert" className="text-sm text-danger">
-                Every time needs at least one day.
-              </p>
-            )}
-            {save.isError && (
-              <p role="alert" className="text-sm text-danger">
-                {messageOf(save.error)}
-              </p>
-            )}
-          </>
-        )}
-      </CardBody>
+          </CardBody>
+        </>
+      )}
     </Card>
   );
 }
@@ -240,7 +245,10 @@ function SlotRow({
     <SettlingItem
       role="listitem"
       aria-describedby={overlaps ? problem : undefined}
-      className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 border-t border-border bg-surface p-3 first:border-t-0 sm:grid-cols-[1.5rem_minmax(0,1fr)]"
+      className={classes(
+        BAND_CLASS,
+        "grid grid-cols-[1.25rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 sm:grid-cols-[1.5rem_minmax(0,1fr)]",
+      )}
     >
       <span
         aria-hidden="true"
