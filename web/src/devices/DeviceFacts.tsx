@@ -1,25 +1,23 @@
 import type { Device, Playlist, ScreenSummary } from "@afterimage/management-client";
 import type { ReactNode } from "react";
 
-import { classes } from "linen";
+import { Fact, Facts } from "linen";
 
 import { ago, moment, signalQuality } from "../app/format";
 
-/** What a device last reported and what it shows, as label and value pairs;
+/** What a device last reported and what it shows, as linen's facts;
  * `children` adds facts of the page's own after them. */
 export function DeviceFacts({
   device,
   playlists,
   screens,
   timeZone,
-  className,
   children,
 }: {
   device: Device;
   playlists: Playlist[] | undefined;
   screens: ScreenSummary[] | undefined;
   timeZone: string | undefined;
-  className?: string | undefined;
   children?: ReactNode;
 }) {
   const { showing, seenAt, wakesAt } = device;
@@ -43,8 +41,8 @@ export function DeviceFacts({
   const showingName = `${what}${from}${pinned ? ", pinned" : ""}`;
 
   return (
-    <dl className={classes("grid grid-cols-[max-content_minmax(0,1fr)] gap-x-6 gap-y-2 text-sm", className)}>
-      <Fact label="Showing">
+    <Facts>
+      <Fact name="Showing">
         {showingName}
         {showing && timeZone && (
           <Aside>
@@ -61,7 +59,7 @@ export function DeviceFacts({
           </Aside>
         )}
       </Fact>
-      <Fact label="Last seen">
+      <Fact name="Last seen">
         {seenAt ? ago(seenAt) : "Never"}
         {seenAt && timeZone && (
           <Aside>
@@ -70,29 +68,20 @@ export function DeviceFacts({
           </Aside>
         )}
       </Fact>
-      <Fact label="Battery">
+      <Fact name="Battery">
         {batteryPercent !== undefined ? `${Math.round(batteryPercent)}%` : "Not reported"}
         {batteryVoltage !== undefined && <Aside> {batteryVoltage.toFixed(2)} V</Aside>}
       </Fact>
-      <Fact label="Signal">
+      <Fact name="Signal">
         {signal !== undefined ? signalQuality(signal) : "Not reported"}
         {signal !== undefined && <Aside> {signal} dBm</Aside>}
       </Fact>
-      <Fact label="Firmware">
+      <Fact name="Firmware">
         {firmwareVersion ?? "Not reported"}
         {device.firmware.updateAvailable && <Aside> · {device.firmware.latestVersion} available</Aside>}
       </Fact>
       {children}
-    </dl>
-  );
-}
-
-export function Fact({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="contents">
-      <dt className="text-text-muted">{label}</dt>
-      <dd className="min-w-0 [overflow-wrap:anywhere]">{children}</dd>
-    </div>
+    </Facts>
   );
 }
 

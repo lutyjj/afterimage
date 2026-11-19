@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { buttonClass, Card, Content, EmptyState, TopBar } from "linen";
+import { buttonClass, Card, CardBody, Content, EmptyState, Fact, TopBar } from "linen";
 import { Link, useParams } from "react-router";
 
 import { displayModelsQuery, messageOf, serverQuery } from "../app/client";
 import { Panel } from "../panel/Panel";
 import { playlistsQuery } from "../playlists/queries";
 import { screensQuery } from "../screens/queries";
-import { Aside, DeviceFacts, Fact } from "./DeviceFacts";
+import { Aside, DeviceFacts } from "./DeviceFacts";
 import { DeviceFirmware } from "./DeviceFirmware";
 import { DeviceSettings } from "./DeviceSettings";
 import { deviceQuery, findDisplay, imageUrl } from "./queries";
@@ -59,21 +59,23 @@ export function DeviceDetail() {
         ))}
       />
       <Content>
-        <Card className="grid items-start gap-6 p-gutter min-[72rem]:grid-cols-[minmax(0,800px)_minmax(15rem,1fr)]">
-          <Panel
-            src={imageUrl(data)}
-            alt={`What ${data.name} shows`}
-            width={model?.width}
-            height={model?.height}
-            colors={palette?.colors}
-            paletteName={palette?.name}
-          />
-          <DeviceFacts device={data} playlists={playlists} screens={screens} timeZone={timeZone}>
-            <Fact label="Hardware">
-              {data.firmwareModel}
-              <Aside> {data.mac}</Aside>
-            </Fact>
-          </DeviceFacts>
+        <Card>
+          <CardBody className="min-[72rem]:grid min-[72rem]:grid-cols-[minmax(0,800px)_minmax(15rem,1fr)] min-[72rem]:items-start">
+            <Panel
+              src={imageUrl(data)}
+              alt={`What ${data.name} shows`}
+              width={model?.width}
+              height={model?.height}
+              colors={palette?.colors}
+              paletteName={palette?.name}
+            />
+            <DeviceFacts device={data} playlists={playlists} screens={screens} timeZone={timeZone}>
+              <Fact name="Hardware">
+                {data.firmwareModel}
+                <Aside> {data.mac}</Aside>
+              </Fact>
+            </DeviceFacts>
+          </CardBody>
         </Card>
         {/* Keyed by the display, so a draft never carries over to another. */}
         <ScheduleEditor

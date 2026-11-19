@@ -1,6 +1,6 @@
 import type { Device, DisplayModel, Playlist, ScreenSummary } from "@afterimage/management-client";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, CardBody, CardHead, Content, TopBar } from "linen";
+import { Button, Card, CardBody, CardHead, Content, Fact, TopBar } from "linen";
 import { Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
@@ -11,7 +11,7 @@ import { playlistsQuery } from "../playlists/queries";
 import { screensQuery } from "../screens/queries";
 import { ClaimDialog } from "./ClaimDialog";
 import { DayTrack, HourAxis, marksOf, namesOf } from "./DayTrack";
-import { DeviceFacts, Fact } from "./DeviceFacts";
+import { DeviceFacts } from "./DeviceFacts";
 import { devicesQuery, findDisplay, imageUrl } from "./queries";
 import { dayOf, nowIn } from "./schedule";
 import { deviceStates, useShownStates } from "./states";
@@ -84,60 +84,67 @@ function DeviceCard({
 
   return (
     <li>
-      <Card className="grid items-start gap-6 p-gutter min-[72rem]:grid-cols-[minmax(0,800px)_minmax(15rem,1fr)]">
-        <Link to={`/devices/${device.id}`} className="block min-w-0" aria-label={`${device.name}, open`} tabIndex={-1}>
-          <Panel
-            src={imageUrl(device)}
-            alt={`What ${device.name} shows`}
-            width={model?.width}
-            height={model?.height}
-            colors={palette?.colors}
-            paletteName={palette?.name}
-          />
-        </Link>
-        <div className="grid min-w-0 content-start gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="mr-1 font-display text-lg font-semibold tracking-[-0.01em]">
-              <Link to={`/devices/${device.id}`} className="hover:text-accent">
-                {device.name}
-              </Link>
-            </h2>
-            {states.map((state) => (
-              <StateBadge key={state.key} ended={state.ended} title={state.title}>
-                {state.label}
-              </StateBadge>
-            ))}
-          </div>
-          <DeviceFacts device={device} playlists={playlists} screens={screens} timeZone={timeZone}>
-            <Fact label="Display">{model?.label ?? device.display.model}</Fact>
-          </DeviceFacts>
-          {now && timeZone && (
-            <div className="grid gap-2 border-t border-border pt-4">
-              <h3 className="text-sm font-medium text-text-secondary">
-                Today <span className="font-normal text-text-muted">in {timeZone}</span>
-              </h3>
-              <div className="grid gap-1">
-                <DayTrack
-                  marks={marksOf(
-                    dayOf(
-                      {
-                        schedule: device.schedule,
-                        windows: device.sleep.windows,
-                        shows: device.shows,
-                        held: device.sleepHeld,
-                      },
-                      now.day,
-                    ),
-                    namesOf(playlists, screens),
-                  )}
-                  now={now.minute}
-                  label={`What ${device.name} shows today`}
-                />
-                <HourAxis />
-              </div>
+      <Card>
+        <CardBody className="min-[72rem]:grid min-[72rem]:grid-cols-[minmax(0,800px)_minmax(15rem,1fr)] min-[72rem]:items-start">
+          <Link
+            to={`/devices/${device.id}`}
+            className="block min-w-0"
+            aria-label={`${device.name}, open`}
+            tabIndex={-1}
+          >
+            <Panel
+              src={imageUrl(device)}
+              alt={`What ${device.name} shows`}
+              width={model?.width}
+              height={model?.height}
+              colors={palette?.colors}
+              paletteName={palette?.name}
+            />
+          </Link>
+          <div className="grid min-w-0 content-start gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="mr-1 font-display text-lg font-semibold tracking-[-0.01em]">
+                <Link to={`/devices/${device.id}`} className="hover:text-accent">
+                  {device.name}
+                </Link>
+              </h2>
+              {states.map((state) => (
+                <StateBadge key={state.key} ended={state.ended} title={state.title}>
+                  {state.label}
+                </StateBadge>
+              ))}
             </div>
-          )}
-        </div>
+            <DeviceFacts device={device} playlists={playlists} screens={screens} timeZone={timeZone}>
+              <Fact name="Display">{model?.label ?? device.display.model}</Fact>
+            </DeviceFacts>
+            {now && timeZone && (
+              <div className="grid gap-1">
+                <h3 className="text-sm font-medium text-text-secondary">
+                  Today <span className="font-normal text-text-muted">in {timeZone}</span>
+                </h3>
+                <div className="grid gap-1">
+                  <DayTrack
+                    marks={marksOf(
+                      dayOf(
+                        {
+                          schedule: device.schedule,
+                          windows: device.sleep.windows,
+                          shows: device.shows,
+                          held: device.sleepHeld,
+                        },
+                        now.day,
+                      ),
+                      namesOf(playlists, screens),
+                    )}
+                    now={now.minute}
+                    label={`What ${device.name} shows today`}
+                  />
+                  <HourAxis />
+                </div>
+              </div>
+            )}
+          </div>
+        </CardBody>
       </Card>
     </li>
   );

@@ -136,7 +136,7 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 |---|---|
 | Screen title (20px, 600) | A screen's name in its top bar, a display's name on its card |
 | Card title (16px, 600) | A card's head |
-| Body (14px) and label (13px, 500) | Everything else; fact labels in `text-muted` |
+| Body (14px) and label (13px, 500) | Everything else |
 | Code (JetBrains Mono, 13px) | YAML, addresses, commands, topics, secret and source names |
 
 ## Layout
@@ -171,5 +171,5 @@ Afterimage wears [linen](https://github.com/lutyjj/linen), the design language i
 ### Don't:
 
 - **Don't** draw on, tint or crop a display's image, or scale it above its true pixels; the editor's optional guides are the only marks laid over it.
-- **Don't** build dashboards of status tiles; a device's facts are a two-column list.
+- **Don't** build dashboards of status tiles; a device's facts are linen's `Facts`, each name starting its line and its value ending it.
 - **Don't** add mascots, cute illustration or playful copy; Afterimage is a calm tool.
