@@ -15,6 +15,7 @@ import {
   IconButton,
   LINK_CLASS,
   Nothing,
+  Notice,
   SettlingItem,
   SettlingRows,
   TitleField,
@@ -173,11 +174,7 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
         />
       </TopBar>
       <Content>
-        {save.isError && (
-          <p role="alert" className="text-sm text-danger">
-            {messageOf(save.error)}
-          </p>
-        )}
+        {save.isError && <Notice tone="danger" title={messageOf(save.error)} />}
         <Card>
           <CardHead
             title="Screens"
@@ -312,9 +309,7 @@ function ShownOn({ uses, failure }: { uses: readonly Use[] | undefined; failure:
           <Nothing>Reading displays</Nothing>
         ) : (
           <CardBody>
-            <p role="alert" className="text-sm text-danger">
-              The displays could not be read. {failure}
-            </p>
+            <Notice tone="danger" title={<>The displays could not be read. {failure}</>} />
           </CardBody>
         )
       ) : uses.length === 0 ? (

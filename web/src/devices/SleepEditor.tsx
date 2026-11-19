@@ -11,6 +11,7 @@ import {
   classes,
   IconButton,
   Nothing,
+  Notice,
   SettingRow,
   SettingToggle,
   SettlingItem,
@@ -131,16 +132,8 @@ export function SleepEditor({
         </SettlingRows>
       </div>
       <CardBody>
-        {noDays && (
-          <p role="alert" className="text-sm text-danger">
-            Every sleep window needs at least one day.
-          </p>
-        )}
-        {save.isError && (
-          <p role="alert" className="text-sm text-danger">
-            {messageOf(save.error)}
-          </p>
-        )}
+        {noDays && <Notice tone="danger" title="Every sleep window needs at least one day." />}
+        {save.isError && <Notice tone="danger" title={messageOf(save.error)} />}
         <Actions className="justify-end">
           {dirty && (
             <Button

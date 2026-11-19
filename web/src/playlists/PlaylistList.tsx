@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { buttonClass, Card, Content, Count, EmptyState, TopBar } from "linen";
+import { buttonClass, Card, Content, Count, EmptyState, Notice, TopBar } from "linen";
 import { Plus } from "lucide-react";
 import { Link } from "react-router";
 
@@ -25,11 +25,7 @@ export function PlaylistList() {
       </TopBar>
       <Content>
         {playlists.isPending && <p className="text-sm text-text-muted">Reading playlists</p>}
-        {playlists.isError && (
-          <p role="alert" className="text-sm text-danger">
-            {messageOf(playlists.error)}
-          </p>
-        )}
+        {playlists.isError && <Notice tone="danger" title={messageOf(playlists.error)} />}
         {playlists.data?.length === 0 && (
           <EmptyState
             title="No playlists yet"

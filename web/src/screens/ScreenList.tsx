@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { buttonClass, Card, Content, Count, EmptyState, TopBar } from "linen";
+import { buttonClass, Card, Content, Count, EmptyState, Notice, TopBar } from "linen";
 import { Plus } from "lucide-react";
 import { Link } from "react-router";
 
@@ -24,11 +24,7 @@ export function ScreenList() {
       </TopBar>
       <Content>
         {screens.isPending && <p className="text-sm text-text-muted">Reading screens</p>}
-        {screens.isError && (
-          <p role="alert" className="text-sm text-danger">
-            {messageOf(screens.error)}
-          </p>
-        )}
+        {screens.isError && <Notice tone="danger" title={messageOf(screens.error)} />}
         {screens.data?.length === 0 && (
           <EmptyState
             title="No screens yet"

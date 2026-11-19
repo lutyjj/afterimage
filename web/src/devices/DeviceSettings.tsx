@@ -7,6 +7,7 @@ import {
   CardBody,
   CardHead,
   FieldRow,
+  Notice,
   Select,
   TextField,
   useToast,
@@ -132,12 +133,8 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
               onValueChange={(value) => setRefresh(Number(value))}
             />
           </FieldRow>
+          {save.isError && <Notice tone="danger" title={messageOf(save.error)} />}
           <Actions className="justify-end">
-            {save.isError && (
-              <span role="alert" className="text-sm text-danger">
-                {messageOf(save.error)}
-              </span>
-            )}
             <Button type="submit" variant="primary" disabled={!changed || save.isPending}>
               {save.isPending ? "Saving" : "Save"}
             </Button>

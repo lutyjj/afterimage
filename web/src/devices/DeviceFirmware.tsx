@@ -93,11 +93,7 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
           onChange={setBoard}
           onSaved={stored}
         />
-        {boards.isError && (
-          <p role="alert" className="text-sm text-danger">
-            {messageOf(boards.error)}
-          </p>
-        )}
+        {boards.isError && <Notice tone="danger" title={messageOf(boards.error)} />}
 
         {update && (
           <div className="flex max-w-2xl flex-col gap-4">
@@ -135,18 +131,10 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
                 )}
               </Actions>
             )}
-            {cancel.isError && (
-              <p role="alert" className="text-sm text-danger">
-                {messageOf(cancel.error)}
-              </p>
-            )}
+            {cancel.isError && <Notice tone="danger" title={messageOf(cancel.error)} />}
           </div>
         )}
-        {install.isError && (
-          <p role="alert" className="text-sm text-danger">
-            {messageOf(install.error)}
-          </p>
-        )}
+        {install.isError && <Notice tone="danger" title={messageOf(install.error)} />}
       </CardBody>
       {latest !== undefined && (
         <ConfirmDialog
@@ -291,11 +279,7 @@ function BoardChoice({
           </Button>
         )}
       </FieldRow>
-      {save.isError && (
-        <p role="alert" className="text-sm text-danger">
-          {messageOf(save.error)}
-        </p>
-      )}
+      {save.isError && <Notice tone="danger" title={messageOf(save.error)} />}
     </form>
   );
 }

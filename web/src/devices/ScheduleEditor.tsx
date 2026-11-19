@@ -10,13 +10,14 @@ import {
   CardHead,
   CellSelect,
   type Choice,
+  classes,
   IconButton,
   LINK_CLASS,
   Nothing,
+  Notice,
   SettingRow,
   SettlingItem,
   SettlingRows,
-  classes,
   useToast,
   useUnsavedChanges,
 } from "linen";
@@ -186,16 +187,8 @@ export function ScheduleEditor({
             </SettlingRows>
           </div>
           <CardBody>
-            {noDays && (
-              <p role="alert" className="text-sm text-danger">
-                Every time needs at least one day.
-              </p>
-            )}
-            {save.isError && (
-              <p role="alert" className="text-sm text-danger">
-                {messageOf(save.error)}
-              </p>
-            )}
+            {noDays && <Notice tone="danger" title="Every time needs at least one day." />}
+            {save.isError && <Notice tone="danger" title={messageOf(save.error)} />}
             <Actions className="justify-end">
               {dirty && (
                 <Button
@@ -291,9 +284,9 @@ function SlotRow({
         </IconButton>
       </div>
       {overlaps && (
-        <p id={problem} className="col-start-2 text-sm text-danger">
-          {overlaps}
-        </p>
+        <div id={problem} className="col-start-2">
+          <Notice tone="danger" title={overlaps} />
+        </div>
       )}
     </SettlingItem>
   );

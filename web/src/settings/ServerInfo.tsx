@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardBody, CardHead, Fact, Facts, Nothing, SettingNote } from "linen";
+import { Card, CardBody, CardHead, Fact, Facts, Nothing, Notice, SettingNote } from "linen";
 
 import { messageOf, serverQuery, signInOptionsQuery } from "../app/client";
 
@@ -15,9 +15,7 @@ export function ServerInfo() {
       {server.isPending && <Nothing>Reading the server's settings</Nothing>}
       {server.isError && (
         <CardBody>
-          <p role="alert" className="text-sm text-danger">
-            {messageOf(server.error)}
-          </p>
+          <Notice tone="danger" title={messageOf(server.error)} />
         </CardBody>
       )}
       {server.data && (

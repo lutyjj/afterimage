@@ -1,6 +1,6 @@
 import type { Device, DisplayModel, Playlist, ScreenSummary } from "@afterimage/management-client";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, CardBody, CardHead, Content, Fact, TopBar } from "linen";
+import { Button, Card, CardBody, CardHead, Content, Fact, Notice, TopBar } from "linen";
 import { Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
@@ -39,11 +39,7 @@ export function DeviceList() {
       </TopBar>
       <Content>
         {devices.isPending && <p className="text-sm text-text-muted">Reading displays</p>}
-        {devices.isError && (
-          <p role="alert" className="text-sm text-danger">
-            {messageOf(devices.error)}
-          </p>
-        )}
+        {devices.isError && <Notice tone="danger" title={messageOf(devices.error)} />}
         {none && <FirstDisplay onClaim={() => setClaiming(true)} />}
         {devices.data && devices.data.length > 0 && (
           <ol className="grid gap-4" aria-label="Displays">

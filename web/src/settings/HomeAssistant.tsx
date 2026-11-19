@@ -56,15 +56,14 @@ export function HomeAssistant() {
         description="Afterimage publishes every claimed display to Home Assistant through MQTT discovery: battery, signal, last check-in, the screen it shows, and a firmware update Home Assistant can install."
       />
       {mqtt.isPending && <Nothing>Reading the broker</Nothing>}
-      {mqtt.isError && (
-        <CardBody>
-          <p role="alert" className="text-sm text-danger">
-            {mqtt.error instanceof Forbidden
-              ? "Only the server's administrator, its first account, sees these settings."
-              : messageOf(mqtt.error)}
-          </p>
-        </CardBody>
-      )}
+      {mqtt.isError &&
+        (mqtt.error instanceof Forbidden ? (
+          <Nothing>Only the server's administrator, its first account, sees the broker.</Nothing>
+        ) : (
+          <CardBody>
+            <Notice tone="danger" title={messageOf(mqtt.error)} />
+          </CardBody>
+        ))}
       {mqtt.data && <Connection settings={mqtt.data} />}
       {mqtt.data?.setByDeployment && <SetByDeployment settings={mqtt.data} />}
       {mqtt.data && !mqtt.data.setByDeployment && (
@@ -258,17 +257,13 @@ function BrokerForm({ settings, save }: { settings: MqttSettings; save: Save }) 
           />
         </FieldRow>
         {movesDevices && (
-          <p className="rounded-button bg-sunken px-3 py-2 text-sm text-text-secondary">
-            Saving takes every display out of Home Assistant under the old topic and adds it again under the new one, as
-            a new device.
-          </p>
+          <Notice
+            tone="warn"
+            title="Saving takes every display out of Home Assistant under the old topic and adds it again under the new one, as a new device."
+          />
         )}
+        {save.isError && <Notice tone="danger" title={messageOf(save.error)} />}
         <Actions className="justify-end">
-          {save.isError && (
-            <span role="alert" className="text-sm text-danger">
-              {messageOf(save.error)}
-            </span>
-          )}
           <Button type="submit" variant="primary" disabled={save.isPending}>
             {save.isPending ? "Saving" : publishing ? "Save" : "Save and connect"}
           </Button>

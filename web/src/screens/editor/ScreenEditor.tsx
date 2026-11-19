@@ -8,11 +8,12 @@ import {
   Content,
   EmptyState,
   IconButton,
+  Notice,
   TitleField,
   TopBar,
   useToast,
-  WIDE_COLUMN_CLASS,
   useUnsavedChanges,
+  WIDE_COLUMN_CLASS,
 } from "linen";
 import { Grid3x3, Trash2 } from "lucide-react";
 import { useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
@@ -204,11 +205,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
       </TopBar>
 
       <div className={classes(WIDE_COLUMN_CLASS, "flex min-h-0 flex-1 flex-col gap-3 py-3")}>
-        {save.isError && (
-          <p role="alert" className="max-w-3xl text-sm text-danger">
-            {messageOf(save.error)}
-          </p>
-        )}
+        {save.isError && <Notice tone="danger" title={messageOf(save.error)} />}
 
         {!screen && !touched && (
           <section aria-labelledby="starters-title" className="grid gap-2">

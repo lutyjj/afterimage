@@ -1,6 +1,6 @@
 import type { Account } from "@afterimage/management-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { arrive, Button, buttonClass, classes, TextField } from "linen";
+import { arrive, Button, buttonClass, classes, Notice, TextField } from "linen";
 import { m } from "motion/react";
 import { useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -32,17 +32,11 @@ export function SignIn() {
           <p className="text-sm text-text-secondary">A server for TRMNL e-paper displays.</p>
         </header>
         {options.isPending && <p className="text-sm text-text-muted">Reading the server</p>}
-        {options.isError && (
-          <p role="alert" className="text-sm text-danger">
-            {messageOf(options.error)}
-          </p>
-        )}
+        {options.isError && <Notice tone="danger" title={messageOf(options.error)} />}
         {options.data && (
           <div className="grid gap-6">
             {providerError && (
-              <p role="alert" className="text-sm text-danger">
-                {providerErrors[providerError] ?? "Signing in did not finish. Try again."}
-              </p>
+              <Notice tone="danger" title={providerErrors[providerError] ?? "Signing in did not finish. Try again."} />
             )}
             {options.data.password && (options.data.firstAccount ? <FirstAccountForm /> : <PasswordForm />)}
             {options.data.oidc && (
@@ -114,11 +108,7 @@ function PasswordForm() {
         value={password}
         onChange={(event) => setPassword(event.target.value)}
       />
-      {signIn.isError && (
-        <p role="alert" className="text-sm text-danger">
-          {messageOf(signIn.error)}
-        </p>
-      )}
+      {signIn.isError && <Notice tone="danger" title={messageOf(signIn.error)} />}
       <Button type="submit" variant="primary" className="w-full" disabled={signIn.isPending}>
         {signIn.isPending ? "Signing in" : "Sign in"}
       </Button>
@@ -183,11 +173,7 @@ function FirstAccountForm() {
         value={password}
         onChange={(event) => setPassword(event.target.value)}
       />
-      {create.isError && (
-        <p role="alert" className="text-sm text-danger">
-          {messageOf(create.error)}
-        </p>
-      )}
+      {create.isError && <Notice tone="danger" title={messageOf(create.error)} />}
       <Button type="submit" variant="primary" className="w-full" disabled={create.isPending}>
         {create.isPending ? "Creating" : "Create account"}
       </Button>

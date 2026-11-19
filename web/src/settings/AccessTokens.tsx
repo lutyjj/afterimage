@@ -17,6 +17,7 @@ import {
   ExplainedStatus,
   Field,
   Nothing,
+  Notice,
   SettingRow,
   SettlingRows,
   ShownOnce,
@@ -64,9 +65,7 @@ export function AccessTokens() {
         {tokens.isPending && <Nothing>Reading tokens</Nothing>}
         {tokens.isError && (
           <CardBody>
-            <p role="alert" className="text-sm text-danger">
-              {messageOf(tokens.error)}
-            </p>
+            <Notice tone="danger" title={messageOf(tokens.error)} />
           </CardBody>
         )}
         {tokens.data?.length === 0 && <Nothing>No tokens yet.</Nothing>}
@@ -195,11 +194,7 @@ function NewToken({ open, onOpenChange }: { open: boolean; onOpenChange: (open: 
                       <span className="text-xs text-text-secondary">{reachOf("read_only").description}</span>
                     </span>
                   </Checkbox>
-                  {create.isError && (
-                    <p role="alert" className="text-sm text-danger">
-                      {messageOf(create.error)}
-                    </p>
-                  )}
+                  {create.isError && <Notice tone="danger" title={messageOf(create.error)} />}
                 </div>
               )}
             </Swap>
