@@ -59,36 +59,34 @@ export function DeviceDetail() {
         ))}
       />
       <Content>
-        <div className="grid gap-4">
-          <Card className="grid items-start gap-6 p-gutter min-[72rem]:grid-cols-[minmax(0,800px)_minmax(15rem,1fr)]">
-            <Panel
-              src={imageUrl(data)}
-              alt={`What ${data.name} shows`}
-              width={model?.width}
-              height={model?.height}
-              colors={palette?.colors}
-              paletteName={palette?.name}
-            />
-            <DeviceFacts device={data} playlists={playlists} screens={screens} timeZone={timeZone}>
-              <Fact label="Hardware">
-                {data.firmwareModel}
-                <Aside> {data.mac}</Aside>
-              </Fact>
-            </DeviceFacts>
-          </Card>
-          {/* Keyed by the display, so a draft never carries over to another. */}
-          <ScheduleEditor
-            key={`schedule-${data.id}`}
-            device={data}
-            playlists={playlists}
-            screens={screens}
-            timeZone={timeZone}
+        <Card className="grid items-start gap-6 p-gutter min-[72rem]:grid-cols-[minmax(0,800px)_minmax(15rem,1fr)]">
+          <Panel
+            src={imageUrl(data)}
+            alt={`What ${data.name} shows`}
+            width={model?.width}
+            height={model?.height}
+            colors={palette?.colors}
+            paletteName={palette?.name}
           />
-          <SleepEditor key={`sleep-${data.id}`} device={data} screens={screens} timeZone={timeZone} />
-          <DeviceSettings key={`settings-${data.id}`} device={data} models={models} />
-          <DeviceFirmware key={`firmware-${data.id}`} device={data} timeZone={timeZone} />
-          <RemoveDevice device={data} />
-        </div>
+          <DeviceFacts device={data} playlists={playlists} screens={screens} timeZone={timeZone}>
+            <Fact label="Hardware">
+              {data.firmwareModel}
+              <Aside> {data.mac}</Aside>
+            </Fact>
+          </DeviceFacts>
+        </Card>
+        {/* Keyed by the display, so a draft never carries over to another. */}
+        <ScheduleEditor
+          key={`schedule-${data.id}`}
+          device={data}
+          playlists={playlists}
+          screens={screens}
+          timeZone={timeZone}
+        />
+        <SleepEditor key={`sleep-${data.id}`} device={data} screens={screens} timeZone={timeZone} />
+        <DeviceSettings key={`settings-${data.id}`} device={data} models={models} />
+        <DeviceFirmware key={`firmware-${data.id}`} device={data} timeZone={timeZone} />
+        <RemoveDevice device={data} />
       </Content>
     </>
   );

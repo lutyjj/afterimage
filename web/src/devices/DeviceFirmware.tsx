@@ -83,7 +83,7 @@ export function DeviceFirmware({ device, timeZone }: { device: Device; timeZone:
           </Button>
         )}
       </CardHead>
-      <CardBody className="grid gap-5">
+      <CardBody>
         <BoardChoice
           device={device}
           boards={boards.data}

@@ -105,7 +105,6 @@ function Agents() {
         <Field
           label="Claude Code"
           hint="Put a token in place of <token>. A read-only token gives an agent everything to read and nothing to change."
-          className="mb-0"
         >
           <CopyValue label="Claude Code command" value={command} />
         </Field>
@@ -171,12 +170,20 @@ function NewToken({ open, onOpenChange }: { open: boolean; onOpenChange: (open: 
           >
             <Swap view={created ? "secret" : "form"} stepped>
               {created ? (
-                <ShownOnce what="Token" label="Access token" secret={created.secret} copyLabel="Copy token">
-                  Give it to the script or agent that will use it.{" "}
-                  {created.token.scope === "read_only" ? READ_ONLY : "It acts as you."}
-                </ShownOnce>
+                <ShownOnce
+                  title="Token"
+                  description={
+                    <>
+                      Give it to the script or agent that will use it.{" "}
+                      {created.token.scope === "read_only" ? READ_ONLY : "It acts as you."}
+                    </>
+                  }
+                  label="Access token"
+                  secret={created.secret}
+                  copyLabel="Copy token"
+                />
               ) : (
-                <>
+                <div className="flex flex-col gap-4">
                   <TextField
                     label="Name"
                     hint="What will hold it, so you know which to revoke."
@@ -194,11 +201,11 @@ function NewToken({ open, onOpenChange }: { open: boolean; onOpenChange: (open: 
                     </span>
                   </Checkbox>
                   {create.isError && (
-                    <p role="alert" className="mt-3 text-sm text-danger">
+                    <p role="alert" className="text-sm text-danger">
                       {messageOf(create.error)}
                     </p>
                   )}
-                </>
+                </div>
               )}
             </Swap>
           </DialogLayout>

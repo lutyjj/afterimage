@@ -52,19 +52,17 @@ export function ClaimDialog({ open, onOpenChange }: { open: boolean; onOpenChang
       onConfirm={() => claim.mutateAsync()}
       width="26rem"
     >
-      <div className="mb-4">
-        <CodeField
-          value={code}
-          onChange={(value) => {
-            setCode(value);
-            if (claim.isError) claim.reset();
-          }}
-          label="Code on the display"
-          invalid={notFound}
-          describedBy={hintId}
-          autoFocus
-        />
-      </div>
+      <CodeField
+        value={code}
+        onChange={(value) => {
+          setCode(value);
+          if (claim.isError) claim.reset();
+        }}
+        label="Code on the display"
+        invalid={notFound}
+        describedBy={hintId}
+        autoFocus
+      />
       <TextField
         label="Name, optional"
         value={name}
@@ -73,7 +71,7 @@ export function ClaimDialog({ open, onOpenChange }: { open: boolean; onOpenChang
         onChange={(event) => setName(event.target.value)}
       />
       {claim.isError && (
-        <p role="alert" className="-mt-2 text-sm text-danger">
+        <p role="alert" className="text-sm text-danger">
           {notFound
             ? "No display shows this code. Check it on the display: a display that sets up again shows a new one."
             : messageOf(claim.error)}

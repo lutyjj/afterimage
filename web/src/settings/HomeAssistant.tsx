@@ -180,8 +180,8 @@ function BrokerForm({ settings, save }: { settings: MqttSettings; save: Save }) 
     (url.trim() !== settings.url || (username.trim() || undefined) !== settings.username);
 
   return (
-    <CardBody className="border-t border-border">
-      <form onSubmit={submit} className="grid max-w-2xl gap-x-4 sm:grid-cols-2">
+    <CardBody>
+      <form onSubmit={submit} className="grid max-w-2xl gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <TextField
             label="Broker"
@@ -219,7 +219,7 @@ function BrokerForm({ settings, save }: { settings: MqttSettings; save: Save }) 
           onChange={(event) => setPassword(event.target.value)}
         />
         {settings.passwordSet && (
-          <div className="mb-4 sm:col-span-2">
+          <div className="sm:col-span-2">
             <Checkbox checked={removePassword} onCheckedChange={setRemovePassword}>
               Remove the saved password
             </Checkbox>
@@ -245,7 +245,7 @@ function BrokerForm({ settings, save }: { settings: MqttSettings; save: Save }) 
           onChange={(event) => setPrefix(event.target.value)}
         />
         {movesDevices && (
-          <p className="mb-4 rounded-button bg-sunken px-3 py-2 text-sm text-text-secondary sm:col-span-2">
+          <p className="rounded-button bg-sunken px-3 py-2 text-sm text-text-secondary sm:col-span-2">
             Saving takes every display out of Home Assistant under the old topic and adds it again under the new one, as
             a new device.
           </p>

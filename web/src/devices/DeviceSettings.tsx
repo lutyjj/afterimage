@@ -81,7 +81,7 @@ export function DeviceSettings({ device, models }: { device: Device; models: Dis
     <Card>
       <CardHead title="Name and display" />
       <CardBody>
-        <form onSubmit={submit} className="grid max-w-2xl gap-x-4 sm:grid-cols-2">
+        <form onSubmit={submit} className="grid max-w-2xl gap-4 sm:grid-cols-2">
           <TextField
             label="Name"
             value={name}

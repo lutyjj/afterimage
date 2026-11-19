@@ -90,7 +90,7 @@ export function SleepEditor({
         }
       />
       <HoldToggle device={device} />
-      <CardBody className="grid gap-4">
+      <CardBody>
         <div className="max-w-md">
           <Select
             label="While asleep, it shows"

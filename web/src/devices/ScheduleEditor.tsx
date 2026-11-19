@@ -124,7 +124,7 @@ export function ScheduleEditor({
       {(playlists?.length ?? 0) > 0 || (screens?.length ?? 0) > 0 ? (
         <PinRow device={device} playlists={playlists ?? []} screens={screens ?? []} names={names} />
       ) : null}
-      <CardBody className="grid gap-5">
+      <CardBody>
         {playlists?.length === 0 ? (
           <p className="max-w-2xl text-sm text-text-secondary">
             No playlists yet.{" "}

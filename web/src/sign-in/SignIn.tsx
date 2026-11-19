@@ -93,8 +93,8 @@ function PasswordForm() {
     signIn.mutate();
   };
   return (
-    <form className="grid" onSubmit={submit}>
-      <h2 className="mb-4 text-md font-semibold">Sign in</h2>
+    <form className="grid gap-4" onSubmit={submit}>
+      <h2 className="text-md font-semibold">Sign in</h2>
       <TextField
         label="Username"
         name="username"
@@ -115,7 +115,7 @@ function PasswordForm() {
         onChange={(event) => setPassword(event.target.value)}
       />
       {signIn.isError && (
-        <p role="alert" className="mb-4 text-sm text-danger">
+        <p role="alert" className="text-sm text-danger">
           {messageOf(signIn.error)}
         </p>
       )}
@@ -140,12 +140,14 @@ function FirstAccountForm() {
     create.mutate();
   };
   return (
-    <form className="grid" onSubmit={submit}>
-      <h2 className="text-md font-semibold">Create the first account</h2>
-      <p className="mt-1 mb-4 text-sm text-text-secondary">
-        This server has no accounts yet. The first one signs in with a password; later ones come from the sign-in
-        provider, when the server has one.
-      </p>
+    <form className="grid gap-4" onSubmit={submit}>
+      <div>
+        <h2 className="text-md font-semibold">Create the first account</h2>
+        <p className="text-sm text-text-secondary">
+          This server has no accounts yet. The first one signs in with a password; later ones come from the sign-in
+          provider, when the server has one.
+        </p>
+      </div>
       <TextField
         label="Your name"
         name="name"
@@ -182,7 +184,7 @@ function FirstAccountForm() {
         onChange={(event) => setPassword(event.target.value)}
       />
       {create.isError && (
-        <p role="alert" className="mb-4 text-sm text-danger">
+        <p role="alert" className="text-sm text-danger">
           {messageOf(create.error)}
         </p>
       )}

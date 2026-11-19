@@ -171,69 +171,67 @@ function Workbench({ playlist }: { playlist: Playlist | undefined }) {
         />
       </TopBar>
       <Content>
-        <div className="grid gap-4">
-          {save.isError && (
-            <p role="alert" className="text-sm text-danger">
-              {messageOf(save.error)}
-            </p>
-          )}
-          <Card>
-            <CardHead
-              title="Screens"
-              description="A display shows them in this order, one at each check-in, and starts again at the first."
-            />
-            <CardBody className="grid gap-4">
-              {screens?.length === 0 ? (
-                <p className="max-w-2xl text-sm text-text-secondary">
-                  No screens yet.{" "}
-                  <Link to="/screens/new" className={LINK_CLASS}>
-                    Write the first screen
-                  </Link>
-                  , then come back to add it here.
-                </p>
-              ) : (
-                <>
-                  {rows.length === 0 && (
-                    <p className="max-w-2xl text-sm text-text-secondary">
-                      Empty: a display on this playlist shows “Nothing to show”. Add a screen to give it something.
-                    </p>
-                  )}
-                  {/* The list stays on the page while it is empty, only hidden,
-                      so the first screen added arrives into the same list. */}
-                  <div
-                    role="list"
-                    aria-label="Screens, in order"
-                    hidden={rows.length === 0}
-                    className="grid overflow-hidden rounded-button border border-border"
-                  >
-                    <SettlingRows scope={`playlist-${playlist?.id ?? "new"}`} marksArrivals>
-                      {rows.map((row, index) => (
-                        <ScreenRow
-                          key={row.key}
-                          row={row}
-                          index={index}
-                          count={rows.length}
-                          screens={screens ?? []}
-                          onChange={(screenId) =>
-                            setRows((all) => all.map((each) => (each.key === row.key ? { ...each, screenId } : each)))
-                          }
-                          onMove={(by) => move(index, by)}
-                          onRemove={() => setRows((all) => all.filter((each) => each.key !== row.key))}
-                        />
-                      ))}
-                    </SettlingRows>
-                  </div>
-                  <Actions>
-                    <Button onClick={add} disabled={!screens?.length || rows.length >= MOST_SCREENS}>
-                      <Plus aria-hidden="true" className="size-4" /> Add a screen
-                    </Button>
-                  </Actions>
-                </>
-              )}
-            </CardBody>
-          </Card>
-          {playlist && <ShownOn uses={uses} failure={displays.isError ? messageOf(displays.error) : undefined} />}
-        </div>
+        {save.isError && (
+          <p role="alert" className="text-sm text-danger">
+            {messageOf(save.error)}
+          </p>
+        )}
+        <Card>
+          <CardHead
+            title="Screens"
+            description="A display shows them in this order, one at each check-in, and starts again at the first."
+          />
+          <CardBody>
+            {screens?.length === 0 ? (
+              <p className="max-w-2xl text-sm text-text-secondary">
+                No screens yet.{" "}
+                <Link to="/screens/new" className={LINK_CLASS}>
+                  Write the first screen
+                </Link>
+                , then come back to add it here.
+              </p>
+            ) : (
+              <>
+                {rows.length === 0 && (
+                  <p className="max-w-2xl text-sm text-text-secondary">
+                    Empty: a display on this playlist shows “Nothing to show”. Add a screen to give it something.
+                  </p>
+                )}
+                {/* The list stays on the page while it is empty, only hidden,
+                    so the first screen added arrives into the same list. */}
+                <div
+                  role="list"
+                  aria-label="Screens, in order"
+                  hidden={rows.length === 0}
+                  className="grid overflow-hidden rounded-button border border-border"
+                >
+                  <SettlingRows scope={`playlist-${playlist?.id ?? "new"}`} marksArrivals>
+                    {rows.map((row, index) => (
+                      <ScreenRow
+                        key={row.key}
+                        row={row}
+                        index={index}
+                        count={rows.length}
+                        screens={screens ?? []}
+                        onChange={(screenId) =>
+                          setRows((all) => all.map((each) => (each.key === row.key ? { ...each, screenId } : each)))
+                        }
+                        onMove={(by) => move(index, by)}
+                        onRemove={() => setRows((all) => all.filter((each) => each.key !== row.key))}
+                      />
+                    ))}
+                  </SettlingRows>
+                </div>
+                <Actions>
+                  <Button onClick={add} disabled={!screens?.length || rows.length >= MOST_SCREENS}>
+                    <Plus aria-hidden="true" className="size-4" /> Add a screen
+                  </Button>
+                </Actions>
+              </>
+            )}
+          </CardBody>
+        </Card>
+        {playlist && <ShownOn uses={uses} failure={displays.isError ? messageOf(displays.error) : undefined} />}
       </Content>
       {playlist && (
         <ConfirmDialog

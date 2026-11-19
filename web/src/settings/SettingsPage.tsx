@@ -20,9 +20,7 @@ export function SettingsPage() {
       <TopBar title="Settings" />
       <SectionNav label="Settings" sections={sections} />
       <Content>
-        <div className="grid gap-4">
-          <Outlet />
-        </div>
+        <Outlet />
       </Content>
     </>
   );

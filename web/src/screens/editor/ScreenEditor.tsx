@@ -15,7 +15,7 @@ import {
   useUnsavedChanges,
 } from "linen";
 import { Grid3x3, Trash2 } from "lucide-react";
-import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { client, displayModelsQuery, messageOf, queryClient, serverQuery } from "../../app/client";
@@ -35,6 +35,20 @@ import { usePreview } from "./usePreview";
 import { openingText, parseYaml, rangeOf } from "./yamlDocument";
 
 const TRAIL = [{ href: "/screens", label: "Screens" }];
+
+/** Where the YAML and the preview stand side by side, Tailwind's `lg`, which
+ * is where the preview column scrolls on its own. */
+const SIDE_BY_SIDE = "(width >= 64rem)";
+
+function watchSideBySide(listener: () => void) {
+  const media = window.matchMedia(SIDE_BY_SIDE);
+  media.addEventListener("change", listener);
+  return () => media.removeEventListener("change", listener);
+}
+
+function useSideBySide() {
+  return useSyncExternalStore(watchSideBySide, () => window.matchMedia(SIDE_BY_SIDE).matches);
+}
 
 /** Writing a screen: its YAML beside a preview the server draws at the display's
  * own pixels, with what each source answered and every problem in place. */
@@ -73,6 +87,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
   const [baseline, setBaseline] = useState({ text: screen ? initialText : "", name: screen?.name ?? "" });
   const [touched, setTouched] = useState(Boolean(screen));
   const [grid, setGrid] = useState(false);
+  const sideBySide = useSideBySide();
 
   const parsed = useMemo(() => parseYaml(text), [text]);
   const devices = useQuery(devicesQuery).data;
@@ -245,7 +260,8 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
 
           <aside
             aria-label="Preview"
-            className="grid min-h-0 min-w-0 content-start gap-4 max-lg:w-[min(100%,var(--display-width,100%))] max-lg:justify-self-center lg:overflow-y-auto lg:pr-2 lg:**:scroll-mt-0"
+            data-scroll-box={sideBySide ? "" : undefined}
+            className="grid min-h-0 min-w-0 content-start gap-4 max-lg:w-[min(100%,var(--display-width,100%))] max-lg:justify-self-center lg:overflow-y-auto lg:pr-2"
           >
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-text-secondary">Preview on</span>
