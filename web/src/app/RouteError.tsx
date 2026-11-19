@@ -1,4 +1,4 @@
-import { Content, EmptyState, TopBar } from "linen";
+import { buttonClass, Content, EmptyState, TopBar } from "linen";
 import { isRouteErrorResponse, Link, useRouteError } from "react-router";
 
 import { messageOf } from "./client";
@@ -11,7 +11,7 @@ export function RouteError() {
   return (
     <Content>
       <EmptyState title="This page could not load" description={message}>
-        <a href="/devices" className="text-sm font-medium text-accent">
+        <a href="/devices" className={buttonClass()}>
           Back to devices
         </a>
       </EmptyState>
@@ -28,7 +28,7 @@ export function NotFoundPage() {
           title="Nothing lives at this address"
           description="The page may have moved, or the link may be wrong."
         >
-          <Link to="/devices" className="text-sm font-medium text-accent">
+          <Link to="/devices" className={buttonClass()}>
             Back to devices
           </Link>
         </EmptyState>
