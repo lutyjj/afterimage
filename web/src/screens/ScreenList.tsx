@@ -41,16 +41,12 @@ export function ScreenList() {
         )}
         {screens.data && screens.data.length > 0 && (
           <Card>
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-text-muted">
-                  <th scope="col" className="px-gutter py-2.5 font-medium">
-                    Screen
-                  </th>
-                  <th scope="col" className="px-gutter py-2.5 font-medium">
-                    In playlists
-                  </th>
-                  <th scope="col" className="px-gutter py-2.5 font-medium">
+            <table className="w-full border-separate border-spacing-0 text-sm">
+              <thead className="text-left text-xs text-text-muted">
+                <tr className="[&>th]:h-9 [&>th]:border-b [&>th]:border-border [&>th]:px-gutter [&>th]:font-medium">
+                  <th scope="col">Screen</th>
+                  <th scope="col">In playlists</th>
+                  <th scope="col" className="max-sm:hidden">
                     Changed
                   </th>
                 </tr>
@@ -63,9 +59,9 @@ export function ScreenList() {
                     return (
                       <tr
                         key={screen.id}
-                        className="relative h-11 border-b border-border last:border-b-0 hover:bg-sunken"
+                        className="relative hover:bg-sunken [&>*]:border-b [&>*]:border-border [&>*]:p-gutter last:[&>*]:border-b-0"
                       >
-                        <th scope="row" className="px-gutter text-left font-medium">
+                        <th scope="row" className="text-left font-medium">
                           {/* The whole row answers the pointer; the name is the link. */}
                           <Link
                             to={`/screens/${screen.id}`}
@@ -74,10 +70,10 @@ export function ScreenList() {
                             {screen.name}
                           </Link>
                         </th>
-                        <td className={on.length > 0 ? "px-gutter text-text-secondary" : "px-gutter text-text-muted"}>
+                        <td className={on.length > 0 ? "text-text-secondary" : "text-text-muted"}>
                           {on.length > 0 ? on.join(", ") : "None"}
                         </td>
-                        <td className="px-gutter whitespace-nowrap text-text-secondary tabular-nums">
+                        <td className="whitespace-nowrap text-text-secondary tabular-nums max-sm:hidden">
                           {ago(screen.updatedAt)}
                         </td>
                       </tr>

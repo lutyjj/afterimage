@@ -42,16 +42,12 @@ export function PlaylistList() {
         )}
         {playlists.data && playlists.data.length > 0 && (
           <Card>
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-text-muted">
-                  <th scope="col" className="px-gutter py-2.5 font-medium">
-                    Playlist
-                  </th>
-                  <th scope="col" className="px-gutter py-2.5 font-medium">
-                    Screens
-                  </th>
-                  <th scope="col" className="px-gutter py-2.5 font-medium max-sm:hidden">
+            <table className="w-full border-separate border-spacing-0 text-sm">
+              <thead className="text-left text-xs text-text-muted">
+                <tr className="[&>th]:h-9 [&>th]:border-b [&>th]:border-border [&>th]:px-gutter [&>th]:font-medium">
+                  <th scope="col">Playlist</th>
+                  <th scope="col">Screens</th>
+                  <th scope="col" className="max-sm:hidden">
                     Shown on
                   </th>
                 </tr>
@@ -62,9 +58,9 @@ export function PlaylistList() {
                   return (
                     <tr
                       key={playlist.id}
-                      className="relative h-11 border-b border-border last:border-b-0 hover:bg-sunken"
+                      className="relative hover:bg-sunken [&>*]:border-b [&>*]:border-border [&>*]:p-gutter last:[&>*]:border-b-0"
                     >
-                      <th scope="row" className="px-gutter text-left font-medium">
+                      <th scope="row" className="text-left font-medium">
                         {/* The whole row answers the pointer; the name is the link. */}
                         <Link
                           to={`/playlists/${playlist.id}`}
@@ -73,18 +69,12 @@ export function PlaylistList() {
                           {playlist.name}
                         </Link>
                       </th>
-                      <td
-                        className={
-                          playlist.screens.length > 0 ? "px-gutter text-text-secondary" : "px-gutter text-text-muted"
-                        }
-                      >
+                      <td className={playlist.screens.length > 0 ? "text-text-secondary" : "text-text-muted"}>
                         {playlist.screens.length > 0 ? playlist.screens.map(screenName).join(", ") : "No screens"}
                       </td>
                       <td
                         className={
-                          on.length > 0
-                            ? "px-gutter text-text-secondary max-sm:hidden"
-                            : "px-gutter text-text-muted max-sm:hidden"
+                          on.length > 0 ? "text-text-secondary max-sm:hidden" : "text-text-muted max-sm:hidden"
                         }
                       >
                         {on.length > 0 ? on.join(", ") : "No display"}
