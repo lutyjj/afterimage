@@ -1,5 +1,6 @@
+import { Input } from "@base-ui/react/input";
 import { classes } from "linen";
-import { useId, useState } from "react";
+import { useState } from "react";
 
 /** The characters a claim code uses: no 0, 1, I or O, which read alike. */
 const ALPHABET = /[2-9A-HJ-NP-Z]/;
@@ -15,24 +16,19 @@ function cleanCode(text: string): string {
 export interface CodeFieldProps {
   value: string;
   onChange: (value: string) => void;
-  label: string;
   invalid?: boolean;
-  describedBy?: string;
   autoFocus?: boolean;
 }
 
 /** Six cells for the code a display shows. One real input carries the value, so
  * typing, pasting and assistive technology work as with any text field; the cells
- * draw it. */
-export function CodeField({ value, onChange, label, invalid = false, describedBy, autoFocus }: CodeFieldProps) {
-  const id = useId();
+ * draw it. It stands in a linen Field, which names it and says why it was
+ * refused. */
+export function CodeField({ value, onChange, invalid = false, autoFocus }: CodeFieldProps) {
   const [focused, setFocused] = useState(false);
   const active = Math.min(value.length, CODE_LENGTH - 1);
   return (
     <div className="relative">
-      <label htmlFor={id} className="sr-only">
-        {label}
-      </label>
       <div className="grid grid-cols-6 gap-2" aria-hidden="true">
         {Array.from({ length: CODE_LENGTH }, (_, index) => {
           const isActive = focused && index === active;
@@ -56,8 +52,7 @@ export function CodeField({ value, onChange, label, invalid = false, describedBy
           );
         })}
       </div>
-      <input
-        id={id}
+      <Input
         className="absolute inset-0 w-full cursor-text opacity-0"
         value={value}
         onChange={(event) => onChange(cleanCode(event.target.value))}
@@ -70,8 +65,6 @@ export function CodeField({ value, onChange, label, invalid = false, describedBy
         inputMode="text"
         maxLength={CODE_LENGTH + 4}
         autoFocus={autoFocus}
-        aria-invalid={invalid || undefined}
-        aria-describedby={describedBy}
       />
     </div>
   );
