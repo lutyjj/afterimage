@@ -13,6 +13,8 @@ import {
   CardHead,
   Checkbox,
   ConfirmDialog,
+  Fact,
+  Facts,
   FieldRow,
   Nothing,
   Notice,
@@ -113,21 +115,23 @@ function SetByDeployment({ settings }: { settings: MqttSettings }) {
   const none = <span className="text-text-muted">None</span>;
   return (
     <>
-      <SettingRow title="Username">
-        <span className="text-sm">{settings.username ?? none}</span>
-      </SettingRow>
-      <SettingRow title="Password">
-        <span className="text-sm">{settings.passwordSet ? "Set" : none}</span>
-      </SettingRow>
-      <SettingRow title="Topic" description="Names the server at the broker and starts every display's topics.">
-        <code className="font-mono text-xs">{settings.topic}</code>
-      </SettingRow>
-      <SettingRow title="Discovery prefix" description="Where Home Assistant listens for new devices.">
-        <code className="font-mono text-xs">{settings.discoveryPrefix}</code>
-      </SettingRow>
+      <CardBody>
+        <Facts>
+          <Fact name="Username">{settings.username ?? none}</Fact>
+          <Fact name="Password">{settings.passwordSet ? "Set" : none}</Fact>
+          <Fact name="Topic" mono>
+            {settings.topic}
+          </Fact>
+          <Fact name="Discovery prefix" mono>
+            {settings.discoveryPrefix}
+          </Fact>
+        </Facts>
+      </CardBody>
       <SettingNote>
-        The deployment sets this broker with <code className="font-mono">AFTERIMAGE_MQTT_URL</code> and the settings
-        beside it. Change it there and restart Afterimage.
+        The topic names the server at the broker and starts every display's topics, and Home Assistant listens for new
+        devices under the discovery prefix. The deployment sets this broker with{" "}
+        <code className="font-mono">AFTERIMAGE_MQTT_URL</code> and the settings beside it. Change it there and restart
+        Afterimage.
       </SettingNote>
     </>
   );

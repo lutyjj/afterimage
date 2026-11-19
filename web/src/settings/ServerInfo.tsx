@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardBody, CardHead, Nothing, SettingRow } from "linen";
+import { Card, CardBody, CardHead, Fact, Facts, Nothing, SettingNote } from "linen";
 
 import { messageOf, serverQuery, signInOptionsQuery } from "../app/client";
 
@@ -22,40 +22,36 @@ export function ServerInfo() {
       )}
       {server.data && (
         <>
-          <SettingRow title="Release">
-            <span className="text-sm tabular-nums">{server.data.version}</span>
-          </SettingRow>
-          <SettingRow title="Time zone" description="Schedules keep its time, and screens show dates in it.">
-            <span className="text-sm">{server.data.timeZone}</span>
-          </SettingRow>
-          <SettingRow
-            title="Secrets"
-            description={
-              <>
-                Data source requests read them as <code className="font-mono text-xs">secrets.NAME</code>. Every account
-                may send them in its requests.
-              </>
-            }
-          >
-            {server.data.secretNames.length === 0 ? (
-              <span className="text-sm text-text-muted">None</span>
-            ) : (
-              <span className="flex flex-wrap justify-end gap-1">
-                {server.data.secretNames.map((name) => (
-                  <code key={name} className="rounded-input bg-sunken px-1.5 py-0.5 font-mono text-xs">
-                    {name}
-                  </code>
-                ))}
-              </span>
-            )}
-          </SettingRow>
-          <SettingRow title="Sign-in">
-            <span className="text-sm">
-              {[signIn?.oidc && `Through ${signIn.oidc.name}`, signIn?.password && "With a password"]
-                .filter(Boolean)
-                .join(", ")}
-            </span>
-          </SettingRow>
+          <CardBody>
+            <Facts>
+              <Fact name="Release">
+                <span className="tabular-nums">{server.data.version}</span>
+              </Fact>
+              <Fact name="Time zone">{server.data.timeZone}</Fact>
+              <Fact name="Secrets">
+                {server.data.secretNames.length === 0 ? (
+                  <span className="text-text-muted">None</span>
+                ) : (
+                  <span className="flex flex-wrap justify-end gap-1">
+                    {server.data.secretNames.map((name) => (
+                      <code key={name} className="rounded-input bg-sunken px-1.5 py-0.5 font-mono text-xs">
+                        {name}
+                      </code>
+                    ))}
+                  </span>
+                )}
+              </Fact>
+              <Fact name="Sign-in">
+                {[signIn?.oidc && `Through ${signIn.oidc.name}`, signIn?.password && "With a password"]
+                  .filter(Boolean)
+                  .join(", ")}
+              </Fact>
+            </Facts>
+          </CardBody>
+          <SettingNote>
+            Schedules keep the time zone, and screens show dates in it. Data source requests read a secret as{" "}
+            <code className="font-mono">secrets.NAME</code>, and every account may send them in its requests.
+          </SettingNote>
         </>
       )}
     </Card>
