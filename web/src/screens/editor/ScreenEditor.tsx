@@ -7,10 +7,14 @@ import {
   ConfirmDialog,
   Content,
   EmptyState,
+  Field,
   IconButton,
   Notice,
+  OptionCards,
+  Select,
   TitleField,
   TopBar,
+  useNarrow,
   useToast,
   useUnsavedChanges,
   WIDE_COLUMN_CLASS,
@@ -89,6 +93,14 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
   const [touched, setTouched] = useState(Boolean(screen));
   const [grid, setGrid] = useState(false);
   const sideBySide = useSideBySide();
+  const narrow = useNarrow();
+  const starterId = STARTERS.find((candidate) => candidate.yaml === text)?.id;
+  const start = (id: string) => {
+    const candidate = STARTERS.find((each) => each.id === id);
+    if (!candidate) return;
+    editor.current?.setText(candidate.yaml);
+    setName(candidate.name);
+  };
 
   const parsed = useMemo(() => parseYaml(text), [text]);
   const devices = useQuery(devicesQuery).data;
@@ -208,37 +220,31 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
         {save.isError && <Notice tone="danger" title={messageOf(save.error)} />}
 
         {!screen && !touched && (
-          <section aria-labelledby="starters-title" className="grid gap-2">
-            <h2 id="starters-title" className="text-sm font-medium">
-              Start from an example
-            </h2>
-            <ul className="flex gap-2 overflow-x-auto pb-1">
-              {STARTERS.map((candidate) => {
-                const chosen = text === candidate.yaml;
-                return (
-                  <li key={candidate.id} className="shrink-0">
-                    <button
-                      type="button"
-                      aria-pressed={chosen}
-                      onClick={() => {
-                        editor.current?.setText(candidate.yaml);
-                        setName(candidate.name);
-                      }}
-                      className={classes(
-                        "grid h-full w-60 cursor-pointer content-start gap-0.5 rounded-button border px-3 py-2 text-left",
-                        chosen
-                          ? "border-accent bg-accent-weak"
-                          : "border-border-strong bg-surface hover:border-accent hover:bg-accent-weak",
-                      )}
-                    >
-                      <span className={classes("text-sm font-medium", chosen && "text-accent")}>{candidate.name}</span>
-                      <span className="text-xs text-text-secondary">{candidate.summary}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+          // On a phone a picker one control tall, so the YAML starts on the
+          // first screen; wider, a card for each with what it shows.
+          <div>
+            {narrow ? (
+              <Select
+                label="Start from an example"
+                choices={STARTERS.map((candidate) => ({ value: candidate.id, label: candidate.name }))}
+                value={starterId ?? ""}
+                onValueChange={start}
+              />
+            ) : (
+              <Field label="Start from an example">
+                <OptionCards
+                  label="Start from an example"
+                  options={STARTERS.map((candidate) => ({
+                    value: candidate.id,
+                    label: candidate.name,
+                    description: candidate.summary,
+                  }))}
+                  value={starterId}
+                  onValueChange={start}
+                />
+              </Field>
+            )}
+          </div>
         )}
 
         <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(24rem,1fr)_minmax(0,calc(var(--display-width,50%)+0.5rem))]">
