@@ -1,15 +1,18 @@
 import type { SourceResult } from "@afterimage/management-client";
 import { ChevronRight } from "lucide-react";
-import { classes } from "linen";
+import { classes, Status } from "linen";
 import { useState } from "react";
 
 /** What each data source answered, as a tree whose leaves copy the template that
  * reads them. */
 export function SourcesPanel({
   sources,
+  named,
   secretNames,
 }: {
   sources: Record<string, SourceResult> | undefined;
+  /** The sources a problem on the page names, which says why they failed. */
+  named: ReadonlySet<string>;
   secretNames: string[];
 }) {
   // The clipboard needs a secure context; over plain HTTP, or when the browser
@@ -41,10 +44,14 @@ export function SourcesPanel({
               className="size-3.5 [transition:rotate_var(--motion-state)] group-open/source:rotate-90"
             />
             <code className="font-mono text-xs">{name}</code>
-            {result.error !== undefined && <span className="text-xs font-semibold text-danger">no data</span>}
+            {result.error !== undefined && <Status tone="danger">No data</Status>}
           </summary>
           {result.error !== undefined ? (
-            <p className="pb-2 text-sm text-danger">{result.error}</p>
+            named.has(name) ? (
+              <p className="pb-2 text-sm text-text-secondary">Its request failed; the problems above say why.</p>
+            ) : (
+              <p className="pb-2 text-sm text-danger">{result.error}</p>
+            )
           ) : (
             <div
               data-scroll-box

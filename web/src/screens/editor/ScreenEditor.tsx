@@ -33,6 +33,7 @@ import { Panel } from "../../panel/Panel";
 import { playlistsQuery } from "../../playlists/queries";
 import { screenQuery, screensQuery } from "../queries";
 import { Editor, type EditorHandle, type Located } from "./Editor";
+import { sourcesNamed } from "./sourceProblems";
 import { SourcesPanel } from "./SourcesPanel";
 import { screenDeletion } from "./deletion";
 import { STARTERS } from "./starters";
@@ -131,6 +132,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
     [preview.problems, parsed.document],
   );
   const inText = useMemo(() => located.filter((problem) => problem.to > problem.from), [located]);
+  const named = useMemo(() => sourcesNamed(preview.problems), [preview.problems]);
 
   const valid = parsed.value !== undefined && name.trim().length > 0;
 
@@ -216,7 +218,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
         />
       </TopBar>
 
-      <div className={classes(WIDE_COLUMN_CLASS, "flex min-h-0 flex-1 flex-col gap-3 py-3")}>
+      <div className={classes(WIDE_COLUMN_CLASS, "flex min-h-0 flex-1 flex-col gap-4 py-3")}>
         {save.isError && <Notice tone="danger" title={messageOf(save.error)} />}
 
         {!screen && !touched && (
@@ -247,7 +249,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
           </div>
         )}
 
-        <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(24rem,1fr)_minmax(0,calc(var(--display-width,50%)+0.5rem))]">
+        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(24rem,1fr)_minmax(0,calc(var(--display-width,50%)+0.5rem))]">
           <div className="min-h-0 min-w-0 max-lg:h-[60dvh]">
             <Editor
               ref={editor}
@@ -375,7 +377,7 @@ function Workbench({ screen }: { screen: Screen | undefined }) {
               </section>
             )}
 
-            <SourcesPanel sources={preview.sources} secretNames={secretNames} />
+            <SourcesPanel sources={preview.sources} named={named} secretNames={secretNames} />
           </aside>
         </div>
       </div>
