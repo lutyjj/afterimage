@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, CardHead, Chip, SegmentedControl, SettingRow } from "linen";
+import { Button, Card, CardHead, ExplainedStatus, SegmentedControl, SettingRow } from "linen";
 import { Form, useNavigation } from "react-router";
 
 import { accountQuery } from "../app/client";
@@ -27,7 +27,11 @@ export function Preferences() {
             account?.username ? `Signs in with the username ${account.username}.` : "Signs in through single sign-on."
           }
         >
-          {account?.administrator && <Chip size="row">Administrator</Chip>}
+          {account?.administrator && (
+            <ExplainedStatus description="The server's first account. It alone sees the Home Assistant broker, and sets it where the deployment does not.">
+              Administrator
+            </ExplainedStatus>
+          )}
         </SettingRow>
         <SettingRow title="Sign out" description="Ends this browser's session. Access tokens keep working.">
           <Form method="post" action="/sign-out">

@@ -7,7 +7,6 @@ import {
   CardBody,
   CardHead,
   Checkbox,
-  Chip,
   ConfirmDialog,
   CopyValue,
   Count,
@@ -15,6 +14,7 @@ import {
   DialogLayout,
   DialogRoot,
   DialogShell,
+  ExplainedStatus,
   Field,
   Nothing,
   SettingRow,
@@ -31,11 +31,9 @@ import { client, messageOf, queryClient, serverQuery } from "../app/client";
 import { ACT_SECONDS, within } from "../app/deadline";
 import { ago, moment } from "../app/format";
 import { tokensQuery } from "./queries";
+import { reachOf } from "./reach";
 
 type Created = { token: AccessToken; secret: string };
-
-/** What a read-only token may do, said as it is chosen and with its secret. */
-const READ_ONLY = "It can read devices, screens and playlists, and change nothing.";
 
 /** The personal access tokens scripts and agents act with, and how an agent
  * connects over MCP with one. */
@@ -173,10 +171,7 @@ function NewToken({ open, onOpenChange }: { open: boolean; onOpenChange: (open: 
                 <ShownOnce
                   title="Token"
                   description={
-                    <>
-                      Give it to the script or agent that will use it.{" "}
-                      {created.token.scope === "read_only" ? READ_ONLY : "It acts as you."}
-                    </>
+                    <>Give it to the script or agent that will use it. {reachOf(created.token.scope).description}</>
                   }
                   label="Access token"
                   secret={created.secret}
@@ -197,7 +192,7 @@ function NewToken({ open, onOpenChange }: { open: boolean; onOpenChange: (open: 
                   <Checkbox checked={readOnly} onCheckedChange={setReadOnly}>
                     <span className="grid">
                       Read only
-                      <span className="text-xs text-text-secondary">{READ_ONLY}</span>
+                      <span className="text-xs text-text-secondary">{reachOf("read_only").description}</span>
                     </span>
                   </Checkbox>
                   {create.isError && (
@@ -232,7 +227,7 @@ function TokenRow({ token, timeZone }: { token: AccessToken; timeZone: string | 
       title={
         <span className="flex flex-wrap items-center gap-2">
           {token.name}
-          <Chip size="row">{token.scope === "read_only" ? "Read only" : "Full access"}</Chip>
+          <ExplainedStatus description={reachOf(token.scope).description}>{reachOf(token.scope).label}</ExplainedStatus>
         </span>
       }
       description={
