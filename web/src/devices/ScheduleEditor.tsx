@@ -380,7 +380,7 @@ function PinRow({
     >
       <CellSelect
         aria-label="Showing"
-        className="w-full md:w-80"
+        width={FIELD_WIDTH}
         placeholder="Its schedule"
         disabled={pin.isPending}
         choices={[
