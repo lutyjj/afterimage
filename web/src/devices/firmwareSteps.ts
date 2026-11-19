@@ -27,7 +27,9 @@ export function updateSteps(update: FirmwareUpdate, device: Device): Step[] {
     case "requested":
       return [
         requested,
-        { label: "Sent", state: "current", at: nextCheckIn(device), note: "At its next check-in" },
+        // A non-breaking hyphen: a third of a phone's width breaks "check-in"
+        // at its hyphen otherwise.
+        { label: "Sent", state: "current", at: nextCheckIn(device), note: "At its next check\u2011in" },
         { label: "Installed", state: "waiting", note: "When it checks in again" },
       ];
     case "sent":
